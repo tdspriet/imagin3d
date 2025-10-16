@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef, useLayoutEffect } from 'react'
 import { useMoodboardStore } from '../../store/moodboardStore'
+import NodeLayerControls from './NodeLayerControls'
 import './FontNode.css'
 
 /**
@@ -100,35 +101,38 @@ function FontNode({ id, data, selected }) {
   }, [updateDimensionsToFit])
 
   return (
-    <div className="font-node">
-      <div
-        className="font-display"
-        style={{
-          fontSize: `${fontSize}px`,
-          fontFamily: data.uniqueFontFamily || 'Arial',
-        }}
-        ref={displayRef}
-      >
-        {fontFamily}
-      </div>
-      {selected && (
-        <div className="font-size-controls" onDoubleClick={handleControlDoubleClick}>
-          <button
-            onClick={increaseFontSize}
-            onDoubleClick={handleControlDoubleClick}
-            className="font-size-btn"
-          >
-            ↑
-          </button>
-          <button
-            onClick={decreaseFontSize}
-            onDoubleClick={handleControlDoubleClick}
-            className="font-size-btn"
-          >
-            ↓
-          </button>
+    <div className="node-frame">
+      <NodeLayerControls id={id} isVisible={selected} />
+      <div className="font-node">
+        <div
+          className="font-display"
+          style={{
+            fontSize: `${fontSize}px`,
+            fontFamily: data.uniqueFontFamily || 'Arial',
+          }}
+          ref={displayRef}
+        >
+          {fontFamily}
         </div>
-      )}
+        {selected && (
+          <div className="font-size-controls" onDoubleClick={handleControlDoubleClick}>
+            <button
+              onClick={increaseFontSize}
+              onDoubleClick={handleControlDoubleClick}
+              className="font-size-btn"
+            >
+              ↑
+            </button>
+            <button
+              onClick={decreaseFontSize}
+              onDoubleClick={handleControlDoubleClick}
+              className="font-size-btn"
+            >
+              ↓
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   )
 }

@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react'
 import { NodeResizer } from 'reactflow'
 import { useMoodboardStore } from '../../store/moodboardStore'
+import NodeLayerControls from './NodeLayerControls'
 import './TextNode.css'
 
 /**
@@ -139,44 +140,47 @@ function TextNode({ id, data, selected }) {
         lineClassName="node-resizer-line"
         handleClassName="node-resizer-handle"
       />
-      <div className="text-node" onDoubleClick={handleDoubleClick} ref={containerRef}>
-        {isEditing ? (
-          <textarea
-            ref={textareaRef}
-            value={text}
-            onChange={handleTextChange}
-            onBlur={handleBlur}
-            onKeyDown={handleKeyDown}
-            className="text-editor"
-            style={{ fontSize: `${fontSize}px` }}
-          />
-        ) : (
-          <div
-            className="text-display"
-            style={{ fontSize: `${fontSize}px` }}
-            ref={contentRef}
-          >
-            {text}
-          </div>
-        )}
-        {selected && !isEditing && (
-          <div className="font-size-controls" onDoubleClick={handleControlDoubleClick}>
-            <button
-              onClick={increaseFontSize}
-              onDoubleClick={handleControlDoubleClick}
-              className="font-size-btn"
+      <div className="node-frame">
+        <NodeLayerControls id={id} isVisible={selected && !isEditing} />
+        <div className="text-node" onDoubleClick={handleDoubleClick} ref={containerRef}>
+          {isEditing ? (
+            <textarea
+              ref={textareaRef}
+              value={text}
+              onChange={handleTextChange}
+              onBlur={handleBlur}
+              onKeyDown={handleKeyDown}
+              className="text-editor"
+              style={{ fontSize: `${fontSize}px` }}
+            />
+          ) : (
+            <div
+              className="text-display"
+              style={{ fontSize: `${fontSize}px` }}
+              ref={contentRef}
             >
-              ↑
-            </button>
-            <button
-              onClick={decreaseFontSize}
-              onDoubleClick={handleControlDoubleClick}
-              className="font-size-btn"
-            >
-              ↓
-            </button>
-          </div>
-        )}
+              {text}
+            </div>
+          )}
+          {selected && !isEditing && (
+            <div className="font-size-controls" onDoubleClick={handleControlDoubleClick}>
+              <button
+                onClick={increaseFontSize}
+                onDoubleClick={handleControlDoubleClick}
+                className="font-size-btn"
+              >
+                ↑
+              </button>
+              <button
+                onClick={decreaseFontSize}
+                onDoubleClick={handleControlDoubleClick}
+                className="font-size-btn"
+              >
+                ↓
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     </>
   )

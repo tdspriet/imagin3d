@@ -1,12 +1,13 @@
 import React from 'react'
 import { NodeResizer } from 'reactflow'
+import NodeLayerControls from './NodeLayerControls'
 import './VideoNode.css'
 
 /**
  * VideoNode Component
  * Displays a video with resizable handles that maintain aspect ratio
  */
-function VideoNode({ data, selected }) {
+function VideoNode({ id, data, selected }) {
   return (
     <>
       <NodeResizer
@@ -17,11 +18,14 @@ function VideoNode({ data, selected }) {
         lineClassName="node-resizer-line"
         handleClassName="node-resizer-handle"
       />
-      <div className="video-node">
-        <video
-          src={data.src}
-          controls
-        />
+      <div className="node-frame">
+        <NodeLayerControls id={id} isVisible={selected} />
+        <div className="video-node">
+          <video
+            src={data.src}
+            controls
+          />
+        </div>
       </div>
     </>
   )

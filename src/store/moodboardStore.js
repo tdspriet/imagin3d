@@ -1,5 +1,14 @@
 import { create } from 'zustand'
 
+const applyLayerOrder = (nodes) =>
+  nodes.map((node, index) => ({
+    ...node,
+    style: {
+      ...(node.style || {}),
+      zIndex: index + 1,
+    },
+  }))
+
 /**
  * Moodboard Store
  * Manages the state of all nodes and canvas operations
@@ -16,7 +25,7 @@ export const useMoodboardStore = create((set, get) => ({
   setReactFlowInstance: (instance) => set({ reactFlowInstance: instance }),
 
   // Set nodes
-  setNodes: (nodes) => set({ nodes }),
+  setNodes: (nodes) => set({ nodes: applyLayerOrder(nodes) }),
 
   // Update specific node data
   updateNodeData: (nodeId, newData) => {
@@ -32,17 +41,16 @@ export const useMoodboardStore = create((set, get) => ({
   // Update node style dimensions (width/height)
   setNodeDimensions: (nodeId, dimensions) => {
     set((state) => ({
-      nodes: state.nodes.map((node) =>
-        node.id === nodeId
-          ? {
-              ...node,
-              style: {
-                ...node.style,
-                ...dimensions,
-              },
-            }
-          : node
-      ),
+      nodes: state.nodes.map((node) => {
+        if (node.id !== nodeId) return node
+        return {
+          ...node,
+          style: {
+            ...(node.style || {}),
+            ...dimensions,
+          },
+        }
+      }),
     }))
 
     const instance = get().reactFlowInstance
@@ -81,7 +89,37 @@ export const useMoodboardStore = create((set, get) => ({
           }
         }
       })
-      return { nodes: updatedNodes }
+      return { nodes: applyLayerOrder(updatedNodes) }
+    })
+  },
+
+  // Move node one layer forward (on top)
+  bringNodeForward: (nodeId) => {
+    set((state) => {
+      const index = state.nodes.findIndex((node) => node.id === nodeId)
+      if (index === -1 || index === state.nodes.length - 1) {
+        return {}
+      }
+
+      const reordered = [...state.nodes]
+      const [node] = reordered.splice(index, 1)
+      reordered.splice(index + 1, 0, node)
+      return { nodes: applyLayerOrder(reordered) }
+    })
+  },
+
+  // Move node one layer backward (to bottom)
+  sendNodeBackward: (nodeId) => {
+    set((state) => {
+      const index = state.nodes.findIndex((node) => node.id === nodeId)
+      if (index <= 0) {
+        return {}
+      }
+
+      const reordered = [...state.nodes]
+      const [node] = reordered.splice(index, 1)
+      reordered.splice(index - 1, 0, node)
+      return { nodes: applyLayerOrder(reordered) }
     })
   },
 
@@ -120,7 +158,9 @@ export const useMoodboardStore = create((set, get) => ({
         style: { width: safeWidth, height: safeHeight },
       }
 
-      set((state) => ({ nodes: [...state.nodes, newNode] }))
+      set((state) => ({
+        nodes: applyLayerOrder([...state.nodes, newNode]),
+      }))
     }
 
     image.onload = () => {
@@ -161,7 +201,9 @@ export const useMoodboardStore = create((set, get) => ({
         style: { width: safeWidth, height: safeHeight },
       }
 
-      set((state) => ({ nodes: [...state.nodes, newNode] }))
+      set((state) => ({
+        nodes: applyLayerOrder([...state.nodes, newNode]),
+      }))
     }
 
     const handleLoadedMetadata = () => {
@@ -201,7 +243,9 @@ export const useMoodboardStore = create((set, get) => ({
       data: { text: 'Double-click to edit', fontSize: 16 },
       style: { width: 200, height: 40 },
     }
-    set((state) => ({ nodes: [...state.nodes, newNode] }))
+    set((state) => ({
+      nodes: applyLayerOrder([...state.nodes, newNode]),
+    }))
   },
 
   // Add font node
@@ -233,7 +277,9 @@ export const useMoodboardStore = create((set, get) => ({
       },
       style: { width: 150, height: 40 },
     }
-    set((state) => ({ nodes: [...state.nodes, newNode] }))
+    set((state) => ({
+      nodes: applyLayerOrder([...state.nodes, newNode]),
+    }))
   },
 
   // Fit view to show all content
@@ -279,7 +325,10 @@ export const useMoodboardStore = create((set, get) => ({
   loadMoodboard: (data) => {
     try {
       if (data.nodes && Array.isArray(data.nodes)) {
-        set({ nodes: data.nodes, edges: [] })
+        set({
+          nodes: applyLayerOrder(data.nodes),
+          edges: [],
+        })
         // Trigger fit view after loading
         setTimeout(() => {
           set((state) => ({ fitViewTrigger: state.fitViewTrigger + 1 }))
