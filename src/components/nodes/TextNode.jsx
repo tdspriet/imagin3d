@@ -4,6 +4,8 @@ import { useMoodboardStore } from '../../store/moodboardStore'
 import NodeLayerControls from './NodeLayerControls'
 import './TextNode.css'
 
+const DEFAULT_PLACEHOLDER = 'Double-click to edit'
+
 /**
  * TextNode Component
  * Displays editable text in a resizable box
@@ -11,7 +13,7 @@ import './TextNode.css'
  */
 function TextNode({ id, data, selected }) {
   const [isEditing, setIsEditing] = useState(false)
-  const [text, setText] = useState(data.text || 'Double-click to edit')
+  const [text, setText] = useState(data.text || DEFAULT_PLACEHOLDER)
   const [fontSize, setFontSize] = useState(data.fontSize || 16)
   const textareaRef = useRef(null)
   const containerRef = useRef(null)
@@ -48,9 +50,15 @@ function TextNode({ id, data, selected }) {
 
   // Focus textarea when entering edit mode
   useEffect(() => {
-    if (isEditing && textareaRef.current) {
-      textareaRef.current.focus()
-      textareaRef.current.select()
+    if (!isEditing || !textareaRef.current) return
+    const textarea = textareaRef.current
+    textarea.focus()
+    const value = textarea.value
+    if (!value || value === DEFAULT_PLACEHOLDER) {
+      textarea.select()
+    } else {
+      const cursorPos = value.length
+      textarea.setSelectionRange(cursorPos, cursorPos)
     }
   }, [isEditing])
 
