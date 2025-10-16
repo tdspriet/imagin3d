@@ -15,7 +15,7 @@
 
 .font-display {
   display: inline-block;
-  color: #333;
+  color: var(--color-text-primary);
   font-weight: 500;
   user-select: none;
   line-height: 1.4;
@@ -23,7 +23,7 @@
 }
 
 .font-placeholder {
-  color: #999;
+  color: var(--color-font-placeholder);
   font-style: italic;
   cursor: pointer;
 }
@@ -41,9 +41,9 @@
 .font-size-btn {
   width: 20px;
   height: 20px;
-  border: 1px solid #999;
-  background-color: #fff;
-  color: #333;
+  border: 1px solid var(--color-node-control-border);
+  background-color: var(--color-node-control-bg);
+  color: var(--color-text-primary);
   border-radius: 3px;
   font-size: 12px;
   font-weight: bold;
@@ -57,6 +57,6 @@
 }
 
 .font-size-btn:hover {
-  background-color: #f0f0f0;
-  border-color: #666;
+  background-color: var(--color-node-control-hover);
+  border-color: var(--color-button-border-hover);
 }

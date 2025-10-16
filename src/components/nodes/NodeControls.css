@@ -18,9 +18,9 @@
 .node-layer-btn {
   width: 20px;
   height: 20px;
-  border: 1px solid #999;
-  background-color: #fff;
-  color: #333;
+  border: 1px solid var(--color-node-control-border);
+  background-color: var(--color-node-control-bg);
+  color: var(--color-text-primary);
   border-radius: 3px;
   font-size: 0;
   cursor: pointer;
@@ -33,12 +33,12 @@
 }
 
 .node-layer-btn:hover {
-  background-color: #f0f0f0;
-  border-color: #666;
+  background-color: var(--color-node-control-hover);
+  border-color: var(--color-button-border-hover);
 }
 
 .node-layer-btn:active {
-  background-color: #e5e5e5;
+  background-color: var(--color-button-secondary-hover);
 }
 
 .node-layer-btn:focus-visible {
@@ -50,7 +50,7 @@
   width: 12px;
   height: 12px;
   fill: none;
-  stroke: #333;
+  stroke: var(--color-text-primary);
   stroke-width: 1.5;
   pointer-events: none;
 }

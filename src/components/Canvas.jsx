@@ -96,9 +96,9 @@ function Canvas() {
         proOptions={{ hideAttribution: true }}
         minZoom={0.1}
         maxZoom={4}
-        defaultViewport={{ x: 0, y: 0, zoom: 1 }}
+      defaultViewport={{ x: 0, y: 0, zoom: 1 }}
       >
-        <Background color="#ddd" gap={20} />
+        <Background color="var(--color-grid-lines)" gap={20} />
         <MiniMap
           nodeColor={(node) => {
             switch (node.type) {
@@ -114,10 +114,10 @@ function Canvas() {
                 return '#e5e7eb'
             }
           }}
-          maskColor="rgba(255, 255, 255, 0)"
+          maskColor="rgba(0, 0, 0, 0)"
           style={{
-            backgroundColor: '#ffffff',
-            border: '2px solid #e0e0e0',
+            backgroundColor: 'var(--color-reactflow-minimap-bg)',
+            border: '2px solid var(--color-border)',
             borderRadius: '8px',
           }}
         />
