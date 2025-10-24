@@ -12,6 +12,7 @@ import ImageNode from './nodes/ImageNode'
 import VideoNode from './nodes/VideoNode'
 import TextNode from './nodes/TextNode'
 import FontNode from './nodes/FontNode'
+import ModelNode from './nodes/ModelNode'
 import './Canvas.css'
 
 // Register custom node types
@@ -20,6 +21,7 @@ const nodeTypes = {
   videoNode: VideoNode,
   textNode: TextNode,
   fontNode: FontNode,
+  modelNode: ModelNode,
 }
 
 /**
@@ -96,7 +98,7 @@ function Canvas() {
         proOptions={{ hideAttribution: true }}
         minZoom={0.1}
         maxZoom={4}
-      defaultViewport={{ x: 0, y: 0, zoom: 1 }}
+        defaultViewport={{ x: 0, y: 0, zoom: 1 }}
       >
         <Background color="var(--color-grid-lines)" gap={20} />
         <MiniMap
@@ -110,6 +112,8 @@ function Canvas() {
                 return '#fde047'
               case 'fontNode':
                 return '#d8b4fe'
+              case 'modelNode':
+                return '#86efac'
               default:
                 return '#e5e7eb'
             }

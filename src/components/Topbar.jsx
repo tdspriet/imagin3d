@@ -7,10 +7,11 @@ import './Topbar.css'
  * Contains all action buttons for the moodboard
  */
 function Topbar() {
-  const { addImage, addVideo, addText, addFont, fitView, clearAll, saveMoodboard, loadMoodboard } = useMoodboardStore()
+  const { addImage, addVideo, addText, addFont, addModel, fitView, clearAll, saveMoodboard, loadMoodboard } = useMoodboardStore()
   const fileInputRef = useRef(null)
   const videoInputRef = useRef(null)
   const fontInputRef = useRef(null)
+  const modelInputRef = useRef(null)
   const loadInputRef = useRef(null)
 
   // Handle image file selection
@@ -61,6 +62,28 @@ function Topbar() {
     e.target.value = '' // Reset input
   }
 
+  // Handle 3D model file selection
+  const handleModelUpload = (e) => {
+    const file = e.target.files[0]
+    if (file) {
+      const validExtensions = ['.glb', '.gltf']
+      const fileExtension = '.' + file.name.split('.').pop().toLowerCase()
+      
+      if (validExtensions.includes(fileExtension)) {
+        const reader = new FileReader()
+        reader.onload = (event) => {
+          const modelData = event.target.result
+          const fileName = file.name
+          addModel(modelData, fileName)
+        }
+        reader.readAsDataURL(file)
+      } else {
+        alert('Please upload a valid 3D model file (.glb, .gltf)')
+      }
+    }
+    e.target.value = '' // Reset input
+  }
+
   // Handle moodboard file loading
   const handleLoadFile = (e) => {
     const file = e.target.files[0]
@@ -94,6 +117,9 @@ function Topbar() {
         </button>
         <button onClick={() => fontInputRef.current?.click()} className="btn">
           Add Font
+        </button>
+        <button onClick={() => modelInputRef.current?.click()} className="btn">
+          Add 3D
         </button>
       </div>
 
@@ -132,6 +158,13 @@ function Topbar() {
         type="file"
         accept=".otf,.ttf,.woff,.woff2"
         onChange={handleFontUpload}
+        style={{ display: 'none' }}
+      />
+      <input
+        ref={modelInputRef}
+        type="file"
+        accept=".glb,.gltf"
+        onChange={handleModelUpload}
         style={{ display: 'none' }}
       />
       <input

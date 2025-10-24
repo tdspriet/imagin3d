@@ -3,6 +3,10 @@ import { create } from 'zustand'
 const applyLayerOrder = (nodes) =>
   nodes.map((node, index) => ({
     ...node,
+    dragHandle:
+      node.type === 'modelNode'
+        ? node.dragHandle || '.react-flow-drag-handle'
+        : node.dragHandle,
     style: {
       ...(node.style || {}),
       zIndex: index + 1,
@@ -277,6 +281,28 @@ export const useMoodboardStore = create((set, get) => ({
       },
       style: { width: 150, height: 40 },
     }
+    set((state) => ({
+      nodes: applyLayerOrder([...state.nodes, newNode]),
+    }))
+  },
+
+  // Add 3D model node
+  addModel: (src, fileName) => {
+    const position = get().getCenterPosition()
+    const nodeId = `model-${Date.now()}`
+    
+    const newNode = {
+      id: nodeId,
+      type: 'modelNode',
+      position,
+      data: { 
+        src,
+        fileName: fileName || 'model.glb'
+      },
+      dragHandle: '.react-flow-drag-handle',
+      style: { width: 300, height: 300 },
+    }
+    
     set((state) => ({
       nodes: applyLayerOrder([...state.nodes, newNode]),
     }))
