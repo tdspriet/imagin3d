@@ -46,6 +46,14 @@
   background-color: var(--color-reactflow-minimap-bg) !important;
 }
 
+.react-flow__minimap-node.minimap-node {
+  z-index: 2;
+}
+
+.react-flow__minimap-node.minimap-node--cluster {
+  z-index: 0;
+}
+
 /* Hide ReactFlow attribution */
 .react-flow__attribution {
   display: none;

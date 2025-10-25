@@ -7,7 +7,7 @@ import './Topbar.css'
  * Contains all action buttons for the moodboard
  */
 function Topbar() {
-  const { addImage, addVideo, addText, addFont, addModel, fitView, clearAll, saveMoodboard, loadMoodboard } = useMoodboardStore()
+  const { addImage, addVideo, addText, addFont, addModel, addCluster, fitView, clearAll, saveMoodboard, loadMoodboard } = useMoodboardStore()
   const fileInputRef = useRef(null)
   const videoInputRef = useRef(null)
   const fontInputRef = useRef(null)
@@ -102,25 +102,41 @@ function Topbar() {
     e.target.value = '' // Reset input
   }
 
+  const handleAddCluster = () => {
+    const title = window.prompt('Choose a name for your cluster', 'New Cluster')
+    if (title === null) {
+      return
+    }
+    addCluster(title)
+  }
+
   return (
     <div className="topbar">
       <div className="topbar-left">
-        <div className="logo">imagin3d</div>
-        <button onClick={() => videoInputRef.current?.click()} className="btn">
-          Add Video
-        </button>
-        <button onClick={() => fileInputRef.current?.click()} className="btn">
-          Add Image
-        </button>
-        <button onClick={addText} className="btn">
-          Add Text
-        </button>
-        <button onClick={() => fontInputRef.current?.click()} className="btn">
-          Add Font
-        </button>
-        <button onClick={() => modelInputRef.current?.click()} className="btn">
-          Add 3D
-        </button>
+        <div className="logo">
+          <img src="/logo.png" alt="imagin3d logo" className="logo-mark" />
+          <span className="logo-text">imagin3d</span>
+        </div>
+        <div className="topbar-add" role="group" aria-label="Add items">
+          <button onClick={() => videoInputRef.current?.click()} className="btn">
+            Add Video
+          </button>
+          <button onClick={() => fileInputRef.current?.click()} className="btn">
+            Add Image
+          </button>
+          <button onClick={addText} className="btn">
+            Add Text
+          </button>
+          <button onClick={() => fontInputRef.current?.click()} className="btn">
+            Add Font
+          </button>
+          <button onClick={() => modelInputRef.current?.click()} className="btn">
+            Add 3D
+          </button>
+          <button onClick={handleAddCluster} className="btn">
+            Add Cluster
+          </button>
+        </div>
       </div>
 
       <div className="topbar-right">

@@ -13,6 +13,7 @@ import VideoNode from './nodes/VideoNode'
 import TextNode from './nodes/TextNode'
 import FontNode from './nodes/FontNode'
 import ModelNode from './nodes/ModelNode'
+import ClusterNode from './nodes/ClusterNode'
 import './Canvas.css'
 
 // Register custom node types
@@ -22,6 +23,7 @@ const nodeTypes = {
   textNode: TextNode,
   fontNode: FontNode,
   modelNode: ModelNode,
+  clusterNode: ClusterNode,
 }
 
 /**
@@ -114,10 +116,17 @@ function Canvas() {
                 return '#d8b4fe'
               case 'modelNode':
                 return '#86efac'
+              case 'clusterNode':
+                return '#bdbdbd'
               default:
                 return '#e5e7eb'
             }
           }}
+          nodeClassName={(node) =>
+            node.type === 'clusterNode'
+              ? 'minimap-node minimap-node--cluster'
+              : 'minimap-node minimap-node--content'
+          }
           maskColor="rgba(0, 0, 0, 0)"
           style={{
             backgroundColor: 'var(--color-reactflow-minimap-bg)',

@@ -1,17 +1,54 @@
 import { create } from 'zustand'
 
-const applyLayerOrder = (nodes) =>
-  nodes.map((node, index) => ({
-    ...node,
-    dragHandle:
-      node.type === 'modelNode'
-        ? node.dragHandle || '.react-flow-drag-handle'
-        : node.dragHandle,
-    style: {
-      ...(node.style || {}),
-      zIndex: index + 1,
-    },
-  }))
+const applyLayerOrder = (nodes) => {
+  const clusterNodes = []
+  const contentNodes = []
+
+  nodes.forEach((node) => {
+    const isModelNode = node.type === 'modelNode'
+    const isClusterNode = node.type === 'clusterNode'
+
+    const dragHandle = isModelNode
+      ? node.dragHandle || '.react-flow-drag-handle'
+      : isClusterNode
+        ? node.dragHandle || '.cluster-node-header'
+        : node.dragHandle
+
+    const baseNode = {
+      ...node,
+      dragHandle,
+    }
+
+    if (isClusterNode) {
+      clusterNodes.push(baseNode)
+    } else {
+      contentNodes.push(baseNode)
+    }
+  })
+
+  const orderedNodes = [...clusterNodes, ...contentNodes]
+  let clusterCounter = 0
+  let contentCounter = 0
+
+  return orderedNodes.map((node) => {
+    const isClusterNode = node.type === 'clusterNode'
+    const zIndex = isClusterNode ? -1000 + clusterCounter : contentCounter + 1
+
+    if (isClusterNode) {
+      clusterCounter += 1
+    } else {
+      contentCounter += 1
+    }
+
+    return {
+      ...node,
+      style: {
+        ...(node.style || {}),
+        zIndex,
+      },
+    }
+  })
+}
 
 /**
  * Moodboard Store
@@ -101,7 +138,7 @@ export const useMoodboardStore = create((set, get) => ({
   bringNodeForward: (nodeId) => {
     set((state) => {
       const index = state.nodes.findIndex((node) => node.id === nodeId)
-      if (index === -1 || index === state.nodes.length - 1) {
+      if (index === -1 || state.nodes[index]?.type === 'clusterNode' || index === state.nodes.length - 1) {
         return {}
       }
 
@@ -116,7 +153,7 @@ export const useMoodboardStore = create((set, get) => ({
   sendNodeBackward: (nodeId) => {
     set((state) => {
       const index = state.nodes.findIndex((node) => node.id === nodeId)
-      if (index <= 0) {
+      if (index <= 0 || state.nodes[index]?.type === 'clusterNode') {
         return {}
       }
 
@@ -303,6 +340,26 @@ export const useMoodboardStore = create((set, get) => ({
       style: { width: 300, height: 300 },
     }
     
+    set((state) => ({
+      nodes: applyLayerOrder([...state.nodes, newNode]),
+    }))
+  },
+
+  // Add cluster node
+  addCluster: (title) => {
+    const position = get().getCenterPosition()
+    const clusterTitle =
+      typeof title === 'string' && title.trim().length > 0 ? title.trim() : 'Cluster'
+
+    const newNode = {
+      id: `cluster-${Date.now()}`,
+      type: 'clusterNode',
+      position,
+      data: { title: clusterTitle },
+      dragHandle: '.cluster-node-header',
+      style: { width: 640, height: 420 },
+    }
+
     set((state) => ({
       nodes: applyLayerOrder([...state.nodes, newNode]),
     }))
