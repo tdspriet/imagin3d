@@ -148,7 +148,7 @@ function Topbar() {
     <div className="topbar">
       <div className="topbar-left">
         <div className="logo">
-          <img src="/logo.png" alt="imagin3d logo" className="logo-mark" />
+          <img src="logo.png" alt="imagin3d logo" className="logo-mark" />
           <span className="logo-text">imagin3d</span>
         </div>
         <div className="topbar-add" role="group" aria-label="Add items">
