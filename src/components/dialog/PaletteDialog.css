@@ -108,11 +108,10 @@
   width: 42px;
   height: 42px;
   border-radius: 50%;
-  border: none;
+  border: 2px solid #ffffff;
   padding: 0;
   cursor: pointer;
-  background: transparent;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
   margin-bottom: 12px;
 }
 
@@ -122,15 +121,15 @@
 }
 
 .palette-dialog__manual-color input::-webkit-color-swatch {
-  border: none;
+  border: 2px solid #ffffff;
   border-radius: 50%;
-  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.1);
+  box-shadow: none;
 }
 
 .palette-dialog__manual-color input::-moz-color-swatch {
-  border: none;
+  border: 2px solid #ffffff;
   border-radius: 50%;
-  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.1);
+  box-shadow: none;
 }
 
 .palette-dialog__manual-color input:focus-visible {
