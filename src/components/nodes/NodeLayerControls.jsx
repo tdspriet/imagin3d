@@ -1,4 +1,5 @@
 import React, { useCallback } from 'react'
+import { MdFlipToFront, MdFlipToBack } from 'react-icons/md'
 import { useMoodboardStore } from '../../store/moodboardStore'
 import './NodeControls.css'
 
@@ -44,31 +45,7 @@ function NodeLayerControls({ id, isVisible }) {
         onClick={handleForward}
         aria-label="Move layer up"
       >
-        <svg viewBox="0 0 20 20" aria-hidden="true">
-          <polyline
-            points="6 9.5 10 5.5 14 9.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth="1.5"
-          />
-          <line
-            x1="10"
-            y1="6"
-            x2="10"
-            y2="13.5"
-            strokeLinecap="round"
-            strokeWidth="1.3"
-            strokeOpacity="0.8"
-          />
-          <line
-            x1="6"
-            y1="13.5"
-            x2="14"
-            y2="13.5"
-            strokeLinecap="round"
-            strokeWidth="1.5"
-          />
-        </svg>
+        <MdFlipToFront className="node-layer-icon" size={16} aria-hidden="true" focusable="false" />
       </button>
       <button
         type="button"
@@ -76,31 +53,7 @@ function NodeLayerControls({ id, isVisible }) {
         onClick={handleBackward}
         aria-label="Move layer down"
       >
-        <svg viewBox="0 0 20 20" aria-hidden="true">
-          <polyline
-            points="6 10.5 10 14.5 14 10.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth="1.5"
-          />
-          <line
-            x1="10"
-            y1="14"
-            x2="10"
-            y2="6.5"
-            strokeLinecap="round"
-            strokeWidth="1.3"
-            strokeOpacity="0.8"
-          />
-          <line
-            x1="6"
-            y1="6.5"
-            x2="14"
-            y2="6.5"
-            strokeLinecap="round"
-            strokeWidth="1.5"
-          />
-        </svg>
+        <MdFlipToBack className="node-layer-icon" size={16} aria-hidden="true" focusable="false" />
       </button>
     </div>
   )

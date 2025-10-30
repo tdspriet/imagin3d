@@ -55,8 +55,6 @@
   background-color: var(--color-node-control-bg);
   color: var(--color-text-primary);
   border-radius: 3px;
-  font-size: 12px;
-  font-weight: bold;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -69,4 +67,11 @@
 .font-size-btn:hover {
   background-color: var(--color-node-control-hover);
   border-color: var(--color-button-border-hover);
+}
+
+.font-size-icon {
+  width: 16px;
+  height: 16px;
+  color: currentColor;
+  pointer-events: none;
 }

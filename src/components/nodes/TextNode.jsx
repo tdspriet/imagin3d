@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react'
 import { NodeResizer } from 'reactflow'
+import { MdTextIncrease, MdTextDecrease } from 'react-icons/md'
 import { useMoodboardStore } from '../../store/moodboardStore'
 import NodeLayerControls from './NodeLayerControls'
 import './TextNode.css'
@@ -177,14 +178,14 @@ function TextNode({ id, data, selected }) {
                 onDoubleClick={handleControlDoubleClick}
                 className="font-size-btn"
               >
-                ↑
+                <MdTextIncrease className="font-size-icon" size={16} aria-hidden="true" focusable="false" />
               </button>
               <button
                 onClick={decreaseFontSize}
                 onDoubleClick={handleControlDoubleClick}
                 className="font-size-btn"
               >
-                ↓
+                <MdTextDecrease className="font-size-icon" size={16} aria-hidden="true" focusable="false" />
               </button>
             </div>
           )}

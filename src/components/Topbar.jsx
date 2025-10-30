@@ -1,4 +1,17 @@
 import React, { useRef, useState } from 'react'
+import {
+  MdVideoLibrary,
+  MdImage,
+  MdTitle,
+  MdFontDownload,
+  MdViewInAr,
+  MdGridOn,
+  MdPalette,
+  MdZoomOutMap,
+  MdDeleteSweep,
+  MdSave,
+  MdFolderOpen,
+} from 'react-icons/md'
 import { useMoodboardStore } from '../store/moodboardStore'
 import PaletteDialog from './dialog/PaletteDialog'
 import './Topbar.css'
@@ -152,42 +165,53 @@ function Topbar() {
           <span className="logo-text">imagin3d</span>
         </div>
         <div className="topbar-add" role="group" aria-label="Add items">
-          <button onClick={() => videoInputRef.current?.click()} className="btn">
-            Add Video
-          </button>
-          <button onClick={() => fileInputRef.current?.click()} className="btn">
-            Add Image
-          </button>
-          <button onClick={addText} className="btn">
-            Add Text
-          </button>
-          <button onClick={() => fontInputRef.current?.click()} className="btn">
-            Add Font
+          <button onClick={handleAddCluster} className="btn">
+            <MdGridOn className="btn-icon" size={18} aria-hidden="true" focusable="false" />
+            <span>Add Cluster</span>
           </button>
           <button onClick={() => modelInputRef.current?.click()} className="btn">
-            Add 3D
+            <MdViewInAr className="btn-icon" size={18} aria-hidden="true" focusable="false" />
+            <span>Add 3D</span>
           </button>
-          <button onClick={handleAddCluster} className="btn">
-            Add Cluster
+          <button onClick={() => videoInputRef.current?.click()} className="btn">
+            <MdVideoLibrary className="btn-icon" size={18} aria-hidden="true" focusable="false" />
+            <span>Add Video</span>
+          </button>
+          <button onClick={() => fileInputRef.current?.click()} className="btn">
+            <MdImage className="btn-icon" size={18} aria-hidden="true" focusable="false" />
+            <span>Add Image</span>
+          </button>
+          <button onClick={addText} className="btn">
+            <MdTitle className="btn-icon" size={18} aria-hidden="true" focusable="false" />
+            <span>Add Text</span>
+          </button>
+          <button onClick={() => fontInputRef.current?.click()} className="btn">
+            <MdFontDownload className="btn-icon" size={18} aria-hidden="true" focusable="false" />
+            <span>Add Font</span>
           </button>
           <button onClick={() => setPaletteDialogOpen(true)} className="btn">
-            Add Palette
+            <MdPalette className="btn-icon" size={18} aria-hidden="true" focusable="false" />
+            <span>Add Palette</span>
           </button>
         </div>
       </div>
 
       <div className="topbar-right">
         <button onClick={fitView} className="btn btn-secondary">
-          Fit View
+          <MdZoomOutMap className="btn-icon" size={18} aria-hidden="true" focusable="false" />
+          <span>Fit View</span>
         </button>
         <button onClick={clearAll} className="btn btn-danger">
-          Clear All
+          <MdDeleteSweep className="btn-icon" size={18} aria-hidden="true" focusable="false" />
+          <span>Clear All</span>
         </button>
         <button onClick={saveMoodboard} className="btn btn-success">
-          Save
+          <MdSave className="btn-icon" size={18} aria-hidden="true" focusable="false" />
+          <span>Save</span>
         </button>
         <button onClick={() => loadInputRef.current?.click()} className="btn btn-success">
-          Load
+          <MdFolderOpen className="btn-icon" size={18} aria-hidden="true" focusable="false" />
+          <span>Load</span>
         </button>
       </div>
 
