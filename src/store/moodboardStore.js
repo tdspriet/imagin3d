@@ -1,5 +1,7 @@
 import { create } from 'zustand'
 
+const SELECTED_Z_OFFSET = 1000
+
 const applyLayerOrder = (nodes) => {
   const clusterNodes = []
   const contentNodes = []
@@ -32,7 +34,8 @@ const applyLayerOrder = (nodes) => {
 
   return orderedNodes.map((node) => {
     const isClusterNode = node.type === 'clusterNode'
-    const zIndex = isClusterNode ? -1000 + clusterCounter : contentCounter + 1
+    const baseZIndex = isClusterNode ? -1000 + clusterCounter : contentCounter + 1
+    const isSelected = Boolean(node.selected)
 
     if (isClusterNode) {
       clusterCounter += 1
@@ -44,7 +47,7 @@ const applyLayerOrder = (nodes) => {
       ...node,
       style: {
         ...(node.style || {}),
-        zIndex,
+        zIndex: baseZIndex + (isSelected ? SELECTED_Z_OFFSET : 0),
       },
     }
   })
