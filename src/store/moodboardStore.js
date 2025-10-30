@@ -82,20 +82,21 @@ export const useMoodboardStore = create((set, get) => ({
   // Update node style dimensions (width/height)
   setNodeDimensions: (nodeId, dimensions) => {
     set((state) => ({
-      nodes: state.nodes.map((node) => {
-        if (node.id !== nodeId) return node
-        return {
-          ...node,
-          style: {
-            ...(node.style || {}),
-            ...dimensions,
-          },
-        }
-      }),
+      nodes: state.nodes.map((node) =>
+        node.id === nodeId
+          ? {
+              ...node,
+              style: {
+                ...(node.style || {}),
+                ...dimensions,
+              },
+            }
+          : node
+      ),
     }))
 
     const instance = get().reactFlowInstance
-    if (instance && typeof instance.updateNodeInternals === 'function') {
+    if (instance?.updateNodeInternals) {
       requestAnimationFrame(() => instance.updateNodeInternals(nodeId))
     }
   },
@@ -340,6 +341,30 @@ export const useMoodboardStore = create((set, get) => ({
       style: { width: 300, height: 300 },
     }
     
+    set((state) => ({
+      nodes: applyLayerOrder([...state.nodes, newNode]),
+    }))
+  },
+
+  // Add palette node
+  addPalette: (colors, options = {}) => {
+    const paletteColors = Array.isArray(colors) ? [...colors] : []
+    const position = get().getCenterPosition()
+    const width = Number.isFinite(options.width) ? options.width : 150
+    const height = Number.isFinite(options.height) ? options.height : 100
+    const nodeId = `palette-${Date.now()}`
+
+    const newNode = {
+      id: nodeId,
+      type: 'paletteNode',
+      position,
+      data: {
+        colors: paletteColors,
+        origin: options.origin || 'manual',
+      },
+      style: { width, height },
+    }
+
     set((state) => ({
       nodes: applyLayerOrder([...state.nodes, newNode]),
     }))

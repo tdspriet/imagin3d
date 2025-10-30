@@ -1,0 +1,33 @@
+.palette-node-frame {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.palette-node {
+  position: relative;
+  display: flex;
+  width: 100%;
+  height: 100%;
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--color-surface-raised);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: var(--shadow-elevated);
+}
+
+.palette-node__stripes {
+  display: flex;
+  width: 100%;
+  height: 100%;
+}
+
+.palette-node__stripe {
+  position: relative;
+  flex: 1 1 0;
+}
+
+.palette-node__stripe:not(:last-child) {
+  box-shadow: inset -1px 0 0 rgba(0, 0, 0, 0.1);
+}

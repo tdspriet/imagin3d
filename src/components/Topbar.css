@@ -112,7 +112,7 @@
   background-color: var(--accent-success-bg-hover);
 }
 
-@media (max-width: 1180px) {
+@media (max-width: 1260px) {
   .topbar-left {
     flex-wrap: wrap;
     align-items: flex-start;

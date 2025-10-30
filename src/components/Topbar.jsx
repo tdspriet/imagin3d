@@ -1,5 +1,6 @@
-import React, { useRef } from 'react'
+import React, { useRef, useState } from 'react'
 import { useMoodboardStore } from '../store/moodboardStore'
+import PaletteDialog from './dialog/PaletteDialog'
 import './Topbar.css'
 
 /**
@@ -7,12 +8,37 @@ import './Topbar.css'
  * Contains all action buttons for the moodboard
  */
 function Topbar() {
-  const { addImage, addVideo, addText, addFont, addModel, addCluster, fitView, clearAll, saveMoodboard, loadMoodboard } = useMoodboardStore()
+  const {
+    addImage,
+    addVideo,
+    addText,
+    addFont,
+    addModel,
+    addCluster,
+    addPalette,
+    fitView,
+    clearAll,
+    saveMoodboard,
+    loadMoodboard,
+  } = useMoodboardStore((state) => ({
+    addImage: state.addImage,
+    addVideo: state.addVideo,
+    addText: state.addText,
+    addFont: state.addFont,
+    addModel: state.addModel,
+    addCluster: state.addCluster,
+    addPalette: state.addPalette,
+    fitView: state.fitView,
+    clearAll: state.clearAll,
+    saveMoodboard: state.saveMoodboard,
+    loadMoodboard: state.loadMoodboard,
+  }))
   const fileInputRef = useRef(null)
   const videoInputRef = useRef(null)
   const fontInputRef = useRef(null)
   const modelInputRef = useRef(null)
   const loadInputRef = useRef(null)
+  const [isPaletteDialogOpen, setPaletteDialogOpen] = useState(false)
 
   // Handle image file selection
   const handleImageUpload = (e) => {
@@ -110,6 +136,14 @@ function Topbar() {
     addCluster(title)
   }
 
+  const handleCreateManualPalette = (colors) => {
+    if (!Array.isArray(colors) || colors.length === 0) {
+      return false
+    }
+    addPalette(colors, { origin: 'manual', colorCount: colors.length })
+    return true
+  }
+
   return (
     <div className="topbar">
       <div className="topbar-left">
@@ -135,6 +169,9 @@ function Topbar() {
           </button>
           <button onClick={handleAddCluster} className="btn">
             Add Cluster
+          </button>
+          <button onClick={() => setPaletteDialogOpen(true)} className="btn">
+            Add Palette
           </button>
         </div>
       </div>
@@ -189,6 +226,11 @@ function Topbar() {
         accept=".json"
         onChange={handleLoadFile}
         style={{ display: 'none' }}
+      />
+      <PaletteDialog
+        isOpen={isPaletteDialogOpen}
+        onClose={() => setPaletteDialogOpen(false)}
+        onCreateManual={handleCreateManualPalette}
       />
     </div>
   )

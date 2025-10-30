@@ -14,6 +14,7 @@ import TextNode from './nodes/TextNode'
 import FontNode from './nodes/FontNode'
 import ModelNode from './nodes/ModelNode'
 import ClusterNode from './nodes/ClusterNode'
+import ColorPaletteNode from './nodes/ColorPaletteNode'
 import './Canvas.css'
 
 // Register custom node types
@@ -24,6 +25,7 @@ const nodeTypes = {
   fontNode: FontNode,
   modelNode: ModelNode,
   clusterNode: ClusterNode,
+  paletteNode: ColorPaletteNode,
 }
 
 /**
@@ -118,6 +120,8 @@ function Canvas() {
                 return '#86efac'
               case 'clusterNode':
                 return '#bdbdbd'
+              case 'paletteNode':
+                return '#f97316'
               default:
                 return '#e5e7eb'
             }
