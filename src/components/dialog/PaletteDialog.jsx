@@ -1,8 +1,6 @@
-import React, { useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 import { generateRandomPalette, normalizeHexColor, randomHexColor } from '../../utils/colorUtils'
 import './PaletteDialog.css'
-
-{/* TODO: clean up */}
 
 const DEFAULT_COLOR_COUNT = 4
 const MIN_COLORS = 1
@@ -12,23 +10,30 @@ const createRandomManualPalette = () => generateRandomPalette(DEFAULT_COLOR_COUN
 
 function PaletteDialog({ isOpen, onClose, onCreateManual }) {
   const [manualColors, setManualColors] = useState(createRandomManualPalette)
+  const stripes = manualColors.length
+  const canAddColor = stripes < MAX_COLORS
+  const canRemoveColor = stripes > MIN_COLORS
+
+  const handleClose = useCallback(() => {
+    onClose?.()
+  }, [onClose])
 
   useEffect(() => {
     if (!isOpen) {
       setManualColors(createRandomManualPalette())
-      return undefined
+      return
     }
 
     const handleKeyDown = (event) => {
       if (event.key === 'Escape') {
         event.preventDefault()
-        onClose?.()
+        handleClose()
       }
     }
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [isOpen, onClose])
+  }, [isOpen, handleClose])
 
   const handleManualColorChange = (index, value) => {
     const normalized = normalizeHexColor(value)
@@ -55,11 +60,11 @@ function PaletteDialog({ isOpen, onClose, onCreateManual }) {
   }
 
   const handleCreateManual = () => {
-    const sanitized = manualColors.map((color) => normalizeHexColor(color)).filter(Boolean)
+    const sanitized = manualColors.map(normalizeHexColor).filter(Boolean)
     if (!sanitized.length) return
     const result = onCreateManual?.(sanitized)
     if (result !== false) {
-      onClose?.()
+      handleClose()
     }
   }
 
@@ -67,23 +72,17 @@ function PaletteDialog({ isOpen, onClose, onCreateManual }) {
     return null
   }
 
-  const stripes = manualColors.length
-
   return (
     <div className="palette-dialog" role="dialog" aria-modal="true">
       <div
         className="palette-dialog__backdrop"
-        onClick={() => {
-          onClose?.()
-        }}
+        onClick={handleClose}
       />
       <div className="palette-dialog__content" onClick={(event) => event.stopPropagation()}>
         <button
           type="button"
           className="palette-dialog__close"
-          onClick={() => {
-            onClose?.()
-          }}
+          onClick={handleClose}
           aria-label="Close"
         >
           ×
@@ -108,7 +107,7 @@ function PaletteDialog({ isOpen, onClose, onCreateManual }) {
                 className="palette-dialog__manual-color"
                 style={{ backgroundColor: color }}
               >
-                {manualColors.length > MIN_COLORS && (
+                {canRemoveColor && (
                   <button
                     type="button"
                     className="palette-dialog__manual-remove"
@@ -125,11 +124,12 @@ function PaletteDialog({ isOpen, onClose, onCreateManual }) {
                 />
               </div>
             ))}
-            {manualColors.length < MAX_COLORS && (
+            {canAddColor && (
               <button
                 type="button"
                 className="palette-dialog__manual-add"
                 onClick={handleManualAddColor}
+                aria-label="Add color"
               >
                 +
               </button>
