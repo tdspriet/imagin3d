@@ -40,6 +40,9 @@
   --accent-danger: #d32f2f;
   --accent-success-bg-hover: #e8f5e9;
   --accent-danger-bg-hover: #ffebee;
+  --palette-add-border: rgba(31, 41, 55, 0.2);
+  --palette-add-bg: rgba(31, 41, 55, 0.08);
+  --palette-add-text: var(--color-text-primary);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -76,6 +79,9 @@
     --shadow-floating: 0 2px 12px rgba(0, 0, 0, 0.5);
     --accent-success-bg-hover: rgba(46, 125, 50, 0.2);
     --accent-danger-bg-hover: rgba(211, 47, 47, 0.2);
+    --palette-add-border: rgba(255, 255, 255, 0.16);
+    --palette-add-bg: rgba(255, 255, 255, 0.08);
+    --palette-add-text: rgba(248, 248, 248, 0.88);
   }
 }
 

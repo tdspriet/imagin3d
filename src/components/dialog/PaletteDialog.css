@@ -37,7 +37,7 @@
   border-radius: 50%;
   border: 1px solid rgba(0, 0, 0, 0.12);
   background: rgba(255, 255, 255, 0.92);
-  color: inherit;
+  color: var(--color-text-inverse);
   font-size: 20px;
   line-height: 1;
   cursor: pointer;
@@ -156,9 +156,9 @@
 
 .palette-dialog__manual-add {
   flex: 1 1 0;
-  border: 1.5px dashed rgba(31, 41, 55, 0.2);
-  background: rgba(31, 41, 55, 0.08);
-  color: var(--color-text-primary);
+  border: 1.5px dashed var(--palette-add-border);
+  background: var(--palette-add-bg);
+  color: var(--palette-add-text);
   font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 0.08em;
