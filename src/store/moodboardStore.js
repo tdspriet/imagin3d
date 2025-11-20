@@ -56,7 +56,6 @@ const applyLayerOrder = (nodes) => {
 /**
  * Moodboard Store
  * Manages the state of all nodes and canvas operations
- * Uses Zustand for simple and efficient state management
  */
 export const useMoodboardStore = create((set, get) => ({
   // State
