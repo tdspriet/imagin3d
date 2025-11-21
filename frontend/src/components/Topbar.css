@@ -123,7 +123,7 @@
   flex-shrink: 0;
 }
 
-@media (max-width: 1550px) {
+@media (max-width: 1420px) {
   .topbar-left {
     flex-wrap: wrap;
     align-items: flex-start;

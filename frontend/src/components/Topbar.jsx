@@ -185,10 +185,12 @@ function Topbar() {
             <MdTitle className="btn-icon" size={18} aria-hidden="true" focusable="false" />
             <span>Add Text</span>
           </button>
+          {/*
           <button onClick={() => fontInputRef.current?.click()} className="btn">
             <MdFontDownload className="btn-icon" size={18} aria-hidden="true" focusable="false" />
             <span>Add Font</span>
           </button>
+          */}
           <button onClick={() => setPaletteDialogOpen(true)} className="btn">
             <MdPalette className="btn-icon" size={18} aria-hidden="true" focusable="false" />
             <span>Add Palette</span>
