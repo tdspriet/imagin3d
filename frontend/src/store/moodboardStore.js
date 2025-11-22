@@ -1,7 +1,8 @@
 import { create } from 'zustand'
 
 // Backend configuration
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL.replace(/\/$/, '')
+// NOTE: this should not be hardcoded in production
+const BACKEND_URL = 'http://localhost:8000'.replace(/\/$/, '')
 
 // Z-index constants
 const SELECTED_Z_OFFSET = 1000

@@ -7,7 +7,6 @@ generated
 
 # Environment variables
 .env
-.env.local
 .venv
 venv
 backend/.venv
