@@ -1,3 +1,23 @@
+# Dependencies
 node_modules
+
+# Build outputs
 dist
+generated
+
+# Environment variables
 .env
+.env.local
+.venv
+venv
+backend/.venv
+
+# Python
+__pycache__
+*.pyc
+
+# Backend
+backend/generated
+
+# Notes
+notes.txt

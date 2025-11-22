@@ -11,6 +11,7 @@ import {
   MdDeleteSweep,
   MdSave,
   MdFolderOpen,
+  MdAutoAwesome,
 } from 'react-icons/md'
 import { useMoodboardStore } from '../store/moodboardStore'
 import PaletteDialog from './dialog/PaletteDialog'
@@ -33,6 +34,8 @@ function Topbar() {
     clearAll,
     saveMoodboard,
     loadMoodboard,
+    generateMoodboard,
+    isGenerating,
   } = useMoodboardStore((state) => ({
     addImage: state.addImage,
     addVideo: state.addVideo,
@@ -45,6 +48,8 @@ function Topbar() {
     clearAll: state.clearAll,
     saveMoodboard: state.saveMoodboard,
     loadMoodboard: state.loadMoodboard,
+    generateMoodboard: state.generateMoodboard,
+    isGenerating: state.isGenerating,
   }))
   const fileInputRef = useRef(null)
   const videoInputRef = useRef(null)
@@ -157,6 +162,17 @@ function Topbar() {
     return true
   }
 
+  const handleGenerateMoodboard = async () => {
+    try {
+      const result = await generateMoodboard()
+      if (result?.file) {
+        console.log(`Generated extraction ${result.file} with ${result.count} elements`)
+      }
+    } catch (error) {
+      console.error('Failed to extract:', error)
+    }
+  }
+
   return (
     <div className="topbar">
       <div className="topbar-left">
@@ -214,6 +230,10 @@ function Topbar() {
         <button onClick={() => loadInputRef.current?.click()} className="btn btn-success">
           <MdFolderOpen className="btn-icon" size={18} aria-hidden="true" focusable="false" />
           <span>Load</span>
+        </button>
+        <button onClick={handleGenerateMoodboard} className="btn btn-warning" disabled={isGenerating}>
+          <MdAutoAwesome className="btn-icon" size={18} aria-hidden="true" focusable="false" />
+          <span>Generate</span>
         </button>
       </div>
 

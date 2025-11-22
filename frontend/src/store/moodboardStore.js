@@ -1,6 +1,79 @@
 import { create } from 'zustand'
 
+// Backend configuration
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL.replace(/\/$/, '')
+
+// Z-index constants
 const SELECTED_Z_OFFSET = 1000
+const CLUSTER_Z_OFFSET = -1000
+// Default font sizes
+const DEFAULT_FONT_SIZE = 16
+const FONT_NODE_BASE_SIZE = 24
+// Default sizes for various nodes
+const DEFAULT_SIZES = {
+  TOPBAR_HEIGHT: 60,
+  
+  IMAGE: { width: 300, height: 200, maxDimension: 400, fallbackAspectRatio: 1.5 },
+  VIDEO: { width: 400, height: 225, maxDimension: 450, aspectRatio: 16 / 9 },
+  TEXT: { width: 200, height: 40 },
+  FONT: { width: 150, height: 40 },
+  MODEL: { width: 300, height: 300 },
+  PALETTE: { width: 150, height: 100 },
+  CLUSTER: { width: 640, height: 420 },
+}
+
+const addInitialSize = (data, width, height) => ({
+  ...data,
+  initialSize: { width, height },
+})
+
+const serializeNodesForBackend = (nodes = []) =>
+  nodes.map((node, index) => ({
+    id: index + 1,
+    content: {
+      type: node.type,
+      data: sanitizeNodeData(node),
+    },
+    position: {
+      x: Number(node?.position?.x, 0),
+      y: Number(node?.position?.y, 0),
+    },
+    size: computeSizeRatios(node),
+  }))
+
+const sanitizeNodeData = (node = {}) => {
+  const data = node?.data || {}
+  const { initialSize, aspectRatio, ...rest } = data
+  if (node.type === 'fontNode') {
+    const { fontSize, baseFontSize, ...fontRest } = rest
+    return fontRest
+  }
+  if (node.type === 'textNode') {
+    const { fontSize, ...textRest } = rest
+    return textRest
+  }
+  return rest
+}
+
+const computeSizeRatios = (node) => {
+  if (node.type === 'fontNode' || node.type === 'textNode') {
+    const currentFontSize = Number(node?.data?.fontSize, DEFAULT_FONT_SIZE)
+    const defaultFontSize = DEFAULT_FONT_SIZE
+    const ratio = currentFontSize / defaultFontSize
+    return { sizeX: ratio, sizeY: ratio }
+  }
+
+  const width = Number(node?.style?.width, Number(node?.width, 1))
+  const height = Number(node?.style?.height, Number(node?.height, 1))
+  const initialWidth = Number(node?.data?.initialSize?.width, width || 1)
+  const initialHeight = Number(node?.data?.initialSize?.height, height || 1)
+
+  return {
+    sizeX: initialWidth ? width / initialWidth : 1,
+    sizeY: initialHeight ? height / initialHeight : 1,
+  }
+}
+
 
 const applyLayerOrder = (nodes) => {
   const clusterNodes = []
@@ -34,7 +107,7 @@ const applyLayerOrder = (nodes) => {
 
   return orderedNodes.map((node) => {
     const isClusterNode = node.type === 'clusterNode'
-    const baseZIndex = isClusterNode ? -1000 + clusterCounter : contentCounter + 1
+    const baseZIndex = isClusterNode ? CLUSTER_Z_OFFSET + clusterCounter : contentCounter + 1
     const isSelected = Boolean(node.selected)
 
     if (isClusterNode) {
@@ -63,6 +136,7 @@ export const useMoodboardStore = create((set, get) => ({
   edges: [],
   reactFlowInstance: null,
   fitViewTrigger: 0,
+  isGenerating: false,
 
   // Set ReactFlow instance
   setReactFlowInstance: (instance) => set({ reactFlowInstance: instance }),
@@ -170,15 +244,12 @@ export const useMoodboardStore = create((set, get) => ({
   // Get center position of current viewport
   getCenterPosition: () => {
     const { reactFlowInstance } = get()
-    if (!reactFlowInstance) return { x: 250, y: 250 }
 
-    const viewport = reactFlowInstance.getViewport()
-    const { x, y, zoom } = viewport
-    const bounds = reactFlowInstance.getViewport()
+    const { x, y, zoom } = reactFlowInstance.getViewport()
 
     // Calculate center of visible area
     const centerX = (window.innerWidth / 2 - x) / zoom
-    const centerY = ((window.innerHeight - 60) / 2 - y) / zoom // Subtract topbar height
+    const centerY = ((window.innerHeight - DEFAULT_SIZES.TOPBAR_HEIGHT) / 2 - y) / zoom // Subtract topbar height
 
     return { x: centerX, y: centerY }
   },
@@ -190,15 +261,15 @@ export const useMoodboardStore = create((set, get) => ({
     const image = new Image()
 
     const appendNode = (width, height, aspectRatio) => {
-      const safeWidth = Number.isFinite(width) && width > 0 ? width : 300
-      const safeHeight = Number.isFinite(height) && height > 0 ? height : 200
+      const safeWidth = Number.isFinite(width) && width > 0 ? width : DEFAULT_SIZES.IMAGE.width
+      const safeHeight = Number.isFinite(height) && height > 0 ? height : DEFAULT_SIZES.IMAGE.height
       const ratio = Number.isFinite(aspectRatio) && aspectRatio > 0 ? aspectRatio : safeWidth / safeHeight
 
       const newNode = {
         id: nodeId,
         type: 'imageNode',
         position,
-        data: { src, aspectRatio: ratio },
+        data: addInitialSize({ src, aspectRatio: ratio }, safeWidth, safeHeight),
         style: { width: safeWidth, height: safeHeight },
       }
 
@@ -208,9 +279,9 @@ export const useMoodboardStore = create((set, get) => ({
     }
 
     image.onload = () => {
-      const naturalWidth = image.naturalWidth || 300
-      const naturalHeight = image.naturalHeight || 200
-      const maxDimension = 400
+      const naturalWidth = image.naturalWidth || DEFAULT_SIZES.IMAGE.width
+      const naturalHeight = image.naturalHeight || DEFAULT_SIZES.IMAGE.height
+      const maxDimension = DEFAULT_SIZES.IMAGE.maxDimension
       const dominantSize = Math.max(naturalWidth, naturalHeight)
       const scale = dominantSize > maxDimension ? maxDimension / dominantSize : 1
       const width = naturalWidth * scale
@@ -219,7 +290,7 @@ export const useMoodboardStore = create((set, get) => ({
     }
 
     image.onerror = () => {
-      appendNode(300, 200, 1.5)
+      appendNode(DEFAULT_SIZES.IMAGE.width, DEFAULT_SIZES.IMAGE.height, DEFAULT_SIZES.IMAGE.fallbackAspectRatio)
     }
 
     image.src = src
@@ -233,15 +304,15 @@ export const useMoodboardStore = create((set, get) => ({
     video.preload = 'metadata'
 
     const appendNode = (width, height, aspectRatio) => {
-      const safeWidth = Number.isFinite(width) && width > 0 ? width : 400
-      const safeHeight = Number.isFinite(height) && height > 0 ? height : 225
+      const safeWidth = Number.isFinite(width) && width > 0 ? width : DEFAULT_SIZES.VIDEO.width
+      const safeHeight = Number.isFinite(height) && height > 0 ? height : DEFAULT_SIZES.VIDEO.height
       const ratio = Number.isFinite(aspectRatio) && aspectRatio > 0 ? aspectRatio : safeWidth / safeHeight
 
       const newNode = {
         id: nodeId,
         type: 'videoNode',
         position,
-        data: { src, aspectRatio: ratio },
+        data: addInitialSize({ src, aspectRatio: ratio }, safeWidth, safeHeight),
         style: { width: safeWidth, height: safeHeight },
       }
 
@@ -251,9 +322,9 @@ export const useMoodboardStore = create((set, get) => ({
     }
 
     const handleLoadedMetadata = () => {
-      const naturalWidth = video.videoWidth || 400
-      const naturalHeight = video.videoHeight || 225
-      const maxDimension = 450
+      const naturalWidth = video.videoWidth || DEFAULT_SIZES.VIDEO.width
+      const naturalHeight = video.videoHeight || DEFAULT_SIZES.VIDEO.height
+      const maxDimension = DEFAULT_SIZES.VIDEO.maxDimension
       const dominantSize = Math.max(naturalWidth, naturalHeight)
       const scale = dominantSize > maxDimension ? maxDimension / dominantSize : 1
       const width = naturalWidth * scale
@@ -263,7 +334,7 @@ export const useMoodboardStore = create((set, get) => ({
     }
 
     const handleError = () => {
-      appendNode(400, 225, 16 / 9)
+      appendNode(DEFAULT_SIZES.VIDEO.width, DEFAULT_SIZES.VIDEO.height, DEFAULT_SIZES.VIDEO.aspectRatio)
       cleanup()
     }
 
@@ -280,12 +351,14 @@ export const useMoodboardStore = create((set, get) => ({
   // Add text node
   addText: () => {
     const position = get().getCenterPosition()
+    const width = DEFAULT_SIZES.TEXT.width
+    const height = DEFAULT_SIZES.TEXT.height
     const newNode = {
       id: `text-${Date.now()}`,
       type: 'textNode',
       position,
-      data: { text: 'Double-click to edit', fontSize: 16 },
-      style: { width: 200, height: 40 },
+      data: addInitialSize({ text: 'Double-click to edit', fontSize: DEFAULT_FONT_SIZE }, width, height),
+      style: { width, height },
     }
     set((state) => ({
       nodes: applyLayerOrder([...state.nodes, newNode]),
@@ -308,18 +381,22 @@ export const useMoodboardStore = create((set, get) => ({
     `
     document.head.appendChild(style)
     
+    const width = DEFAULT_SIZES.FONT.width
+    const height = DEFAULT_SIZES.FONT.height
+    const baseFontSize = FONT_NODE_BASE_SIZE
     const newNode = {
       id: nodeId,
       type: 'fontNode',
       position,
-      data: { 
-        fontFamily: fontName, 
-        fontSize: 24, 
+      data: addInitialSize({
+        fontFamily: fontName,
+        fontSize: baseFontSize,
+        baseFontSize,
         fontLoaded: true,
         uniqueFontFamily: uniqueFontFamily,
-        fontData: fontData
-      },
-      style: { width: 150, height: 40 },
+        fontData: fontData,
+      }, width, height),
+      style: { width, height },
     }
     set((state) => ({
       nodes: applyLayerOrder([...state.nodes, newNode]),
@@ -331,16 +408,18 @@ export const useMoodboardStore = create((set, get) => ({
     const position = get().getCenterPosition()
     const nodeId = `model-${Date.now()}`
     
+    const width = DEFAULT_SIZES.MODEL.width
+    const height = DEFAULT_SIZES.MODEL.height
     const newNode = {
       id: nodeId,
       type: 'modelNode',
       position,
-      data: { 
+      data: addInitialSize({ 
         src,
         fileName: fileName || 'model.glb'
-      },
+      }, width, height),
       dragHandle: '.react-flow-drag-handle',
-      style: { width: 300, height: 300 },
+      style: { width, height },
     }
     
     set((state) => ({
@@ -352,18 +431,18 @@ export const useMoodboardStore = create((set, get) => ({
   addPalette: (colors, options = {}) => {
     const paletteColors = Array.isArray(colors) ? [...colors] : []
     const position = get().getCenterPosition()
-    const width = Number.isFinite(options.width) ? options.width : 150
-    const height = Number.isFinite(options.height) ? options.height : 100
+    const width = Number.isFinite(options.width) ? options.width : DEFAULT_SIZES.PALETTE.width
+    const height = Number.isFinite(options.height) ? options.height : DEFAULT_SIZES.PALETTE.height
     const nodeId = `palette-${Date.now()}`
 
     const newNode = {
       id: nodeId,
       type: 'paletteNode',
       position,
-      data: {
+      data: addInitialSize({
         colors: paletteColors,
         origin: options.origin || 'manual',
-      },
+      }, width, height),
       style: { width, height },
     }
 
@@ -378,13 +457,15 @@ export const useMoodboardStore = create((set, get) => ({
     const clusterTitle =
       typeof title === 'string' && title.trim().length > 0 ? title.trim() : 'Cluster'
 
+    const width = DEFAULT_SIZES.CLUSTER.width
+    const height = DEFAULT_SIZES.CLUSTER.height
     const newNode = {
       id: `cluster-${Date.now()}`,
       type: 'clusterNode',
       position,
-      data: { title: clusterTitle },
+      data: addInitialSize({ title: clusterTitle }, width, height),
       dragHandle: '.cluster-node-header',
-      style: { width: 640, height: 420 },
+      style: { width, height },
     }
 
     set((state) => ({
@@ -401,6 +482,36 @@ export const useMoodboardStore = create((set, get) => ({
   clearAll: () => {
     if (confirm('Are you sure you want to clear all elements?')) {
       set({ nodes: [], edges: [] })
+    }
+  },
+
+  // Send moodboard to backend generator
+  generateMoodboard: async () => {
+    const { nodes } = get()
+    const elements = serializeNodesForBackend(nodes)
+
+    if (!elements || elements.length === 0) {
+      return { count: 0, file: null }
+    }
+
+    set({ isGenerating: true })
+    try {
+      const response = await fetch(`${BACKEND_URL}/extract`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ elements }),
+      })
+
+      if (!response.ok) {
+        throw new Error('Backend generation failed')
+      }
+
+      return response.json()
+    } catch (error) {
+      console.error('Error generating moodboard:', error)
+      throw error
+    } finally {
+      set({ isGenerating: false })
     }
   },
 

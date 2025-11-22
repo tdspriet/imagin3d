@@ -2,36 +2,48 @@
 
 ## Installation
 
-1. **Prerequisites** <br>
-Install [Node.js](https://nodejs.org/) and [npm](https://www.npmjs.com/get-npm).
-
-2. **Clone the repository**<br>
+**Clone the repository**<br>
 ``
 git clone https://github.com/tdspriet/imagin3d.git
 ``
 
-3. **Navigate to the project directory**<br>
-``
-cd imagin3d
-``
+### Frontend
 
-4. **Install dependencies**<br>
+1. **Prerequisites** <br>
+Make sure you have [Node.js](https://nodejs.org/) and [npm](https://www.npmjs.com/get-npm) installed.
+
+2. **Install dependencies**<br>
 ``
 npm install
 ``
 
-## Project Structure
+1. **Run the Frontend**<br>
+``
+npm run dev
+``
+
+### Backend 
+
+1. **Prerequisites** <br>
+Make sure you have [Python 3.10+](https://www.python.org/downloads/) and [pip](https://pip.pypa.io/en/stable/installation/) installed.
+
+2. **Make the virtual environment** <br>
+```bash
+  python -m venv .venv
+  source .venv/bin/activate  # Windows: .venv\Scripts\activate
+  pip install -r requirements.txt
+```
+
+3. **Run the Backend** <br>
+``
+uvicorn app:app --reload
+``
 
 ## Architecture Vision
 
 ![architecture](https://github.com/user-attachments/assets/5a7833d7-34ea-43e6-8da4-d8bf20278164)
 
-## Usage
-
-To start the development server, run:
-``
-npm run dev
-``
+## Project Structure
 
 ## Examples
 

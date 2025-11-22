@@ -116,6 +116,16 @@
   background-color: var(--accent-success-bg-hover);
 }
 
+.btn-warning {
+  color: #ffc107;
+  border-color: #ffc107;
+}
+
+.btn-warning:hover {
+  background-color: #ffe8a1;
+  border-color: #ffca2c;
+}
+
 .btn-icon {
   width: 18px;
   height: 18px;
@@ -123,7 +133,7 @@
   flex-shrink: 0;
 }
 
-@media (max-width: 1420px) {
+@media (max-width: 1550px) {
   .topbar-left {
     flex-wrap: wrap;
     align-items: flex-start;
