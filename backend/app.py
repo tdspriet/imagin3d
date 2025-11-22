@@ -37,8 +37,15 @@ app.add_middleware(
 )
 
 
+class Cluster(BaseModel):
+    id: int
+    title: str
+    elements: List[int]
+
+
 class MoodboardPayload(BaseModel):
     elements: List[Dict[str, Any]] = Field(default_factory=list)
+    clusters: List[Cluster] = Field(default_factory=list)
 
 
 class GenerateResponse(BaseModel):
@@ -48,14 +55,16 @@ class GenerateResponse(BaseModel):
 
 @app.post("/extract", response_model=GenerateResponse)
 def extract(payload: MoodboardPayload) -> GenerateResponse:
-    if not payload.elements:
-        raise HTTPException(status_code=400, detail="elements array must not be empty")
+    if not payload.elements and not payload.clusters:
+        raise HTTPException(
+            status_code=400, detail="Payload must contain elements or clusters"
+        )
 
     timestamp = datetime.utcnow().strftime("%Y%m%d-%H%M%S")
     file_path = OUTPUT_DIR / f"moodboard-{timestamp}.json"
 
     with file_path.open("w", encoding="utf-8") as target_file:
-        json.dump(payload.elements, target_file, ensure_ascii=False, indent=2)
+        json.dump(payload.dict(), target_file, ensure_ascii=False, indent=2)
 
     return GenerateResponse(count=len(payload.elements), file=str(file_path))
 

@@ -28,19 +28,48 @@ const addInitialSize = (data, width, height) => ({
   initialSize: { width, height },
 })
 
-const serializeNodesForBackend = (nodes = []) =>
-  nodes.map((node, index) => ({
-    id: index + 1,
-    content: {
-      type: node.type,
-      data: sanitizeNodeData(node),
-    },
-    position: {
-      x: Number(node?.position?.x, 0),
-      y: Number(node?.position?.y, 0),
-    },
-    size: computeSizeRatios(node),
+const serializeDataForBackend = (nodes = []) => {
+  const clusterNodes = nodes.filter(n => n.type === 'clusterNode')
+  const contentNodes = nodes.filter(n => n.type !== 'clusterNode')
+
+  // ELEMENTS
+  const elements = contentNodes.map((node, index) => ({
+    originalId: node.id,
+    formatted: {
+      id: index + 1,
+      content: {
+        type: node.type,
+        data: sanitizeNodeData(node),
+      },
+      position: {
+        x: Number(node?.position?.x, 0),
+        y: Number(node?.position?.y, 0),
+      },
+      size: computeSizeRatios(node),
+    }
   }))
+
+  // CLUSTERS
+  const nodeIdMap = new Map(elements.map(e => [e.originalId, e.formatted.id]))
+
+  const clusters = clusterNodes.map((cluster, index) => {
+    const insideNodeIds = contentNodes
+      .filter(node => isNodeInsideCluster(node, cluster))
+      .map(node => nodeIdMap.get(node.id))
+      .sort((a, b) => a - b)
+
+    return {
+      id: index + 1,
+      title: cluster.data?.title || 'Cluster',
+      elements: insideNodeIds
+    }
+  })
+
+  return {
+    elements: elements.map(e => e.formatted),
+    clusters
+  }
+}
 
 const sanitizeNodeData = (node = {}) => {
   const data = node?.data || {}
@@ -125,6 +154,29 @@ const applyLayerOrder = (nodes) => {
       },
     }
   })
+}
+
+const isNodeInsideCluster = (node, cluster) => {
+  const nodeX = Number(node.position.x)
+  const nodeY = Number(node.position.y)
+  const nodeW = Number(node.style?.width || node.width || 0)
+  const nodeH = Number(node.style?.height || node.height || 0)
+  
+  const clusterX = Number(cluster.position.x)
+  const clusterY = Number(cluster.position.y)
+  const clusterW = Number(cluster.style?.width || cluster.width || 0)
+  const clusterH = Number(cluster.style?.height || cluster.height || 0)
+
+  // Check if center of node is inside cluster
+  const centerX = nodeX + nodeW / 2
+  const centerY = nodeY + nodeH / 2
+
+  return (
+    centerX >= clusterX &&
+    centerX <= clusterX + clusterW &&
+    centerY >= clusterY &&
+    centerY <= clusterY + clusterH
+  )
 }
 
 /**
@@ -489,9 +541,9 @@ export const useMoodboardStore = create((set, get) => ({
   // Send moodboard to backend generator
   generateMoodboard: async () => {
     const { nodes } = get()
-    const elements = serializeNodesForBackend(nodes)
+    const payload = serializeDataForBackend(nodes)
 
-    if (!elements || elements.length === 0) {
+    if ((!payload.elements || payload.elements.length === 0) && (!payload.clusters || payload.clusters.length === 0)) {
       return { count: 0, file: null }
     }
 
@@ -500,7 +552,7 @@ export const useMoodboardStore = create((set, get) => ({
       const response = await fetch(`${BACKEND_URL}/extract`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ elements }),
+        body: JSON.stringify(payload),
       })
 
       if (!response.ok) {
