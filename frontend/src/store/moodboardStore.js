@@ -38,7 +38,7 @@ const serializeDataForBackend = (nodes = []) => {
     formatted: {
       id: index + 1,
       content: {
-        type: node.type,
+        type: node.type.replace('Node', ''),
         data: sanitizeNodeData(node),
       },
       position: {
