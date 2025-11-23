@@ -1,3 +1,24 @@
-TODO: text/image
+{% if ctx.content_type == "text" %}
+You are given a text snippet from a design moodboard. Your task is to convert this text into a descriptive text that captures all the content and meaning while making it suitable for semantic matching and retrieval.
 
-Your task is to describe ...
+Preserve all key information, themes, concepts, and details from the original text. The description should be clear, comprehensive, and retain the essence of the original content.
+
+Text to describe:
+{{ ctx.text }}
+
+{% elif ctx.content_type == "images" %}
+You are given {{ ctx.num_images }} image(s) from a design moodboard. Your task is to create a detailed textual description that captures all visual content, design elements, colors, composition, style, and any other relevant details visible in the image(s).
+
+Be thorough and descriptive. Include:
+- Visual elements and objects present
+- Colors, textures, and materials
+- Composition and layout
+- Style and aesthetic qualities
+- Any text or symbols visible
+- Overall mood or atmosphere
+
+The description should be comprehensive enough that someone could understand the visual content without seeing the images.
+
+{% endif %}
+
+Provide a detailed description that preserves all content.

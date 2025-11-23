@@ -13,6 +13,7 @@ import base64
 import hydra
 from hydra import compose, initialize_config_dir
 from omegaconf import DictConfig
+import pydantic_ai
 
 from backend.common import DesignToken, GenerateResponse, MoodboardPayload
 from backend.engines.blender import Blender
@@ -55,6 +56,22 @@ app.add_middleware(
 )
 
 
+async def save_model_file(element: dict, root_dir: Path) -> Path:
+    model_data = element["content"]["data"]["src"]
+    model_filename = element["content"]["data"]["fileName"]
+    base64_data = model_data.split(",", 1)[1]
+    model_bytes = base64.b64decode(base64_data)
+
+    models_dir = root_dir / "checkpoints" / "models"
+    models_dir.mkdir(parents=True, exist_ok=True)
+    model_path = models_dir / model_filename
+
+    with model_path.open("wb") as f:
+        f.write(model_bytes)
+
+    return model_path
+
+
 @app.post("/extract", response_model=GenerateResponse)
 async def extract(payload: MoodboardPayload) -> GenerateResponse:
     if not payload.elements and not payload.clusters:
@@ -87,28 +104,17 @@ async def extract(payload: MoodboardPayload) -> GenerateResponse:
 
             # 2) Description and embedding generation
             if token_data["type"] == "model":
-                # Model should be rendered from 5 views before description generation
-                # TODO: later, check if Cap3D produces better results
-
-                # Get model data
-                model_data = element["content"]["data"]["src"]
-                model_filename = element["content"]["data"]["fileName"]
-                base64_data = model_data.split(",", 1)[1]
-                model_bytes = base64.b64decode(base64_data)
-
-                # Create model file
-                models_dir = ROOT_DIR / "checkpoints" / "models"
-                models_dir.mkdir(parents=True, exist_ok=True)
-                model_path = models_dir / model_filename
-                with model_path.open("wb") as f:
-                    f.write(model_bytes)
-
+                # Save model file
+                model_path = await save_model_file(element, ROOT_DIR)
                 # Create renders directory
                 renders_dir = ROOT_DIR / "checkpoints" / "renders"
                 renders_dir.mkdir(parents=True, exist_ok=True)
-
                 # Render views using Blender
                 renders = await blender_engine.render_views(model_path, renders_dir)
+                # Generate description from rendered images
+                images = [render.image for render in renders]
+                result = await descriptor_agent.run(images)
+                token_data["description"] = result.output.description
 
             elif token_data["type"] == "video":
                 # Video should be converted into 5 frames before description generation
@@ -117,8 +123,23 @@ async def extract(payload: MoodboardPayload) -> GenerateResponse:
             elif token_data["type"] == "palette":
                 token_data["description"] = ", ".join(element["content"]["colors"])
 
-            else:  # images and text
-                pass
+            elif token_data["type"] == "image":
+                image_base64 = element["content"]["data"]["src"]
+                # Convert base64 data URL to BinaryImage
+                base64_data = image_base64.split(",", 1)[1]
+                image_bytes = base64.b64decode(base64_data)
+                image = pydantic_ai.BinaryImage(
+                    data=image_bytes, media_type="image/jpeg"
+                )
+                # Generate description from image
+                result = await descriptor_agent.run([image])
+                token_data["description"] = result.output.description
+
+            elif token_data["type"] == "text":
+                # Generate description from text content
+                text_content = element["content"]["data"]["text"]
+                result = await descriptor_agent.run(text_content)
+                token_data["description"] = result.output.description
 
             # Embedding should be added here based on generated description
             # TODO: later, check if OmniBind produces better results
