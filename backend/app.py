@@ -10,9 +10,14 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 import base64
+import hydra
+from hydra import compose, initialize_config_dir
+from omegaconf import DictConfig
 
 from backend.common import DesignToken, GenerateResponse, MoodboardPayload
 from backend.engines.blender import Blender
+from backend.agents.descriptor import Descriptor
+from backend.agents.visualizer import Visualizer
 
 load_dotenv()
 
@@ -28,16 +33,17 @@ else:
 # Directory configuration
 ROOT_DIR = Path(__file__).parent.resolve()
 
-# Initialize Blender engine
-blender_engine = Blender(
-    name="blender",
-    version="4.0",
-    exe=os.getenv("BLENDER_EXECUTABLE", "blender"),
-    resolution_x=512,
-    resolution_y=512,
-    num_views=5,
-    timeout_s=60,
-)
+# Initialize Hydra configuration
+config_dir = str(ROOT_DIR / "config")
+with initialize_config_dir(config_dir=config_dir, version_base=None):
+    cfg: DictConfig = compose(config_name="config")
+
+# Initialize Blender engine via Hydra
+blender_engine: Blender = hydra.utils.instantiate(cfg.engine)
+
+# Initialize agents via Hydra
+descriptor_agent: Descriptor = hydra.utils.instantiate(cfg.descriptor)
+visualizer_agent: Visualizer = hydra.utils.instantiate(cfg.visualizer)
 
 # FastAPI application setup
 app = FastAPI(title="Imagin3D Backend", version="1.0.0")

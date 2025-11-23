@@ -1,0 +1,20 @@
+# @package _global_
+defaults:
+  - hydra
+  - agents: bedrock
+  - _self_
+  - override /hydra/hydra_logging: disabled
+  - override /hydra/job_logging: disabled
+
+engine:
+  _target_: backend.engines.blender.Blender
+  name: "Blender"
+  version: "4.5.3"
+  exe: "blender"
+  resolution_x: 1024
+  resolution_y: 1024
+  num_views: 5
+  timeout_s: 60
+
+logging:
+  filename: ${now:%Y-%m-%d}-${now:%H-%M-%S}.log
