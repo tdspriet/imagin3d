@@ -9,8 +9,10 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
+import base64
 
 from backend.common import DesignToken, GenerateResponse, MoodboardPayload
+from backend.engines.blender import Blender
 
 load_dotenv()
 
@@ -26,6 +28,17 @@ else:
 # Directory configuration
 ROOT_DIR = Path(__file__).parent.resolve()
 
+# Initialize Blender engine
+blender_engine = Blender(
+    name="blender",
+    version="4.0",
+    exe=os.getenv("BLENDER_EXECUTABLE", "blender"),
+    resolution_x=512,
+    resolution_y=512,
+    num_views=5,
+    timeout_s=60,
+)
+
 # FastAPI application setup
 app = FastAPI(title="Imagin3D Backend", version="1.0.0")
 app.add_middleware(
@@ -37,17 +50,18 @@ app.add_middleware(
 
 
 @app.post("/extract", response_model=GenerateResponse)
-def extract(payload: MoodboardPayload) -> GenerateResponse:
+async def extract(payload: MoodboardPayload) -> GenerateResponse:
     if not payload.elements and not payload.clusters:
         raise HTTPException(
             status_code=400, detail="Payload must contain elements or clusters"
         )
 
     # Timestamp
-    timestamp = datetime.now(datetime.timezone.utc).strftime("%Y%m%d-%H%M%S")
+    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
 
     # Dump raw elements and clusters to JSON file
-    raw_path = ROOT_DIR / "raw" / f"moodboard-{timestamp}.json"
+    raw_path = ROOT_DIR / "checkpoints" / "raw" / f"moodboard-{timestamp}.json"
+    raw_path.parent.mkdir(parents=True, exist_ok=True)
     with raw_path.open("w", encoding="utf-8") as target_file:
         json.dump(payload.dict(), target_file, ensure_ascii=False, indent=2)
 
@@ -58,7 +72,7 @@ def extract(payload: MoodboardPayload) -> GenerateResponse:
 
         for element in data["elements"]:
             # 1) Basic token structure
-            token = {
+            token_data = {
                 "id": element["id"],
                 "type": element["content"]["type"],
                 "size": {"width": element["width"], "height": element["height"]},
@@ -66,31 +80,52 @@ def extract(payload: MoodboardPayload) -> GenerateResponse:
             }
 
             # 2) Description and embedding generation
-            if token["type"] == "model":
+            if token_data["type"] == "model":
                 # Model should be rendered from 5 views before description generation
                 # TODO: later, check if Cap3D produces better results
-                pass
 
-            elif token["type"] == "video":
+                # Get model data
+                model_data = element["content"]["data"]["src"]
+                model_filename = element["content"]["data"]["fileName"]
+                base64_data = model_data.split(",", 1)[1]
+                model_bytes = base64.b64decode(base64_data)
+
+                # Create model file
+                models_dir = ROOT_DIR / "checkpoints" / "models"
+                models_dir.mkdir(parents=True, exist_ok=True)
+                model_path = models_dir / model_filename
+                with model_path.open("wb") as f:
+                    f.write(model_bytes)
+
+                # Create renders directory
+                renders_dir = ROOT_DIR / "checkpoints" / "renders"
+                renders_dir.mkdir(parents=True, exist_ok=True)
+
+                # Render views using Blender
+                renders = await blender_engine.render_views(model_path, renders_dir)
+
+            elif token_data["type"] == "video":
                 # Video should be converted into 5 frames before description generation
                 pass
 
-            elif token["type"] == "palette":
-                token["description"] = ", ".join(element["content"]["colors"])
-                token["embedding"] = []
+            elif token_data["type"] == "palette":
+                token_data["description"] = ", ".join(element["content"]["colors"])
 
             else:  # images and text
                 pass
 
             # Embedding should be added here based on generated description
             # TODO: later, check if OmniBind produces better results
-            token["embedding"] = []
+            token_data["embedding"] = []
 
             # Append the token to the list
-            design_tokens.append(token)
+            design_tokens.append(DesignToken(**token_data))
 
     # Dump design tokens to JSON file
-    design_tokens_path = ROOT_DIR / "design_tokens" / f"design-tokens-{timestamp}.json"
+    design_tokens_path = (
+        ROOT_DIR / "checkpoints" / "design_tokens" / f"design-tokens-{timestamp}.json"
+    )
+    design_tokens_path.parent.mkdir(parents=True, exist_ok=True)
     with design_tokens_path.open("w", encoding="utf-8") as f:
         json.dump(
             [token.dict() for token in design_tokens], f, ensure_ascii=False, indent=2

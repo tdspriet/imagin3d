@@ -1,0 +1,102 @@
+import bpy
+import math
+import pathlib
+from mathutils import Vector
+
+# remove default objects created by factory startup
+for name in ("Cube", "Camera", "Light"):
+    obj = bpy.data.objects.get(name)
+    if obj is not None:
+        try:
+            bpy.data.objects.remove(obj, do_unlink=True)
+        except Exception:
+            pass
+
+# import GLB model
+bpy.ops.import_scene.gltf(filepath="{{ model_path }}")
+
+# update scene graph; ensures all world matrices are correct
+bpy.context.evaluated_depsgraph_get().update()
+
+# find all mesh objects in the scene
+mesh_objects = [obj for obj in bpy.context.scene.objects if obj.type == "MESH"]
+
+# calculate bounding box of all mesh objects to position camera
+all_coords = []
+for obj in mesh_objects:
+    for vertex in obj.data.vertices:
+        world_coord = obj.matrix_world @ vertex.co
+        all_coords.append(world_coord)
+
+if all_coords:
+    min_coords = [min(coord[i] for coord in all_coords) for i in range(3)]
+    max_coords = [max(coord[i] for coord in all_coords) for i in range(3)]
+    center = [(min_coords[i] + max_coords[i]) / 2 for i in range(3)]
+    size_vec = [max_coords[i] - min_coords[i] for i in range(3)]
+    max_dimension = max(size_vec)
+else:
+    center = [0,0,0]
+    max_dimension=1
+
+
+# set up rendering
+scene = bpy.context.scene
+scene.render.engine = "CYCLES"
+scene.cycles.samples = 128
+scene.render.image_settings.file_format = "JPEG"
+scene.render.resolution_x = {{ cfg.resolution_x }}
+scene.render.resolution_y = {{ cfg.resolution_y }}
+scene.render.resolution_percentage = 100
+
+# try GPU but don't fail if unavailable
+try:
+    prefs = bpy.context.preferences
+    cycles_prefs = prefs.addons["cycles"].preferences
+    cycles_prefs.refresh_devices()
+    cycles_prefs.compute_device_type = "CUDA"
+    scene.cycles.device = "GPU"
+except Exception:
+    pass
+
+# create camera and light
+cam_data = bpy.data.cameras.new("RenderCamera")
+cam = bpy.data.objects.new("RenderCamera", cam_data)
+scene.collection.objects.link(cam)
+scene.camera = cam
+
+light_data = bpy.data.lights.new("RenderLight", type="POINT")
+light = bpy.data.objects.new("RenderLight", light_data)
+scene.collection.objects.link(light)
+light.data.energy = 200 * max_dimension**1.75  # scale light with object size
+light.data.shadow_soft_size = 0.05 * max_dimension # scale light size
+
+# render parameters
+radius = max_dimension * 2.5  # distance camera from center
+elevation = max_dimension * 0.6  # camera height above center
+fov_deg = 30.0
+
+# render multiple views
+for i in range({{ cfg.num_views }}):
+    angle = (2.0 * math.pi * i) / {{ cfg.num_views }}
+    cam.location = (
+        center[0] + radius * math.sin(angle),
+        center[1] + radius * math.cos(angle),
+        center[2] + elevation,
+    )
+    cam.data.angle = math.radians(fov_deg)
+
+    # aim camera at center
+    direction = Vector(center) - cam.location
+    cam.rotation_euler = direction.to_track_quat("-Z", "Y").to_euler()
+
+    # place light near camera
+    light.location = [
+        cam.location[0] * 0.6 + center[0] * 0.4,
+        cam.location[1] * 0.6 + center[1] * 0.4,
+        cam.location[2] * 0.6 + center[2] * 0.4,
+    ]
+
+    render_filename = f"view_{i:01d}.jpg"
+    render_path = pathlib.Path("{{ renders_dir }}") / render_filename
+    scene.render.filepath = str(render_path)
+    bpy.ops.render.render(write_still=True)
