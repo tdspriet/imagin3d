@@ -21,6 +21,7 @@ from backend.embeddings import BedrockEmbeddingFunction
 from backend.engines.blender import Blender
 from backend.agents.descriptor import Descriptor
 from backend.agents.visualizer import Visualizer
+from backend.utils.video import extract_key_frames
 
 load_dotenv()
 
@@ -115,7 +116,7 @@ async def extract(payload: MoodboardPayload) -> GenerateResponse:
                 # Create renders directory
                 renders_dir = ROOT_DIR / "checkpoints" / "renders"
                 renders_dir.mkdir(parents=True, exist_ok=True)
-                # Render views using Blender
+                # Create 5 renders using Blender
                 renders = await blender_engine.render_views(model_path, renders_dir)
                 # Generate description from rendered images
                 images = [render.image for render in renders]
@@ -123,8 +124,12 @@ async def extract(payload: MoodboardPayload) -> GenerateResponse:
                 token_data["description"] = result.output.description
 
             elif token_data["type"] == "video":
-                # Video should be converted into 5 frames before description generation
-                pass
+                video_base64 = element["content"]["data"]["src"]
+                # Extract five most diverse frames
+                frames = extract_key_frames(video_base64, frame_count=5)
+                # Generate description from frames
+                result = await descriptor_agent.run(frames)
+                token_data["description"] = result.output.description
 
             elif token_data["type"] == "palette":
                 token_data["description"] = ", ".join(element["content"]["colors"])
