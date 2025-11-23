@@ -5,6 +5,7 @@ import os
 from datetime import datetime
 from pathlib import Path
 
+import boto3
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -16,6 +17,7 @@ from omegaconf import DictConfig
 import pydantic_ai
 
 from backend.common import DesignToken, GenerateResponse, MoodboardPayload
+from backend.embeddings import BedrockEmbeddingFunction
 from backend.engines.blender import Blender
 from backend.agents.descriptor import Descriptor
 from backend.agents.visualizer import Visualizer
@@ -45,6 +47,10 @@ blender_engine: Blender = hydra.utils.instantiate(cfg.engine)
 # Initialize agents via Hydra
 descriptor_agent: Descriptor = hydra.utils.instantiate(cfg.descriptor)
 visualizer_agent: Visualizer = hydra.utils.instantiate(cfg.visualizer)
+
+# Initialize embedding function
+bedrock_client = boto3.client("bedrock-runtime")
+embedding_function = BedrockEmbeddingFunction(bedrock_client)
 
 # FastAPI application setup
 app = FastAPI(title="Imagin3D Backend", version="1.0.0")
@@ -141,9 +147,10 @@ async def extract(payload: MoodboardPayload) -> GenerateResponse:
                 result = await descriptor_agent.run(text_content)
                 token_data["description"] = result.output.description
 
-            # Embedding should be added here based on generated description
+            # Generate embedding based on description
             # TODO: later, check if OmniBind produces better results
-            token_data["embedding"] = []
+            embedding = embedding_function([token_data["description"]])[0]
+            token_data["embedding"] = embedding.tolist()
 
             # Append the token to the list
             design_tokens.append(DesignToken(**token_data))
