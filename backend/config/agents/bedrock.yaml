@@ -1,10 +1,11 @@
+# @package _global_
 descriptor:
-  _target_: backend.agents.descriptor.Descriptor
+  _target_: agents.descriptor.Descriptor
   llm:
     _target_: pydantic_ai.models.bedrock.BedrockConverseModel
     model_name: global.anthropic.claude-haiku-4-5-20251001-v1:0
 visualizer:
-  _target_: backend.agents.visualizer.Visualizer
+  _target_: agents.visualizer.Visualizer
   llm:
     _target_: pydantic_ai.models.google.GoogleModel
     model_name: gemini-2.5-flash-image
