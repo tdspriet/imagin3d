@@ -56,7 +56,7 @@ class BaseAgent[T](ABC):
         return result, cost
 
     def _add_costs(
-        self, ctx: common.Context, usage: pydantic_ai.RunUsage, elapsed_time: float
+        self, usage: pydantic_ai.RunUsage, elapsed_time: float
     ) -> common.Cost:
         self.total_cost = self.total_cost.add(
             common.Cost(elapsed_time, self._calc_cost(usage))
@@ -71,14 +71,19 @@ class BaseAgent[T](ABC):
         except LookupError:
             # NOTE: since genai_prices doesn't have these models yet, we fallback here
             # when they become available, they will return properly above and this can be removed
+            if "claude-haiku" in self.model_ref:
+                return (
+                    usage.input_tokens * 1 / 1000000 + usage.output_tokens * 5 / 1000000
+                )
             if "claude-sonnet" in self.model_ref:
                 return (
                     usage.input_tokens * 3 / 1000000
                     + usage.output_tokens * 15 / 1000000
                 )
-            if "claude-haiku" in self.model_ref:
+            if "claude-opus" in self.model_ref:
                 return (
-                    usage.input_tokens * 1 / 1000000 + usage.output_tokens * 5 / 1000000
+                    usage.input_tokens * 5 / 1000000
+                    + usage.output_tokens * 25 / 1000000
                 )
             if "gemini-2.5-flash-image" in self.model_ref:
                 return (
@@ -91,13 +96,11 @@ class BaseAgent[T](ABC):
             return 0.0
 
     @classmethod
-    async def load_instructions(
-        cls, ctx: pydantic_ai.RunContext[common.Context]
-    ) -> str:
+    async def load_instructions(cls) -> str:
         instructions_dir = pathlib.Path(__file__).parents[1] / "instructions"
         env = jinja2.Environment(loader=jinja2.FileSystemLoader(str(instructions_dir)))
         template = env.get_template(f"{cls.name}.j2")
-        return template.render(ctx=ctx.deps)
+        return template.render()
 
     @abstractmethod
-    async def run(self, ctx: common.Context) -> Any: ...
+    async def run(self) -> Any: ...
