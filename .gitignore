@@ -15,8 +15,8 @@ backend/.venv
 __pycache__
 *.pyc
 
-# Backend
-backend/generated
+# Checkpoints
+checkpoints
 
 # Notes
 notes.txt

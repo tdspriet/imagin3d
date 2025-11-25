@@ -34,6 +34,18 @@ if ALLOWED_ORIGINS:
 else:
     CORS_ORIGINS = ["*"]
 
+# Amazon Bedrock API
+os.environ["AWS_ACCESS_KEY_ID"] = os.environ.get("BEDROCK_ACCESS_KEY_ID", "")
+os.environ["AWS_SECRET_ACCESS_KEY"] = os.environ.get("BEDROCK_SECRET_ACCESS_KEY", "")
+if os.environ["AWS_ACCESS_KEY_ID"] == "" or os.environ["AWS_SECRET_ACCESS_KEY"] == "":
+    raise Exception("No AWS access keys provided.")
+os.environ["AWS_DEFAULT_REGION"] = "eu-central-1"
+
+# Google API
+os.environ["GOOGLE_API_KEY"] = os.environ.get("GOOGLE_API_KEY", "")
+if os.environ["GOOGLE_API_KEY"] == "":
+    raise Exception("No GOOGLE API key provided.")
+
 # Directory configuration
 ROOT_DIR = Path(__file__).parent.resolve()
 
