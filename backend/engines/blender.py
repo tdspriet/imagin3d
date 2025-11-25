@@ -9,7 +9,7 @@ import jinja2
 import pydantic_ai
 import structlog
 
-from backend.engines import engine
+from engines import engine
 
 logger = structlog.stdlib.get_logger(__name__)
 

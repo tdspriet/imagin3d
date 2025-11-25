@@ -9,7 +9,7 @@ import pydantic_ai
 import pydantic_ai.models
 import structlog
 
-from backend import common as common
+import common as common
 
 logger = structlog.stdlib.get_logger(__name__)
 

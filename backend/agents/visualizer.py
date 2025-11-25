@@ -4,8 +4,8 @@ import pydantic_ai
 import pydantic_ai.models
 import structlog
 
-from backend import common as common
-from backend.agents import agent as agent
+import common as common
+from agents import agent as agent
 
 logger = structlog.stdlib.get_logger(__name__)
 

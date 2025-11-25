@@ -16,12 +16,12 @@ from hydra import compose, initialize_config_dir
 from omegaconf import DictConfig
 import pydantic_ai
 
-from backend.common import DesignToken, GenerateResponse, MoodboardPayload
-from backend.embeddings import BedrockEmbeddingFunction
-from backend.engines.blender import Blender
-from backend.agents.descriptor import Descriptor
-from backend.agents.visualizer import Visualizer
-from backend.utils.video import extract_key_frames
+from common import DesignToken, GenerateResponse, MoodboardPayload
+from embeddings import BedrockEmbeddingFunction
+from engines.blender import Blender
+from agents.descriptor import Descriptor
+from agents.visualizer import Visualizer
+from utils.video import extract_key_frames
 
 load_dotenv()
 
