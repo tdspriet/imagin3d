@@ -33,21 +33,43 @@ const serializeDataForBackend = (nodes = []) => {
   const contentNodes = nodes.filter(n => n.type !== 'clusterNode')
 
   // ELEMENTS
-  const elements = contentNodes.map((node, index) => ({
-    originalId: node.id,
-    formatted: {
-      id: index + 1,
-      content: {
-        type: node.type.replace('Node', ''),
-        data: sanitizeNodeData(node),
-      },
-      position: {
+  const elements = contentNodes.map((node, index) => {
+    let width = Number(node?.style?.width, Number(node?.width, 0))
+    let height = Number(node?.style?.height, Number(node?.height, 0))
+
+    if (width === 0 || height === 0) {
+      if (node.type === 'textNode') {
+        width = width || DEFAULT_SIZES.TEXT.width
+        height = height || DEFAULT_SIZES.TEXT.height
+      } else if (node.type === 'fontNode') {
+        width = width || DEFAULT_SIZES.FONT.width
+        height = height || DEFAULT_SIZES.FONT.height
+      } else {
+        width = width || 1
+        height = height || 1
+      }
+    }
+
+    return {
+      originalId: node.id,
+      formatted: {
+        id: index + 1,
+        content: {
+          type: node.type.replace('Node', ''),
+          data: sanitizeNodeData(node),
+        },
+        width,
+        height,
         x: Number(node?.position?.x, 0),
         y: Number(node?.position?.y, 0),
-      },
-      size: computeSizeRatios(node),
+        position: {
+          x: Number(node?.position?.x, 0),
+          y: Number(node?.position?.y, 0),
+        },
+        size: computeSizeRatios(node),
+      }
     }
-  }))
+  })
 
   // CLUSTERS
   const nodeIdMap = new Map(elements.map(e => [e.originalId, e.formatted.id]))

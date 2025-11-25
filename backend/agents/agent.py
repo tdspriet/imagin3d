@@ -40,7 +40,7 @@ class BaseAgent[T](ABC):
         result = await self.agent.run(content, deps=ctx)
         elapsed_time = time.perf_counter() - start_time
         usage = result.usage()
-        cost = self._add_costs(ctx, usage, elapsed_time)
+        cost = self._add_costs(usage, elapsed_time)
         if log_run:
             logger.info(
                 f"Answer from {self.name}({self.model_ref}):\n"

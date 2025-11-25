@@ -35,3 +35,6 @@ class DesignToken(BaseModel):
 class Cost(NamedTuple):
     time: float
     price: float
+
+    def add(self, other: Cost) -> Cost:
+        return Cost(self.time + other.time, self.price + other.price)

@@ -114,11 +114,25 @@ async def extract(payload: MoodboardPayload) -> GenerateResponse:
 
         for element in data["elements"]:
             # 1) Basic token structure
+            width = element.get("width")
+            height = element.get("height")
+            if width is None or height is None:
+                size_obj = element.get("size", {})
+                width = width if width is not None else size_obj.get("width", 0)
+                height = height if height is not None else size_obj.get("height", 0)
+
+            x = element.get("x")
+            y = element.get("y")
+            if x is None or y is None:
+                pos_obj = element.get("position", {})
+                x = x if x is not None else pos_obj.get("x", 0)
+                y = y if y is not None else pos_obj.get("y", 0)
+
             token_data = {
                 "id": element["id"],
                 "type": element["content"]["type"],
-                "size": {"width": element["width"], "height": element["height"]},
-                "position": {"x": element["x"], "y": element["y"]},
+                "size": {"width": width, "height": height},
+                "position": {"x": x, "y": y},
             }
 
             # 2) Description and embedding generation
@@ -144,7 +158,8 @@ async def extract(payload: MoodboardPayload) -> GenerateResponse:
                 token_data["description"] = result.output.description
 
             elif token_data["type"] == "palette":
-                token_data["description"] = ", ".join(element["content"]["colors"])
+                colors = element["content"].get("data", {}).get("colors", [])
+                token_data["description"] = ", ".join(colors)
 
             elif token_data["type"] == "image":
                 image_base64 = element["content"]["data"]["src"]
