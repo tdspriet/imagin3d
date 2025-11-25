@@ -83,7 +83,7 @@ class Blender(engine.Engine):
         model_path: pathlib.Path,
         renders_dir: pathlib.Path,
     ) -> str:
-        template = self._jinja_env.get_template("render_glb.j2")
+        template = self._jinja_env.get_template("render.j2")
         return template.render(
             cfg=self,
             model_path=str(model_path.resolve()),

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 from datetime import datetime
 from pathlib import Path
 
@@ -98,6 +99,12 @@ async def extract(payload: MoodboardPayload) -> GenerateResponse:
             status_code=400, detail="Payload must contain elements or clusters"
         )
 
+    # Clear checkpoints directory
+    checkpoints_dir = ROOT_DIR / "checkpoints"
+    if checkpoints_dir.exists():
+        shutil.rmtree(checkpoints_dir)
+    checkpoints_dir.mkdir(parents=True, exist_ok=True)
+
     # Timestamp
     timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
 
@@ -140,7 +147,8 @@ async def extract(payload: MoodboardPayload) -> GenerateResponse:
                 # Save model file
                 model_path = await save_model_file(element, ROOT_DIR)
                 # Create renders directory
-                renders_dir = ROOT_DIR / "checkpoints" / "renders"
+                unique_name = str(element["id"])
+                renders_dir = ROOT_DIR / "checkpoints" / "model_renders" / unique_name
                 renders_dir.mkdir(parents=True, exist_ok=True)
                 # Create 5 renders using Blender
                 renders = await blender_engine.render_views(model_path, renders_dir)
@@ -153,6 +161,17 @@ async def extract(payload: MoodboardPayload) -> GenerateResponse:
                 video_base64 = element["content"]["data"]["src"]
                 # Extract five most diverse frames
                 frames = extract_key_frames(video_base64, frame_count=5)
+
+                # Save frames
+                unique_name = str(element["id"])
+                frames_dir = ROOT_DIR / "checkpoints" / "video_frames" / unique_name
+                frames_dir.mkdir(parents=True, exist_ok=True)
+
+                for i, frame in enumerate(frames):
+                    frame_path = frames_dir / f"frame_{i}.jpg"
+                    with open(frame_path, "wb") as f:
+                        f.write(frame.data)
+
                 # Generate description from frames
                 result = await descriptor_agent.run(frames)
                 token_data["description"] = result.output.description

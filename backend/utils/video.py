@@ -79,23 +79,35 @@ def extract_key_frames(
 
     try:
         capture = cv2.VideoCapture(str(temp_path))
-        frames: list[np.ndarray] = []
         features: list[np.ndarray] = []
 
         while True:
             success, frame = capture.read()
             if not success or frame is None:
                 break
-            frames.append(frame)
             features.append(_feature_vector(frame))
 
         capture.release()
 
-        if not frames:
+        if not features:
             return []
 
         indices = _select_diverse_indices(features, frame_count)
-        return [_frame_to_image(frames[idx]) for idx in indices]
+
+        # Re-open video to fetch only the selected frames to save memory
+        capture = cv2.VideoCapture(str(temp_path))
+        frame_map = {}
+        sorted_indices = sorted(list(set(indices)))
+
+        for idx in sorted_indices:
+            capture.set(cv2.CAP_PROP_POS_FRAMES, idx)
+            success, frame = capture.read()
+            if success and frame is not None:
+                frame_map[idx] = _frame_to_image(frame)
+
+        capture.release()
+
+        return [frame_map[idx] for idx in indices if idx in frame_map]
     finally:
         try:
             os.remove(temp_path)
