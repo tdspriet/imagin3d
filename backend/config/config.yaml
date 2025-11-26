@@ -1,7 +1,7 @@
 # @package _global_
 defaults:
   - hydra
-  - agents: bedrock
+  - agents: normal
   - _self_
   - override /hydra/hydra_logging: disabled
   - override /hydra/job_logging: disabled
