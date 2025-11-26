@@ -121,25 +121,14 @@ async def extract(payload: MoodboardPayload) -> GenerateResponse:
 
         for element in data["elements"]:
             # 1) Basic token structure
-            width = element.get("width")
-            height = element.get("height")
-            if width is None or height is None:
-                size_obj = element.get("size", {})
-                width = width if width is not None else size_obj.get("width", 0)
-                height = height if height is not None else size_obj.get("height", 0)
-
-            x = element.get("x")
-            y = element.get("y")
-            if x is None or y is None:
-                pos_obj = element.get("position", {})
-                x = x if x is not None else pos_obj.get("x", 0)
-                y = y if y is not None else pos_obj.get("y", 0)
-
             token_data = {
                 "id": element["id"],
                 "type": element["content"]["type"],
-                "size": {"width": width, "height": height},
-                "position": {"x": x, "y": y},
+                "size": {"x": element["size"]["x"], "y": element["size"]["y"]},
+                "position": {
+                    "x": element["position"]["x"],
+                    "y": element["position"]["y"],
+                },
             }
 
             # 2) Description and embedding generation

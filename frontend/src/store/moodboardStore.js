@@ -34,22 +34,6 @@ const serializeDataForBackend = (nodes = []) => {
 
   // ELEMENTS
   const elements = contentNodes.map((node, index) => {
-    let width = Number(node?.style?.width, Number(node?.width, 0))
-    let height = Number(node?.style?.height, Number(node?.height, 0))
-
-    if (width === 0 || height === 0) {
-      if (node.type === 'textNode') {
-        width = width || DEFAULT_SIZES.TEXT.width
-        height = height || DEFAULT_SIZES.TEXT.height
-      } else if (node.type === 'fontNode') {
-        width = width || DEFAULT_SIZES.FONT.width
-        height = height || DEFAULT_SIZES.FONT.height
-      } else {
-        width = width || 1
-        height = height || 1
-      }
-    }
-
     return {
       originalId: node.id,
       formatted: {
@@ -58,10 +42,6 @@ const serializeDataForBackend = (nodes = []) => {
           type: node.type.replace('Node', ''),
           data: sanitizeNodeData(node),
         },
-        width,
-        height,
-        x: Number(node?.position?.x, 0),
-        y: Number(node?.position?.y, 0),
         position: {
           x: Number(node?.position?.x, 0),
           y: Number(node?.position?.y, 0),
@@ -112,7 +92,7 @@ const computeSizeRatios = (node) => {
     const currentFontSize = Number(node?.data?.fontSize, DEFAULT_FONT_SIZE)
     const defaultFontSize = DEFAULT_FONT_SIZE
     const ratio = currentFontSize / defaultFontSize
-    return { sizeX: ratio, sizeY: ratio }
+    return { x: ratio, y: ratio }
   }
 
   const width = Number(node?.style?.width, Number(node?.width, 1))
