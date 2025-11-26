@@ -32,6 +32,13 @@ def _feature_vector(frame: np.ndarray) -> np.ndarray:
     return lab.astype(np.float32).flatten()
 
 
+def _is_near_solid_frame(frame: np.ndarray, threshold: float = 75.0) -> bool:
+    # Convert to grayscale and check standard deviation
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    std_dev = np.std(gray)
+    return std_dev < threshold
+
+
 def _select_diverse_indices(features: list[np.ndarray], count: int) -> list[int]:
     if not features:
         return []
@@ -80,19 +87,27 @@ def extract_key_frames(
     try:
         capture = cv2.VideoCapture(str(temp_path))
         features: list[np.ndarray] = []
+        valid_indices: list[int] = []
+        frame_idx = 0
 
         while True:
             success, frame = capture.read()
             if not success or frame is None:
                 break
-            features.append(_feature_vector(frame))
+            # Skip near-solid frames (pure black, white, or uniform color)
+            if not _is_near_solid_frame(frame):
+                features.append(_feature_vector(frame))
+                valid_indices.append(frame_idx)
+            frame_idx += 1
 
         capture.release()
 
         if not features:
             return []
 
-        indices = _select_diverse_indices(features, frame_count)
+        selected_local = _select_diverse_indices(features, frame_count)
+        # Map back to original frame indices
+        indices = [valid_indices[i] for i in selected_local]
 
         # Re-open video to fetch only the selected frames to save memory
         capture = cv2.VideoCapture(str(temp_path))
