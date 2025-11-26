@@ -101,8 +101,8 @@ const computeSizeRatios = (node) => {
   const initialHeight = Number(node?.data?.initialSize?.height, height || 1)
 
   return {
-    sizeX: initialWidth ? width / initialWidth : 1,
-    sizeY: initialHeight ? height / initialHeight : 1,
+    x: initialWidth ? width / initialWidth : 1,
+    y: initialHeight ? height / initialHeight : 1,
   }
 }
 

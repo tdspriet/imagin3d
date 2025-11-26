@@ -5,7 +5,6 @@ Preserve all key information, themes, concepts, and details from the original te
 
 Text to describe:
 {{ ctx.text }}
-
 {% elif ctx.content_type == "images" %}
 You are given {{ ctx.num_images }} image(s) from a design moodboard. Your task is to create a detailed textual description that captures all visual content, design elements, colors, composition, style, and any other relevant details visible in the image(s).
 
@@ -18,7 +17,5 @@ Be thorough and descriptive. Include:
 - Overall mood or atmosphere
 
 The description should be comprehensive enough that someone could understand the visual content without seeing the images.
-
 {% endif %}
-
 Provide a detailed description that preserves all content.

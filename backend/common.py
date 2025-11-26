@@ -28,8 +28,8 @@ class DesignToken(BaseModel):
     type: str
     description: Optional[str] = None
     embedding: List[float] = Field(default_factory=list)
-    size: Dict[str, float]  # e.g., {"width": 100, "height": 100}
-    position: Dict[str, float]  # e.g., {"x": 0, "y": 0}
+    size: Dict[str, float]
+    position: Dict[str, float]
 
 
 class Cost(NamedTuple):
