@@ -72,6 +72,7 @@ app.add_middleware(
 )
 
 
+# TODO: this should have a loading bar in the frontend
 @app.post("/extract", response_model=GenerateResponse)
 async def extract(payload: MoodboardPayload) -> GenerateResponse:
     if not payload.elements and not payload.clusters:
@@ -115,6 +116,7 @@ async def extract(payload: MoodboardPayload) -> GenerateResponse:
             }
 
             # 2) Description generation using orchestrator
+            # TODO: this should be parallelized later
             match token_data["type"]:
                 case "model":
                     # TODO: later, check if PointLLM produces better results
