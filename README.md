@@ -9,6 +9,8 @@ git clone https://github.com/tdspriet/imagin3d.git
 
 ### Frontend
 
+The frontend uses React and Vite.
+
 1. **Prerequisites** <br>
 Make sure you have [Node.js](https://nodejs.org/) and [npm](https://www.npmjs.com/get-npm) installed.
 
@@ -23,6 +25,8 @@ npm run dev
 ``
 
 ### Backend 
+
+The backend uses FastAPI and Uvicorn.
 
 1. **Prerequisites** <br>
 Make sure you have [Python 3.10+](https://www.python.org/downloads/) and [pip](https://pip.pypa.io/en/stable/installation/) installed.
