@@ -11,6 +11,7 @@ from typing import NamedTuple
 class MoodboardPayload(BaseModel):
     elements: List[Element] = Field(default_factory=list)
     clusters: List[Cluster] = Field(default_factory=list)
+    prompt: str = Field(default="")
 
 
 class GenerateResponse(BaseModel):

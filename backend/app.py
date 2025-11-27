@@ -88,7 +88,11 @@ async def extract(payload: MoodboardPayload) -> GenerateResponse:
         )
 
     # Log start of moodboard extraction
-    logger.info("Starting moodboard extraction", element_count=len(payload.elements))
+    logger.info(
+        "Starting moodboard extraction",
+        prompt=payload.prompt,
+        element_count=len(payload.elements),
+    )
 
     # Clear checkpoints directory
     checkpoints_dir = ROOT_DIR / "checkpoints"
