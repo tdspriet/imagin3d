@@ -1,19 +1,14 @@
-# Dependencies
+# Frontend Dependencies
 node_modules
 
-# Build outputs
-dist
-generated
-
-# Environment variables
-.env
+# Backend Environment
 .venv
-venv
-backend/.venv
 
 # Python
 __pycache__
-*.pyc
+
+# Secrets
+.env
 
 # Checkpoints
 checkpoints
