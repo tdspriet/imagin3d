@@ -46,7 +46,7 @@ async def handle_model(element: dict) -> tuple[str, str]:
     images = [render.image for render in renders]
 
     # Generate title and description
-    result = await descriptor.run(images)
+    result = await descriptor.run(images, type="model")
     return result.output.info.title, result.output.info.description
 
 
@@ -67,7 +67,7 @@ async def handle_video(element: dict) -> tuple[str, str]:
             f.write(frame.data)
 
     # Generate title and description
-    result = await descriptor.run(frames)
+    result = await descriptor.run(frames, type="video")
     return result.output.info.title, result.output.info.description
 
 
@@ -80,7 +80,7 @@ async def handle_image(element: dict) -> tuple[str, str]:
     image = pydantic_ai.BinaryImage(data=image_bytes, media_type="image/jpeg")
 
     # Generate title and description
-    result = await descriptor.run([image])
+    result = await descriptor.run([image], type="image")
     return result.output.info.title, result.output.info.description
 
 
@@ -88,15 +88,17 @@ async def handle_text(element: dict) -> tuple[str, str]:
     text = element["content"]["data"]["text"]
 
     # Generate title and description
-    result = await descriptor.run(text)
+    result = await descriptor.run(text, type="text")
     return result.output.info.title, result.output.info.description
 
 
-def handle_palette(element: dict) -> tuple[str, str]:
-    # TODO: check if a better method is needed
-    # Make title and description
+async def handle_palette(element: dict) -> tuple[str, str]:
     colors = element["content"].get("data", {}).get("colors", [])
-    return "Colors", ", ".join(colors)
+    colors_description = ", ".join(colors)
+
+    # Generate only title
+    result = await descriptor.run(colors_description, type="palette")
+    return result.output.info.title, colors_description
 
 
 def generate_embedding(title: str) -> list[float]:

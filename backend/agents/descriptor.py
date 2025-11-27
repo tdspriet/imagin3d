@@ -19,15 +19,15 @@ class Descriptor(agent.BaseAgent):
         super().__init__(llm, self.Output)
 
     async def run(
-        self, content: str | list[pydantic_ai.BinaryImage]
+        self,
+        content: str | list[pydantic_ai.BinaryImage],
+        type: str,
     ) -> pydantic_ai.AgentRunResult[Output]:
+        # Text
         if isinstance(content, str):
-            # Plain text -> pass as context for template rendering
-            result, cost = await self._prompt({"content_type": "text", "text": content})
+            result, _ = await self._prompt({"type": type, "text": content})
+        # Images
         else:
-            # List of images -> pass context indicating images, images go in extra
-            result, cost = await self._prompt(
-                {"content_type": "images", "num_images": len(content)}, extra=content
-            )
+            result, _ = await self._prompt({"type": type}, extra=content)
 
         return result
