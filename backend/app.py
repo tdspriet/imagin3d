@@ -5,7 +5,6 @@ import os
 import shutil
 from datetime import datetime
 from pathlib import Path
-
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -13,11 +12,30 @@ import uvicorn
 import structlog
 
 from common import DesignToken, GenerateResponse, MoodboardPayload
-import orchestrator
 
 load_dotenv()
 
+# Amazon Bedrock API
+os.environ["AWS_ACCESS_KEY_ID"] = os.environ.get("BEDROCK_ACCESS_KEY_ID", "")
+os.environ["AWS_SECRET_ACCESS_KEY"] = os.environ.get("BEDROCK_SECRET_ACCESS_KEY", "")
+if os.environ["AWS_ACCESS_KEY_ID"] == "" or os.environ["AWS_SECRET_ACCESS_KEY"] == "":
+    raise Exception("No AWS access keys provided.")
+os.environ["AWS_DEFAULT_REGION"] = "eu-central-1"
+
+# Google API
+os.environ["GOOGLE_API_KEY"] = os.environ.get("GOOGLE_API_KEY", "")
+if os.environ["GOOGLE_API_KEY"] == "":
+    raise Exception("No GOOGLE API key provided.")
+
+import orchestrator  # noqa: E402
+
 # Logging configuration
+structlog.configure(
+    processors=[
+        structlog.stdlib.add_log_level,
+        structlog.dev.ConsoleRenderer(pad_level=False),
+    ],
+)
 logger = structlog.stdlib.get_logger(__name__)
 
 # CORS configuration
@@ -61,6 +79,9 @@ async def extract(payload: MoodboardPayload) -> GenerateResponse:
             status_code=400, detail="Payload must contain elements or clusters"
         )
 
+    # Log start of moodboard extraction
+    logger.info("Starting moodboard extraction", element_count=len(payload.elements))
+
     # Clear checkpoints directory
     checkpoints_dir = ROOT_DIR / "checkpoints"
     if checkpoints_dir.exists():
@@ -97,19 +118,19 @@ async def extract(payload: MoodboardPayload) -> GenerateResponse:
             match token_data["type"]:
                 case "model":
                     # TODO: later, check if Cap3D produces better results
-                    logger.info("Handling model element", element_id=element["id"])
+                    logger.info(f"Handling model element #{element['id']}")
                     title, description = await orchestrator.handle_model(element)
                 case "video":
-                    logger.info("Handling video element", element_id=element["id"])
+                    logger.info(f"Handling video element #{element['id']}")
                     title, description = await orchestrator.handle_video(element)
                 case "palette":
-                    logger.info("Handling palette element", element_id=element["id"])
+                    logger.info(f"Handling palette element #{element['id']}")
                     title, description = orchestrator.handle_palette(element)
                 case "image":
-                    logger.info("Handling image element", element_id=element["id"])
+                    logger.info(f"Handling image element #{element['id']}")
                     title, description = await orchestrator.handle_image(element)
                 case "text":
-                    logger.info("Handling text element", element_id=element["id"])
+                    logger.info(f"Handling text element #{element['id']}")
                     title, description = await orchestrator.handle_text(element)
             token_data["title"] = title
             token_data["description"] = description
@@ -131,6 +152,9 @@ async def extract(payload: MoodboardPayload) -> GenerateResponse:
         json.dump(
             [token.dict() for token in design_tokens], f, ensure_ascii=False, indent=2
         )
+
+    # Log completion of moodboard extraction
+    logger.info("Completed moodboard extraction")
 
     # Return okay response
     return GenerateResponse(count=len(payload.elements), file=str(design_tokens_path))
