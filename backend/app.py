@@ -117,7 +117,7 @@ async def extract(payload: MoodboardPayload) -> GenerateResponse:
             # 2) Description generation using orchestrator
             match token_data["type"]:
                 case "model":
-                    # TODO: later, check if Cap3D produces better results
+                    # TODO: later, check if PointLLM produces better results
                     logger.info(f"Handling model element #{element['id']}")
                     title, description = await orchestrator.handle_model(element)
                 case "video":
@@ -136,6 +136,7 @@ async def extract(payload: MoodboardPayload) -> GenerateResponse:
             token_data["description"] = description
 
             # 3) Generate embedding based on title
+            # TODO: later, check if OmniBind or Point-Bind produces better results
             token_data["embedding"] = orchestrator.generate_embedding(
                 token_data["title"]
             )

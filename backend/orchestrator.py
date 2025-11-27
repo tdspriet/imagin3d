@@ -103,7 +103,6 @@ async def handle_palette(element: dict) -> tuple[str, str]:
 
 def generate_embedding(title: str) -> list[float]:
     # Generate embedding for the given title
-    # TODO: later, check if OmniBind produces better results
     return embedding_function([title])[0].tolist()
 
 

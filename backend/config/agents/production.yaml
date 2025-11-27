@@ -1,0 +1,11 @@
+# @package _global_
+descriptor:
+  _target_: agents.descriptor.Descriptor
+  llm:
+    _target_: pydantic_ai.models.google.GoogleModel
+    model_name: gemini-3-pro-preview
+visualizer:
+  _target_: agents.visualizer.Visualizer
+  llm:
+    _target_: pydantic_ai.models.google.GoogleModel
+    model_name: gemini-2.5-flash-image
