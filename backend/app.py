@@ -16,15 +16,18 @@ import hydra
 from hydra import compose, initialize_config_dir
 from omegaconf import DictConfig
 import pydantic_ai
+import structlog
 
 from common import DesignToken, GenerateResponse, MoodboardPayload
-from embeddings import BedrockEmbeddingFunction
+from utils.embeddings import BedrockEmbeddingFunction
 from engines.blender import Blender
 from agents.descriptor import Descriptor
 from agents.visualizer import Visualizer
 from utils.video import extract_key_frames
 
 load_dotenv()
+
+logger = structlog.stdlib.get_logger(__name__)
 
 # CORS configuration
 ALLOWED_ORIGINS = os.getenv("BACKEND_ALLOWED_ORIGINS")
@@ -50,19 +53,13 @@ if os.environ["GOOGLE_API_KEY"] == "":
 # Directory configuration
 ROOT_DIR = Path(__file__).parent.resolve()
 
-# Initialize Hydra configuration
+# Initialize via Hydra configuration
 config_dir = str(ROOT_DIR / "config")
 with initialize_config_dir(config_dir=config_dir, version_base=None):
     cfg: DictConfig = compose(config_name="config")
-
-# Initialize Blender engine via Hydra
 blender_engine: Blender = hydra.utils.instantiate(cfg.engine)
-
-# Initialize agents via Hydra
-descriptor_agent: Descriptor = hydra.utils.instantiate(cfg.descriptor)
+descriptor: Descriptor = hydra.utils.instantiate(cfg.descriptor)
 visualizer_agent: Visualizer = hydra.utils.instantiate(cfg.visualizer)
-
-# Initialize embedding function
 bedrock_client = boto3.client("bedrock-runtime")
 embedding_function = BedrockEmbeddingFunction(bedrock_client)
 
@@ -143,8 +140,9 @@ async def extract(payload: MoodboardPayload) -> GenerateResponse:
                 renders = await blender_engine.render_views(model_path, renders_dir)
                 # Generate description from rendered images
                 images = [render.image for render in renders]
-                result = await descriptor_agent.run(images)
-                token_data["description"] = result.output.description
+                result = await descriptor.run(images)
+                token_data["title"] = result.output.info.title
+                token_data["description"] = result.output.info.description
 
             elif token_data["type"] == "video":
                 video_base64 = element["content"]["data"]["src"]
@@ -162,11 +160,13 @@ async def extract(payload: MoodboardPayload) -> GenerateResponse:
                         f.write(frame.data)
 
                 # Generate description from frames
-                result = await descriptor_agent.run(frames)
-                token_data["description"] = result.output.description
+                result = await descriptor.run(frames)
+                token_data["title"] = result.output.info.title
+                token_data["description"] = result.output.info.description
 
             elif token_data["type"] == "palette":
                 colors = element["content"].get("data", {}).get("colors", [])
+                token_data["title"] = "Colors"
                 token_data["description"] = ", ".join(colors)
 
             elif token_data["type"] == "image":
@@ -178,14 +178,16 @@ async def extract(payload: MoodboardPayload) -> GenerateResponse:
                     data=image_bytes, media_type="image/jpeg"
                 )
                 # Generate description from image
-                result = await descriptor_agent.run([image])
-                token_data["description"] = result.output.description
+                result = await descriptor.run([image])
+                token_data["title"] = result.output.info.title
+                token_data["description"] = result.output.info.description
 
             elif token_data["type"] == "text":
                 # Generate description from text content
                 text_content = element["content"]["data"]["text"]
-                result = await descriptor_agent.run(text_content)
-                token_data["description"] = result.output.description
+                result = await descriptor.run(text_content)
+                token_data["title"] = result.output.info.title
+                token_data["description"] = result.output.info.description
 
             # Generate embedding based on description
             # TODO: later, check if OmniBind produces better results

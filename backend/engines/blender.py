@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 import pathlib
 import shutil
-from typing import Any
 
 import jinja2
 import pydantic_ai

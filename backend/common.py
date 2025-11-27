@@ -3,18 +3,13 @@ from __future__ import annotations
 from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
-import numpy as np
 from typing import NamedTuple
 
-
-class Cluster(BaseModel):
-    id: int
-    title: str
-    elements: List[int]
+# --- Frontend / Backend link ---
 
 
 class MoodboardPayload(BaseModel):
-    elements: List[Dict[str, Any]] = Field(default_factory=list)
+    elements: List[Element] = Field(default_factory=list)
     clusters: List[Cluster] = Field(default_factory=list)
 
 
@@ -23,13 +18,20 @@ class GenerateResponse(BaseModel):
     file: str
 
 
-class DesignToken(BaseModel):
+# --- Internal Data Models ---
+
+
+class Element(BaseModel):
     id: int
-    type: str
-    description: Optional[str] = None
-    embedding: List[float] = Field(default_factory=list)
-    size: Dict[str, float]
+    content: Dict[str, Any]
     position: Dict[str, float]
+    size: Dict[str, float]
+
+
+class Cluster(BaseModel):
+    id: int
+    title: str
+    elements: List[int]
 
 
 class Cost(NamedTuple):
@@ -38,3 +40,24 @@ class Cost(NamedTuple):
 
     def add(self, other: Cost) -> Cost:
         return Cost(self.time + other.time, self.price + other.price)
+
+
+# --- LLM Data Models ---
+
+
+class Info(BaseModel):
+    title: str
+    description: str
+
+
+# --- Token Data Models ---
+
+
+class DesignToken(BaseModel):
+    id: int
+    type: str
+    title: Optional[str] = None
+    description: Optional[str] = None
+    embedding: List[float] = Field(default_factory=list)
+    size: Dict[str, float]
+    position: Dict[str, float]

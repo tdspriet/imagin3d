@@ -1,4 +1,3 @@
-from typing import Any
 import pydantic
 import pydantic_ai
 import pydantic_ai.models
@@ -14,7 +13,7 @@ class Descriptor(agent.BaseAgent):
     name = "descriptor"
 
     class Output(pydantic.BaseModel):
-        description: str
+        info: common.Info
 
     def __init__(self, llm: pydantic_ai.models.Model | str):
         super().__init__(llm, self.Output)
