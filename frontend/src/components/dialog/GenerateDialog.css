@@ -1,0 +1,151 @@
+.generate-dialog {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.generate-dialog__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 15, 15, 0.45);
+}
+
+.generate-dialog__content {
+  position: relative;
+  z-index: 1;
+  width: min(500px, 94vw);
+  max-height: 90vh;
+  overflow-y: auto;
+  background: var(--color-surface-raised);
+  border-radius: 14px;
+  padding: 24px 28px 32px;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.22);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.generate-dialog__close {
+  position: absolute;
+  top: 18px;
+  right: 20px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.generate-dialog__close:hover {
+  background: var(--color-surface-hover);
+}
+
+.generate-dialog__close:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.generate-dialog__header {
+  margin-bottom: 20px;
+}
+
+.generate-dialog__header h2 {
+  margin: 0 0 8px 0;
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.generate-dialog__header p {
+  margin: 0;
+  font-size: 0.95rem;
+  color: var(--color-text-secondary);
+}
+
+.generate-dialog__form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.generate-dialog__input {
+  width: 100%;
+  padding: 12px 14px;
+  font-size: 0.95rem;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  resize: vertical;
+  min-height: 100px;
+  font-family: inherit;
+}
+
+.generate-dialog__input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(var(--color-primary-rgb), 0.15);
+}
+
+.generate-dialog__input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.generate-dialog__input::placeholder {
+  color: var(--color-text-muted);
+}
+
+.generate-dialog__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.generate-dialog__btn {
+  padding: 10px 20px;
+  font-size: 0.95rem;
+  font-weight: 500;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  border: none;
+}
+
+.generate-dialog__btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.generate-dialog__btn--secondary {
+  background: var(--color-surface-hover);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+}
+
+.generate-dialog__btn--secondary:hover:not(:disabled) {
+  background: var(--color-border);
+}
+
+.generate-dialog__btn--primary {
+  background: #1a1a1a;
+  color: #ffffff;
+}
+
+[data-theme="dark"] .generate-dialog__btn--primary {
+  background: #ffffff;
+  color: #1a1a1a;
+}
+
+.generate-dialog__btn--primary:hover:not(:disabled) {
+  opacity: 0.85;
+}

@@ -15,6 +15,7 @@ import {
 } from 'react-icons/md'
 import { useMoodboardStore } from '../store/moodboardStore'
 import PaletteDialog from './dialog/PaletteDialog'
+import GenerateDialog from './dialog/GenerateDialog'
 import './Topbar.css'
 
 /**
@@ -57,6 +58,7 @@ function Topbar() {
   const modelInputRef = useRef(null)
   const loadInputRef = useRef(null)
   const [isPaletteDialogOpen, setPaletteDialogOpen] = useState(false)
+  const [isGenerateDialogOpen, setGenerateDialogOpen] = useState(false)
 
   // Handle image file selection
   const handleImageUpload = (e) => {
@@ -162,12 +164,13 @@ function Topbar() {
     return true
   }
 
-  const handleGenerateMoodboard = async () => {
+  const handleGenerateMoodboard = async (prompt) => {
     try {
-      const result = await generateMoodboard()
+      const result = await generateMoodboard(prompt)
       if (result?.file) {
         console.log(`Generated extraction ${result.file} with ${result.count} elements`)
       }
+      setGenerateDialogOpen(false) /* only close after okay response */
     } catch (error) {
       console.error('Failed to extract:', error)
     }
@@ -231,7 +234,7 @@ function Topbar() {
           <MdFolderOpen className="btn-icon" size={18} aria-hidden="true" focusable="false" />
           <span>Load</span>
         </button>
-        <button onClick={handleGenerateMoodboard} className="btn btn-warning" disabled={isGenerating}>
+        <button onClick={() => setGenerateDialogOpen(true)} className="btn btn-warning" disabled={isGenerating}>
           <MdAutoAwesome className="btn-icon" size={18} aria-hidden="true" focusable="false" />
           <span>Generate</span>
         </button>
@@ -277,6 +280,12 @@ function Topbar() {
         isOpen={isPaletteDialogOpen}
         onClose={() => setPaletteDialogOpen(false)}
         onCreateManual={handleCreateManualPalette}
+      />
+      <GenerateDialog
+        isOpen={isGenerateDialogOpen}
+        onClose={() => setGenerateDialogOpen(false)}
+        onGenerate={handleGenerateMoodboard}
+        isGenerating={isGenerating}
       />
     </div>
   )

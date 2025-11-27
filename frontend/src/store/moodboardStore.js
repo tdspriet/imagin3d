@@ -541,13 +541,16 @@ export const useMoodboardStore = create((set, get) => ({
   },
 
   // Send moodboard to backend generator
-  generateMoodboard: async () => {
+  generateMoodboard: async (prompt = '') => {
     const { nodes } = get()
     const payload = serializeDataForBackend(nodes)
 
     if ((!payload.elements || payload.elements.length === 0) && (!payload.clusters || payload.clusters.length === 0)) {
       return { count: 0, file: null }
     }
+
+    // Add the user prompt to the payload
+    payload.prompt = prompt
 
     set({ isGenerating: true })
     try {
