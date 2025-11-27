@@ -5,7 +5,7 @@
 
 # Imagin3D
 
-Imagin3D is an AI-powered moodboard platform that generates 3D models based on user prompts. Users can create visual moodboards and use them as inspiration to generate custom 3D assets through generative AI.
+Imagin3D is a moodboard platform that enables users to generate 3D models from visual inspiration. Users compose moodboards and the system uses generative AI to produce corresponding 3D assets.
 
 ## Installation
 
