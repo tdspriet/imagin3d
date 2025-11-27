@@ -8,5 +8,5 @@ Describe these video frames: key scenes, motion, visual style, and narrative.
 {% elif ctx.type == "model" %}
 Describe this 3D model: shape, structure, materials, and purpose.
 {% elif ctx.type == "palette" %}
-Name this color palette (colors: {{ ctx.colors }}). Provide only a creative title, leave description empty.
+Name this color palette (colors: {{ ctx.text }}). Provide only a creative title, description should be "None".
 {% endif %}

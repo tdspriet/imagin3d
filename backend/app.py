@@ -11,7 +11,12 @@ from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 import structlog
 
-from common import DesignToken, GenerateResponse, MoodboardPayload
+from common import (
+    ClusterDescriptor,
+    DesignToken,
+    GenerateResponse,
+    MoodboardPayload,
+)
 
 load_dotenv()
 
@@ -108,20 +113,9 @@ async def extract(payload: MoodboardPayload) -> GenerateResponse:
         data = json.load(source_file)
 
         for element in data["elements"]:
-            # 1) Basic token structure
-            token_data = {
-                "id": element["id"],
-                "type": element["content"]["type"],
-                "size": {"x": element["size"]["x"], "y": element["size"]["y"]},
-                "position": {
-                    "x": element["position"]["x"],
-                    "y": element["position"]["y"],
-                },
-            }
-
-            # 2) Description generation using orchestrator
+            # 1) Title and description generation
             # TODO: this should be parallelized later
-            match token_data["type"]:
+            match element["content"]["type"]:
                 case "model":
                     # TODO: later, check if PointLLM produces better results
                     logger.info(f"Handling model element #{element['id']}")
@@ -131,24 +125,29 @@ async def extract(payload: MoodboardPayload) -> GenerateResponse:
                     title, description = await orchestrator.handle_video(element)
                 case "palette":
                     logger.info(f"Handling palette element #{element['id']}")
-                    title, description = orchestrator.handle_palette(element)
+                    title, description = await orchestrator.handle_palette(element)
                 case "image":
                     logger.info(f"Handling image element #{element['id']}")
                     title, description = await orchestrator.handle_image(element)
                 case "text":
                     logger.info(f"Handling text element #{element['id']}")
                     title, description = await orchestrator.handle_text(element)
-            token_data["title"] = title
-            token_data["description"] = description
 
-            # 3) Generate embedding based on title
+            # 2) Generate embedding based on title
             # TODO: later, check if OmniBind or Point-Bind produces better results
-            token_data["embedding"] = orchestrator.generate_embedding(
-                token_data["title"]
-            )
+            embedding = orchestrator.generate_embedding(title)
 
-            # 4) Append the token to the list
-            design_tokens.append(DesignToken(**token_data))
+            # 3) Create the design token and append to list
+            design_token = DesignToken(
+                id=element["id"],
+                type=element["content"]["type"],
+                title=title,
+                description=description,
+                embedding=embedding,
+                size={"x": element["size"]["x"], "y": element["size"]["y"]},
+                position={"x": element["position"]["x"], "y": element["position"]["y"]},
+            )
+            design_tokens.append(design_token)
 
     # Dump design tokens to JSON file
     design_tokens_path = (
@@ -161,6 +160,53 @@ async def extract(payload: MoodboardPayload) -> GenerateResponse:
         )
 
     # ----- Cluster Descriptors -----
+
+    # Create a lookup map from element id to design token
+    token_lookup: dict[int, DesignToken] = {token.id: token for token in design_tokens}
+
+    # Turn clusters into cluster descriptors
+    cluster_descriptors: list[ClusterDescriptor] = []
+    with raw_path.open("r", encoding="utf-8") as source_file:
+        data = json.load(source_file)
+
+        for cluster in data["clusters"]:
+            logger.info(f"Handling cluster #{cluster['id']}")
+
+            # 1) Gather elements for this cluster
+            elements: list[DesignToken] = [
+                token_lookup[element_id]
+                for element_id in cluster["elements"]
+                if element_id in token_lookup
+            ]
+
+            # 2) Generate title, purpose and description via clusterer
+            # TODO: this should be parallelized later
+            # NOTE: check if purpose is needed
+            title, purpose, description = await orchestrator.handle_cluster(
+                cluster["title"], elements
+            )
+
+            # 3) Create the cluster descriptor and append to list
+            # NOTE: check if cluster descriptors need embeddings
+            cluster_descriptor = ClusterDescriptor(
+                id=cluster["id"],
+                title=title,
+                purpose=purpose,
+                description=description,
+                elements=elements,
+            )
+            cluster_descriptors.append(cluster_descriptor)
+
+            # 4) Dump each cluster descriptor to its own JSON file
+            cluster_descriptors_dir = (
+                ROOT_DIR / "checkpoints" / "cluster_descriptors" / str(cluster["id"])
+            )
+            cluster_descriptors_dir.mkdir(parents=True, exist_ok=True)
+            cluster_descriptor_path = (
+                cluster_descriptors_dir / f"cluster-{cluster['id']}-{timestamp}.json"
+            )
+            with cluster_descriptor_path.open("w", encoding="utf-8") as f:
+                json.dump(cluster_descriptor.dict(), f, ensure_ascii=False, indent=2)
 
     # ----- Intent Router -----
 

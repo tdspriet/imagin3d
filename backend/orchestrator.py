@@ -10,7 +10,9 @@ from omegaconf import DictConfig
 import pydantic_ai
 import structlog
 
+import common
 from agents.descriptor import Descriptor
+from agents.clusterer import Clusterer
 from engines.blender import Blender
 from utils.embeddings import BedrockEmbeddingFunction
 from utils.video import extract_key_frames
@@ -27,6 +29,7 @@ with initialize_config_dir(config_dir=config_dir, version_base=None):
     cfg: DictConfig = compose(config_name="config")
 blender_engine: Blender = hydra.utils.instantiate(cfg.engine)
 descriptor: Descriptor = hydra.utils.instantiate(cfg.descriptor)
+clusterer: Clusterer = hydra.utils.instantiate(cfg.clusterer)
 bedrock_client = boto3.client("bedrock-runtime")
 embedding_function = BedrockEmbeddingFunction(bedrock_client)
 
@@ -99,6 +102,18 @@ async def handle_palette(element: dict) -> tuple[str, str]:
     # Generate only title
     result = await descriptor.run(colors_description, type="palette")
     return result.output.info.title, colors_description
+
+
+async def handle_cluster(
+    title: str,
+    elements: list[common.DesignToken],
+) -> tuple[str, str, str]:
+    result = await clusterer.run(title, elements)
+    return (
+        result.output.info.title,
+        result.output.info.purpose,
+        result.output.info.description,
+    )
 
 
 def generate_embedding(title: str) -> list[float]:

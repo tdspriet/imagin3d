@@ -45,8 +45,14 @@ class Cost(NamedTuple):
 # --- LLM Data Models ---
 
 
-class Info(BaseModel):
+class DesignTokenInfo(BaseModel):
     title: str
+    description: str
+
+
+class ClusterDescriptorInfo(BaseModel):
+    title: str
+    purpose: str
     description: str
 
 
@@ -61,3 +67,11 @@ class DesignToken(BaseModel):
     embedding: List[float] = Field(default_factory=list)
     size: Dict[str, float]
     position: Dict[str, float]
+
+
+class ClusterDescriptor(BaseModel):
+    id: int
+    title: Optional[str] = None
+    purpose: Optional[str] = None
+    description: Optional[str] = None
+    elements: List[DesignToken] = Field(default_factory=list)

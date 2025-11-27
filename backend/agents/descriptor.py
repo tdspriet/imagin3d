@@ -13,7 +13,7 @@ class Descriptor(agent.BaseAgent):
     name = "descriptor"
 
     class Output(pydantic.BaseModel):
-        info: common.Info
+        info: common.DesignTokenInfo
 
     def __init__(self, llm: pydantic_ai.models.Model | str):
         super().__init__(llm, self.Output)
