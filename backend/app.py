@@ -6,27 +6,18 @@ import shutil
 from datetime import datetime
 from pathlib import Path
 
-import boto3
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
-import base64
-import hydra
-from hydra import compose, initialize_config_dir
-from omegaconf import DictConfig
-import pydantic_ai
 import structlog
 
 from common import DesignToken, GenerateResponse, MoodboardPayload
-from utils.embeddings import BedrockEmbeddingFunction
-from engines.blender import Blender
-from agents.descriptor import Descriptor
-from agents.visualizer import Visualizer
-from utils.video import extract_key_frames
+import orchestrator
 
 load_dotenv()
 
+# Logging configuration
 logger = structlog.stdlib.get_logger(__name__)
 
 # CORS configuration
@@ -53,16 +44,6 @@ if os.environ["GOOGLE_API_KEY"] == "":
 # Directory configuration
 ROOT_DIR = Path(__file__).parent.resolve()
 
-# Initialize via Hydra configuration
-config_dir = str(ROOT_DIR / "config")
-with initialize_config_dir(config_dir=config_dir, version_base=None):
-    cfg: DictConfig = compose(config_name="config")
-blender_engine: Blender = hydra.utils.instantiate(cfg.engine)
-descriptor: Descriptor = hydra.utils.instantiate(cfg.descriptor)
-visualizer_agent: Visualizer = hydra.utils.instantiate(cfg.visualizer)
-bedrock_client = boto3.client("bedrock-runtime")
-embedding_function = BedrockEmbeddingFunction(bedrock_client)
-
 # FastAPI application setup
 app = FastAPI(title="Imagin3D Backend", version="1.0.0")
 app.add_middleware(
@@ -71,22 +52,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-
-async def save_model_file(element: dict, root_dir: Path) -> Path:
-    model_data = element["content"]["data"]["src"]
-    model_filename = element["content"]["data"]["fileName"]
-    base64_data = model_data.split(",", 1)[1]
-    model_bytes = base64.b64decode(base64_data)
-
-    models_dir = root_dir / "checkpoints" / "models"
-    models_dir.mkdir(parents=True, exist_ok=True)
-    model_path = models_dir / model_filename
-
-    with model_path.open("wb") as f:
-        f.write(model_bytes)
-
-    return model_path
 
 
 @app.post("/extract", response_model=GenerateResponse)
@@ -128,73 +93,33 @@ async def extract(payload: MoodboardPayload) -> GenerateResponse:
                 },
             }
 
-            # 2) Description and embedding generation
-            if token_data["type"] == "model":
-                # Save model file
-                model_path = await save_model_file(element, ROOT_DIR)
-                # Create renders directory
-                unique_name = str(element["id"])
-                renders_dir = ROOT_DIR / "checkpoints" / "model_renders" / unique_name
-                renders_dir.mkdir(parents=True, exist_ok=True)
-                # Create 5 renders using Blender
-                renders = await blender_engine.render_views(model_path, renders_dir)
-                # Generate description from rendered images
-                images = [render.image for render in renders]
-                result = await descriptor.run(images)
-                token_data["title"] = result.output.info.title
-                token_data["description"] = result.output.info.description
+            # 2) Description generation using orchestrator
+            match token_data["type"]:
+                case "model":
+                    # TODO: later, check if Cap3D produces better results
+                    logger.info("Handling model element", element_id=element["id"])
+                    title, description = await orchestrator.handle_model(element)
+                case "video":
+                    logger.info("Handling video element", element_id=element["id"])
+                    title, description = await orchestrator.handle_video(element)
+                case "palette":
+                    logger.info("Handling palette element", element_id=element["id"])
+                    title, description = orchestrator.handle_palette(element)
+                case "image":
+                    logger.info("Handling image element", element_id=element["id"])
+                    title, description = await orchestrator.handle_image(element)
+                case "text":
+                    logger.info("Handling text element", element_id=element["id"])
+                    title, description = await orchestrator.handle_text(element)
+            token_data["title"] = title
+            token_data["description"] = description
 
-            elif token_data["type"] == "video":
-                video_base64 = element["content"]["data"]["src"]
-                # Extract five most diverse frames
-                frames = extract_key_frames(video_base64, frame_count=5)
+            # 3) Generate embedding based on title
+            token_data["embedding"] = orchestrator.generate_embedding(
+                token_data["title"]
+            )
 
-                # Save frames
-                unique_name = str(element["id"])
-                frames_dir = ROOT_DIR / "checkpoints" / "video_frames" / unique_name
-                frames_dir.mkdir(parents=True, exist_ok=True)
-
-                for i, frame in enumerate(frames):
-                    frame_path = frames_dir / f"frame_{i}.jpg"
-                    with open(frame_path, "wb") as f:
-                        f.write(frame.data)
-
-                # Generate description from frames
-                result = await descriptor.run(frames)
-                token_data["title"] = result.output.info.title
-                token_data["description"] = result.output.info.description
-
-            elif token_data["type"] == "palette":
-                colors = element["content"].get("data", {}).get("colors", [])
-                token_data["title"] = "Colors"
-                token_data["description"] = ", ".join(colors)
-
-            elif token_data["type"] == "image":
-                image_base64 = element["content"]["data"]["src"]
-                # Convert base64 data URL to BinaryImage
-                base64_data = image_base64.split(",", 1)[1]
-                image_bytes = base64.b64decode(base64_data)
-                image = pydantic_ai.BinaryImage(
-                    data=image_bytes, media_type="image/jpeg"
-                )
-                # Generate description from image
-                result = await descriptor.run([image])
-                token_data["title"] = result.output.info.title
-                token_data["description"] = result.output.info.description
-
-            elif token_data["type"] == "text":
-                # Generate description from text content
-                text_content = element["content"]["data"]["text"]
-                result = await descriptor.run(text_content)
-                token_data["title"] = result.output.info.title
-                token_data["description"] = result.output.info.description
-
-            # Generate embedding based on description
-            # TODO: later, check if OmniBind produces better results
-            embedding = embedding_function([token_data["description"]])[0]
-            token_data["embedding"] = embedding.tolist()
-
-            # Append the token to the list
+            # 4) Append the token to the list
             design_tokens.append(DesignToken(**token_data))
 
     # Dump design tokens to JSON file
