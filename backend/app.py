@@ -75,6 +75,8 @@ app.add_middleware(
 # TODO: this should have a loading bar in the frontend
 @app.post("/extract", response_model=GenerateResponse)
 async def extract(payload: MoodboardPayload) -> GenerateResponse:
+    # ----- Ingestion -----
+
     if not payload.elements and not payload.clusters:
         raise HTTPException(
             status_code=400, detail="Payload must contain elements or clusters"
@@ -97,6 +99,8 @@ async def extract(payload: MoodboardPayload) -> GenerateResponse:
     raw_path.parent.mkdir(parents=True, exist_ok=True)
     with raw_path.open("w", encoding="utf-8") as target_file:
         json.dump(payload.dict(), target_file, ensure_ascii=False, indent=2)
+
+    # ----- Design Tokens -----
 
     # Turn elements into design tokens
     design_tokens: list[DesignToken] = []
@@ -155,6 +159,16 @@ async def extract(payload: MoodboardPayload) -> GenerateResponse:
         json.dump(
             [token.dict() for token in design_tokens], f, ensure_ascii=False, indent=2
         )
+
+    # ----- Cluster Descriptors -----
+
+    # ----- Intent Router -----
+
+    # ----- Prompt Synthesis -----
+
+    # ----- Master Prompt and Image Generation -----
+
+    # ----- 3D Generative Model -----
 
     # Log completion of moodboard extraction
     logger.info("Completed moodboard extraction")
