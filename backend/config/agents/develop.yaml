@@ -9,6 +9,11 @@ clusterer:
   llm:
     _target_: pydantic_ai.models.bedrock.BedrockConverseModel
     model_name: global.anthropic.claude-haiku-4-5-20251001-v1:0
+intent_router:
+  _target_: agents.intent_router.IntentRouter
+  llm:
+    _target_: pydantic_ai.models.bedrock.BedrockConverseModel
+    model_name: global.anthropic.claude-haiku-4-5-20251001-v1:0
 visualizer:
   _target_: agents.visualizer.Visualizer
   llm:

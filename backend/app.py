@@ -214,6 +214,37 @@ async def extract(payload: MoodboardPayload) -> GenerateResponse:
 
     # ----- Intent Router -----
 
+    # 1) Route clusters and assign weights
+    for cluster_descriptor in cluster_descriptors:
+        logger.info(f"Routing cluster #{cluster_descriptor.id}")
+        weight = await orchestrator.route_cluster(payload.prompt, cluster_descriptor)
+        cluster_descriptor.weight = weight
+
+    # 2) Provide cluster context for design tokens
+    cluster_context: dict[int, str] = {}
+    for cluster_descriptor in cluster_descriptors:
+        for element in cluster_descriptor.elements:
+            cluster_context[element.id] = (
+                f"{cluster_descriptor.title} ({cluster_descriptor.purpose})"
+            )
+
+    # 3) Route design tokens and assign weights
+    for token in design_tokens:
+        logger.info(f"Routing design token #{token.id}")
+        cluster_context = cluster_context.get(token.id)
+        weight = await orchestrator.route_token(payload.prompt, token, cluster_context)
+        token.weight = weight
+
+    # 4) Update cluster elements with weighted tokens
+    for cluster_descriptor in cluster_descriptors:
+        cluster_descriptor.elements = [
+            token
+            for token in design_tokens
+            if token.id in [e.id for e in cluster_descriptor.elements]
+        ]
+
+    # 5) Display weighing in frontend
+
     # ----- Prompt Synthesis -----
 
     # ----- Master Prompt and Image Generation -----

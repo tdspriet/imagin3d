@@ -13,6 +13,7 @@ import structlog
 import common
 from agents.descriptor import Descriptor
 from agents.clusterer import Clusterer
+from agents.intent_router import IntentRouter
 from engines.blender import Blender
 from utils.embeddings import BedrockEmbeddingFunction
 from utils.video import extract_key_frames
@@ -30,6 +31,7 @@ with initialize_config_dir(config_dir=config_dir, version_base=None):
 blender_engine: Blender = hydra.utils.instantiate(cfg.engine)
 descriptor: Descriptor = hydra.utils.instantiate(cfg.descriptor)
 clusterer: Clusterer = hydra.utils.instantiate(cfg.clusterer)
+intent_router: IntentRouter = hydra.utils.instantiate(cfg.intent_router)
 bedrock_client = boto3.client("bedrock-runtime")
 embedding_function = BedrockEmbeddingFunction(bedrock_client)
 
@@ -114,6 +116,23 @@ async def handle_cluster(
         result.output.info.purpose,
         result.output.info.description,
     )
+
+
+async def route_cluster(
+    prompt: str,
+    cluster: common.ClusterDescriptor,
+) -> int:
+    result = await intent_router.run_for_cluster(prompt, cluster)
+    return result.output.info.weight
+
+
+async def route_token(
+    prompt: str,
+    token: common.DesignToken,
+    cluster_context: str | None = None,
+) -> int:
+    result = await intent_router.run_for_token(prompt, token, cluster_context)
+    return result.output.info.weight
 
 
 def generate_embedding(title: str) -> list[float]:

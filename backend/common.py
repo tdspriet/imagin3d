@@ -57,6 +57,11 @@ class ClusterDescriptorInfo(BaseModel):
     description: str
 
 
+class IntentRouterInfo(BaseModel):
+    weight: int # 0-100
+    reasoning: str
+
+
 # --- Token Data Models ---
 
 
@@ -68,6 +73,7 @@ class DesignToken(BaseModel):
     embedding: List[float] = Field(default_factory=list)
     size: Dict[str, float]
     position: Dict[str, float]
+    weight: int = 0  # 0-100
 
 
 class ClusterDescriptor(BaseModel):
@@ -76,3 +82,4 @@ class ClusterDescriptor(BaseModel):
     purpose: Optional[str] = None
     description: Optional[str] = None
     elements: List[DesignToken] = Field(default_factory=list)
+    weight: int = 0  # 0-100
