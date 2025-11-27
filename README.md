@@ -1,7 +1,7 @@
 
 <img width="1024" height="256" alt="flat_logo" src="https://github.com/user-attachments/assets/f1b3b729-601b-463e-811a-aba7be392477" />
 
-<img width="2624" height="1975" alt="Screenshot from 2025-11-27 15-15-34" src="https://github.com/user-attachments/assets/d7f6490c-7a9b-41dd-a8ad-6018983eda7d" />
+<img width="992" height="980" alt="Screenshot from 2025-11-27 21-33-43" src="https://github.com/user-attachments/assets/e9449160-9e60-428c-8ca5-1f5a89c5683c" />
 
 # Imagin3D
 
