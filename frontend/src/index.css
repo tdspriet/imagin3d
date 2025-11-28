@@ -112,3 +112,36 @@ body {
   display: flex;
   flex-direction: column;
 }
+
+/* Larger invisible hitbox for corner handles */
+.react-flow__resize-control.handle::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 16px;
+  height: 16px;
+}
+
+/* Larger invisible hitbox for side line handles */
+.react-flow__resize-control.line::before {
+  content: '';
+  position: absolute;
+}
+
+.react-flow__resize-control.line.top::before,
+.react-flow__resize-control.line.bottom::before {
+  left: 0;
+  right: 0;
+  top: -8px;
+  bottom: -8px;
+}
+
+.react-flow__resize-control.line.left::before,
+.react-flow__resize-control.line.right::before {
+  top: 0;
+  bottom: 0;
+  left: -8px;
+  right: -8px;
+}
