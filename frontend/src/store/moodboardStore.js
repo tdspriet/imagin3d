@@ -205,6 +205,13 @@ export const useMoodboardStore = create((set, get) => ({
   reactFlowInstance: null,
   fitViewTrigger: 0,
   isGenerating: false,
+  pendingSessionId: null,
+  awaitingConfirmation: false,
+  progress: {
+    current: 0,
+    total: 0,
+    stage: '',
+  },
 
   // Set ReactFlow instance
   setReactFlowInstance: (instance) => set({ reactFlowInstance: instance }),
@@ -567,19 +574,65 @@ export const useMoodboardStore = create((set, get) => ({
     }
   },
 
-  // Send moodboard to backend generator
+  // Helper to apply weights to nodes
+  applyWeights: (weightsData, idMaps) => {
+    set((state) => ({
+      nodes: state.nodes.map((node) => {
+        if (node.type === 'clusterNode') {
+          // CLUSTERS
+          for (const [backendId, frontendId] of idMaps.clusters.entries()) {
+            if (frontendId === node.id && weightsData.cluster_weights?.[backendId]) {
+              const weightInfo = weightsData.cluster_weights[backendId]
+              return {
+                ...node,
+                data: {
+                  ...node.data,
+                  weight: weightInfo.weight,
+                  reasoning: weightInfo.reasoning,
+                },
+              }
+            }
+          }
+        } else {
+          // ELEMENTS
+          for (const [backendId, frontendId] of idMaps.elements.entries()) {
+            if (frontendId === node.id && weightsData.weights?.[backendId]) {
+              const weightInfo = weightsData.weights[backendId]
+              return {
+                ...node,
+                data: {
+                  ...node.data,
+                  weight: weightInfo.weight,
+                  reasoning: weightInfo.reasoning,
+                },
+              }
+            }
+          }
+        }
+        return node
+      }),
+    }))
+  },
+
+  // Send moodboard generation request to backend
   generateMoodboard: async (prompt = '') => {
-    const { nodes } = get()
+    const { nodes, applyWeights } = get()
     const { payload, idMaps } = serializeDataForBackend(nodes)
 
+    // If no elements or clusters, skip generation
     if ((!payload.elements || payload.elements.length === 0) && (!payload.clusters || payload.clusters.length === 0)) {
-      return { count: 0, file: null }
+      return { weights: {}, cluster_weights: {} }
     }
 
     // Add the user prompt to the payload
     payload.prompt = prompt
 
-    set({ isGenerating: true })
+    set({ 
+      isGenerating: true, 
+      awaitingConfirmation: false, 
+      pendingSessionId: null,
+      progress: { current: 0, total: 0, stage: 'Starting...' },
+    })
     try {
       const response = await fetch(`${BACKEND_URL}/extract`, {
         method: 'POST',
@@ -591,54 +644,109 @@ export const useMoodboardStore = create((set, get) => ({
         throw new Error('Backend generation failed')
       }
 
-      const result = await response.json()
+      // Parse SSE stream
+      const reader = response.body.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ''
+      let finalResult = null
 
-      // Apply weights to nodes
-      if (result.weights || result.cluster_weights) {
-        set((state) => ({
-          nodes: state.nodes.map((node) => {
-            if (node.type === 'clusterNode') {
-              // CLUSTERS
-              for (const [backendId, frontendId] of idMaps.clusters.entries()) {
-                if (frontendId === node.id && result.cluster_weights?.[backendId]) {
-                  const weightInfo = result.cluster_weights[backendId]
-                  return {
-                    ...node,
-                    data: {
-                      ...node.data,
-                      weight: weightInfo.weight,
-                      reasoning: weightInfo.reasoning,
-                    },
-                  }
-                }
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        buffer += decoder.decode(value, { stream: true })
+
+        // Parse SSE events from buffer (format: data: {json}\n\n)
+        const events = buffer.split('\n\n')
+        buffer = events.pop() || '' // Keep incomplete event in buffer
+
+        for (const event of events) {
+          if (!event.trim()) continue
+
+          // Extract data from "data: {json}" format
+          const dataMatch = event.match(/^data:\s*(.+)$/m)
+          if (!dataMatch) continue
+
+          try {
+            const parsed = JSON.parse(dataMatch[1])
+            const { type, data, session_id } = parsed
+
+            if (type === 'progress') {
+              // Update progress
+              set({ progress: data })
+            } else if (type === 'weights') {
+              // Apply weights immediately when received
+              applyWeights(data, idMaps)
+              // Store session ID and set awaiting confirmation
+              if (session_id) {
+                set({ 
+                  pendingSessionId: session_id, 
+                  awaitingConfirmation: true,
+                  progress: { current: 0, total: 0, stage: '' }, // Clear progress
+                })
               }
-            } else {
-              // ELEMENTS
-              for (const [backendId, frontendId] of idMaps.elements.entries()) {
-                if (frontendId === node.id && result.weights?.[backendId]) {
-                  const weightInfo = result.weights[backendId]
-                  return {
-                    ...node,
-                    data: {
-                      ...node.data,
-                      weight: weightInfo.weight,
-                      reasoning: weightInfo.reasoning,
-                    },
-                  }
-                }
-              }
+            } else if (type === 'complete') {
+              // Store final result
+              finalResult = data
+              set({ awaitingConfirmation: false, pendingSessionId: null })
+            } else if (type === 'cancelled') {
+              // Pipeline was cancelled
+              console.log('Pipeline cancelled by user')
+              set({ awaitingConfirmation: false, pendingSessionId: null })
+              return { cancelled: true }
+            } else if (type === 'error') {
+              console.error('Backend error:', data)
+              throw new Error(data)
             }
-            return node
-          }),
-        }))
+          } catch (e) {
+            console.error('Error parsing SSE data:', e)
+          }
+        }
       }
 
-      return result
+      return finalResult || {}
     } catch (error) {
       console.error('Error generating moodboard:', error)
       throw error
     } finally {
-      set({ isGenerating: false })
+      set({ 
+        isGenerating: false, 
+        awaitingConfirmation: false, 
+        pendingSessionId: null,
+        progress: { current: 0, total: 0, stage: '' },
+      })
+    }
+  },
+
+  // Confirm weights to continue the pipeline
+  confirmWeights: async () => {
+    const { pendingSessionId, clearWeights } = get()
+    if (!pendingSessionId) return
+
+    try {
+      await fetch(`${BACKEND_URL}/confirm-weights/${pendingSessionId}?confirmed=true`, {
+        method: 'POST',
+      })
+      // Clear weight visualization
+      clearWeights()
+    } catch (error) {
+      console.error('Error confirming weights:', error)
+    }
+  },
+
+  // Cancel weights to stop the pipeline
+  cancelWeights: async () => {
+    const { pendingSessionId, clearWeights } = get()
+    if (!pendingSessionId) return
+
+    try {
+      await fetch(`${BACKEND_URL}/confirm-weights/${pendingSessionId}?confirmed=false`, {
+        method: 'POST',
+      })
+      // Clear weight visualization
+      clearWeights()
+    } catch (error) {
+      console.error('Error cancelling weights:', error)
     }
   },
 

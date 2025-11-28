@@ -165,12 +165,14 @@ function Topbar() {
   }
 
   const handleGenerateMoodboard = async (prompt) => {
+    // Close dialog immediately when starting generation
+    setGenerateDialogOpen(false)
+    
     try {
       const result = await generateMoodboard(prompt)
       if (result?.file) {
         console.log(`Generated extraction ${result.file} with ${result.count} elements`)
       }
-      setGenerateDialogOpen(false) /* only close after okay response */
     } catch (error) {
       console.error('Failed to extract:', error)
     }

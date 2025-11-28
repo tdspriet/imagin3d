@@ -1,0 +1,76 @@
+.confirmation-bar {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 12px 24px;
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  z-index: 1000;
+  animation: slideDown 0.2s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.confirmation-bar__message {
+  font-size: 14px;
+  color: var(--color-text-primary);
+  font-weight: 500;
+}
+
+.confirmation-bar__actions {
+  display: flex;
+  gap: 8px;
+}
+
+.confirmation-bar__button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.confirmation-bar__button--cancel {
+  background: var(--color-button-bg);
+  border: 1px solid var(--color-button-border);
+  color: var(--color-text-primary);
+}
+
+.confirmation-bar__button--cancel:hover {
+  background: var(--accent-danger);
+  border-color: var(--accent-danger);
+  color: white;
+}
+
+.confirmation-bar__button--confirm {
+  background: var(--accent-success);
+  color: white;
+}
+
+.confirmation-bar__button--confirm:hover {
+  background: var(--accent-success-hover);
+}
+
+.confirmation-bar__button svg {
+  flex-shrink: 0;
+}
