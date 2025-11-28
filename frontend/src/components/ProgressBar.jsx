@@ -10,9 +10,6 @@ function ProgressBar({ current, total, stage, isVisible }) {
     <div className="progress-bar">
       <div className="progress-bar__info">
         <span className="progress-bar__stage">{stage}</span>
-        <span className="progress-bar__count">
-          {current} / {total}
-        </span>
       </div>
       <div className="progress-bar__track">
         <div
