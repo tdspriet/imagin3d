@@ -38,14 +38,23 @@ The backend uses FastAPI and Uvicorn.
 1. **Prerequisites** <br>
 Make sure you have [Python 3.10+](https://www.python.org/downloads/) and [pip](https://pip.pypa.io/en/stable/installation/) installed.
 
-2. **Make the virtual environment** <br>
+2. **Set the environment variables** <br>
+Create a `.env` file in the `backend` directory with the following content:<br>
+```bash
+  BACKEND_ALLOWED_ORIGINS=http://localhost:5173 # Frontend URL
+  GOOGLE_API_KEY="..."
+  BEDROCK_ACCESS_KEY_ID="..."
+  BEDROCK_SECRET_ACCESS_KEY="..."
+```
+
+3. **Make the virtual environment** <br>
 ```bash
   python -m venv .venv
   source .venv/bin/activate  # Windows: .venv\Scripts\activate
   pip install -r requirements.txt
 ```
 
-3. **Run the Backend** <br>
+4. **Run the Backend** <br>
 ``
 uvicorn app:app --reload
 ``
