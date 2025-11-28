@@ -122,13 +122,23 @@ async def extract(payload: MoodboardPayload) -> StreamingResponse:
         total_elements = len(payload.elements)
         total_clusters = len(payload.clusters)
         total_steps = total_elements + total_clusters + total_elements + total_clusters
-        current_step = 0
+
+        # Shared progress state
+        progress_state = {"current": 0, "lock": asyncio.Lock()}
+
+        async def increment_progress():
+            async with progress_state["lock"]:
+                progress_state["current"] += 1
+                return progress_state["current"]
+
+        # Queue for progress updates
+        progress_queue: asyncio.Queue = asyncio.Queue()
 
         # Send initial progress
         progress_event = {
             "type": "progress",
             "data": {
-                "current": current_step,
+                "current": 0,
                 "total": total_steps,
                 "stage": "Starting...",
             },
@@ -153,61 +163,69 @@ async def extract(payload: MoodboardPayload) -> StreamingResponse:
         # ----- Design Tokens -----
 
         # Turn elements into design tokens
-        design_tokens: list[DesignToken] = []
+        async def process_element(element: dict) -> DesignToken:
+            element_type = element["content"]["type"]
+            logger.info(f"Handling {element_type} element #{element['id']}")
+
+            # 1) Title and description generation
+            match element_type:
+                case "model":
+                    title, description = await orchestrator.handle_model(element)
+                case "video":
+                    title, description = await orchestrator.handle_video(element)
+                case "palette":
+                    title, description = await orchestrator.handle_palette(element)
+                case "image":
+                    title, description = await orchestrator.handle_image(element)
+                case "text":
+                    title, description = await orchestrator.handle_text(element)
+
+            # 2) Generate embedding based on title
+            embedding = orchestrator.generate_embedding(title)
+
+            # 3) Signal progress
+            current = await increment_progress()
+            await progress_queue.put(
+                {
+                    "current": current,
+                    "total": total_steps,
+                    "stage": "Processing elements...",
+                }
+            )
+
+            # 4) Create and return the design token
+            return DesignToken(
+                id=element["id"],
+                type=element_type,
+                title=title,
+                description=description,
+                embedding=embedding,
+                size={"x": element["size"]["x"], "y": element["size"]["y"]},
+                position={
+                    "x": element["position"]["x"],
+                    "y": element["position"]["y"],
+                },
+            )
+
         with raw_path.open("r", encoding="utf-8") as source_file:
             data = json.load(source_file)
 
-            for element in data["elements"]:
-                # 1) Title and description generation
-                # TODO: this should be parallelized later
-                match element["content"]["type"]:
-                    case "model":
-                        # TODO: later, check if PointLLM produces better results
-                        logger.info(f"Handling model element #{element['id']}")
-                        title, description = await orchestrator.handle_model(element)
-                    case "video":
-                        logger.info(f"Handling video element #{element['id']}")
-                        title, description = await orchestrator.handle_video(element)
-                    case "palette":
-                        logger.info(f"Handling palette element #{element['id']}")
-                        title, description = await orchestrator.handle_palette(element)
-                    case "image":
-                        logger.info(f"Handling image element #{element['id']}")
-                        title, description = await orchestrator.handle_image(element)
-                    case "text":
-                        logger.info(f"Handling text element #{element['id']}")
-                        title, description = await orchestrator.handle_text(element)
+            # Start processing all elements in parallel
+            tasks = [
+                asyncio.create_task(process_element(element))
+                for element in data["elements"]
+            ]
 
-                # 2) Generate embedding based on title
-                # TODO: later, check if OmniBind or Point-Bind produces better results
-                embedding = orchestrator.generate_embedding(title)
-
-                # 3) Create the design token and append to list
-                design_token = DesignToken(
-                    id=element["id"],
-                    type=element["content"]["type"],
-                    title=title,
-                    description=description,
-                    embedding=embedding,
-                    size={"x": element["size"]["x"], "y": element["size"]["y"]},
-                    position={
-                        "x": element["position"]["x"],
-                        "y": element["position"]["y"],
-                    },
-                )
-                design_tokens.append(design_token)
-
-                # Send progress update
-                current_step += 1
-                progress_event = {
-                    "type": "progress",
-                    "data": {
-                        "current": current_step,
-                        "total": total_steps,
-                        "stage": "Processing elements...",
-                    },
-                }
+            # Yield progress updates as they come in
+            completed = 0
+            while completed < len(tasks):
+                progress_data = await progress_queue.get()
+                completed += 1
+                progress_event = {"type": "progress", "data": progress_data}
                 yield f"data: {json.dumps(progress_event)}\n\n"
+
+            # Collect all results
+            design_tokens = list(await asyncio.gather(*tasks))
 
         # Dump design tokens to JSON file
         design_tokens_path = (
@@ -233,66 +251,75 @@ async def extract(payload: MoodboardPayload) -> StreamingResponse:
         }
 
         # Turn clusters into cluster descriptors
-        cluster_descriptors: list[ClusterDescriptor] = []
+        async def process_cluster(cluster: dict) -> ClusterDescriptor:
+            logger.info(f"Handling cluster #{cluster['id']}")
+
+            # 1) Gather elements for this cluster
+            elements: list[DesignToken] = [
+                token_lookup[element_id]
+                for element_id in cluster["elements"]
+                if element_id in token_lookup
+            ]
+
+            # 2) Generate title, purpose and description via clusterer
+            title, purpose, description = await orchestrator.handle_cluster(
+                cluster["title"], elements
+            )
+
+            # 3) Signal progress
+            current = await increment_progress()
+            await progress_queue.put(
+                {
+                    "current": current,
+                    "total": total_steps,
+                    "stage": "Processing clusters...",
+                }
+            )
+
+            # 4) Create and return the cluster descriptor
+            return ClusterDescriptor(
+                id=cluster["id"],
+                title=title,
+                purpose=purpose,
+                description=description,
+                elements=elements,
+            )
+
         with raw_path.open("r", encoding="utf-8") as source_file:
             data = json.load(source_file)
 
-            for cluster in data["clusters"]:
-                logger.info(f"Handling cluster #{cluster['id']}")
+            # Start processing all clusters in parallel
+            cluster_tasks = [
+                asyncio.create_task(process_cluster(cluster))
+                for cluster in data["clusters"]
+            ]
 
-                # 1) Gather elements for this cluster
-                elements: list[DesignToken] = [
-                    token_lookup[element_id]
-                    for element_id in cluster["elements"]
-                    if element_id in token_lookup
-                ]
-
-                # 2) Generate title, purpose and description via clusterer
-                # TODO: this should be parallelized later
-                # NOTE: check if purpose is needed
-                title, purpose, description = await orchestrator.handle_cluster(
-                    cluster["title"], elements
-                )
-
-                # 3) Create the cluster descriptor and append to list
-                # NOTE: check if cluster descriptors need embeddings
-                cluster_descriptor = ClusterDescriptor(
-                    id=cluster["id"],
-                    title=title,
-                    purpose=purpose,
-                    description=description,
-                    elements=elements,
-                )
-                cluster_descriptors.append(cluster_descriptor)
-
-                # 4) Dump each cluster descriptor to its own JSON file
-                cluster_descriptors_dir = (
-                    ROOT_DIR
-                    / "checkpoints"
-                    / "cluster_descriptors"
-                    / str(cluster["id"])
-                )
-                cluster_descriptors_dir.mkdir(parents=True, exist_ok=True)
-                cluster_descriptor_path = (
-                    cluster_descriptors_dir
-                    / f"cluster-{cluster['id']}-{timestamp}.json"
-                )
-                with cluster_descriptor_path.open("w", encoding="utf-8") as f:
-                    json.dump(
-                        cluster_descriptor.dict(), f, ensure_ascii=False, indent=2
-                    )
-
-                # Send progress update
-                current_step += 1
-                progress_event = {
-                    "type": "progress",
-                    "data": {
-                        "current": current_step,
-                        "total": total_steps,
-                        "stage": "Processing clusters...",
-                    },
-                }
+            # Yield progress updates as they come in
+            completed = 0
+            while completed < len(cluster_tasks):
+                progress_data = await progress_queue.get()
+                completed += 1
+                progress_event = {"type": "progress", "data": progress_data}
                 yield f"data: {json.dumps(progress_event)}\n\n"
+
+            # Collect all results
+            cluster_descriptors = list(await asyncio.gather(*cluster_tasks))
+
+        # Dump each cluster descriptor to its own JSON file
+        for cluster_descriptor in cluster_descriptors:
+            cluster_descriptors_dir = (
+                ROOT_DIR
+                / "checkpoints"
+                / "cluster_descriptors"
+                / str(cluster_descriptor.id)
+            )
+            cluster_descriptors_dir.mkdir(parents=True, exist_ok=True)
+            cluster_descriptor_path = (
+                cluster_descriptors_dir
+                / f"cluster-{cluster_descriptor.id}-{timestamp}.json"
+            )
+            with cluster_descriptor_path.open("w", encoding="utf-8") as f:
+                json.dump(cluster_descriptor.dict(), f, ensure_ascii=False, indent=2)
 
         # ----- Intent Router -----
 
@@ -301,28 +328,46 @@ async def extract(payload: MoodboardPayload) -> StreamingResponse:
         cluster_weights: dict[int, WeightInfo] = {}
 
         # 1) Route clusters and assign weights
-        for cluster_descriptor in cluster_descriptors:
+        async def route_single_cluster(
+            cluster_descriptor: ClusterDescriptor,
+        ) -> tuple[int, float, str]:
             logger.info(f"Routing cluster #{cluster_descriptor.id}")
             weight, reasoning = await orchestrator.route_cluster(
                 payload.prompt, cluster_descriptor
             )
-            cluster_descriptor.weight = weight
-            cluster_descriptor.reasoning = reasoning
-            cluster_weights[cluster_descriptor.id] = WeightInfo(
-                weight=weight, reasoning=reasoning
-            )
-
-            # Send progress update
-            current_step += 1
-            progress_event = {
-                "type": "progress",
-                "data": {
-                    "current": current_step,
+            # Signal progress
+            current = await increment_progress()
+            await progress_queue.put(
+                {
+                    "current": current,
                     "total": total_steps,
                     "stage": "Weighing clusters...",
-                },
-            }
+                }
+            )
+            return cluster_descriptor.id, weight, reasoning
+
+        # Start routing all clusters in parallel
+        cluster_routing_tasks = [
+            asyncio.create_task(route_single_cluster(cd)) for cd in cluster_descriptors
+        ]
+
+        # Yield progress updates as they come in
+        completed = 0
+        while completed < len(cluster_routing_tasks):
+            progress_data = await progress_queue.get()
+            completed += 1
+            progress_event = {"type": "progress", "data": progress_data}
             yield f"data: {json.dumps(progress_event)}\n\n"
+
+        # Collect all results
+        cluster_routing_results = list(await asyncio.gather(*cluster_routing_tasks))
+
+        # Apply the routing results to cluster descriptors
+        cluster_descriptor_lookup = {cd.id: cd for cd in cluster_descriptors}
+        for cluster_id, weight, reasoning in cluster_routing_results:
+            cluster_descriptor_lookup[cluster_id].weight = weight
+            cluster_descriptor_lookup[cluster_id].reasoning = reasoning
+            cluster_weights[cluster_id] = WeightInfo(weight=weight, reasoning=reasoning)
 
         # 2) Provide cluster context for design tokens
         token_cluster_context: dict[int, str] = {}
@@ -333,27 +378,45 @@ async def extract(payload: MoodboardPayload) -> StreamingResponse:
                 )
 
         # 3) Route design tokens and assign weights
-        for token in design_tokens:
+        async def route_single_token(token: DesignToken) -> tuple[int, float, str]:
             logger.info(f"Routing design token #{token.id}")
             cluster_context = token_cluster_context.get(token.id)
             weight, reasoning = await orchestrator.route_token(
                 payload.prompt, token, cluster_context
             )
-            token.weight = weight
-            token.reasoning = reasoning
-            element_weights[token.id] = WeightInfo(weight=weight, reasoning=reasoning)
-
-            # Send progress update
-            current_step += 1
-            progress_event = {
-                "type": "progress",
-                "data": {
-                    "current": current_step,
+            # Signal progress
+            current = await increment_progress()
+            await progress_queue.put(
+                {
+                    "current": current,
                     "total": total_steps,
                     "stage": "Weighing elements...",
-                },
-            }
+                }
+            )
+            return token.id, weight, reasoning
+
+        # Start routing all tokens in parallel
+        token_routing_tasks = [
+            asyncio.create_task(route_single_token(token)) for token in design_tokens
+        ]
+
+        # Yield progress updates as they come in
+        completed = 0
+        while completed < len(token_routing_tasks):
+            progress_data = await progress_queue.get()
+            completed += 1
+            progress_event = {"type": "progress", "data": progress_data}
             yield f"data: {json.dumps(progress_event)}\n\n"
+
+        # Collect all results
+        token_routing_results = list(await asyncio.gather(*token_routing_tasks))
+
+        # Apply the routing results to design tokens
+        token_lookup_for_routing = {token.id: token for token in design_tokens}
+        for token_id, weight, reasoning in token_routing_results:
+            token_lookup_for_routing[token_id].weight = weight
+            token_lookup_for_routing[token_id].reasoning = reasoning
+            element_weights[token_id] = WeightInfo(weight=weight, reasoning=reasoning)
 
         # 4) Update cluster elements with weighted tokens
         for cluster_descriptor in cluster_descriptors:
