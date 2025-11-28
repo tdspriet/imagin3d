@@ -3,6 +3,7 @@ import { Canvas } from '@react-three/fiber'
 import { OrbitControls, PerspectiveCamera } from '@react-three/drei'
 import { NodeResizer } from 'reactflow'
 import NodeLayerControls from './NodeLayerControls'
+import WeightOverlay from './WeightOverlay'
 import './ModelNode.css'
 import * as THREE from 'three'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader'
@@ -259,6 +260,7 @@ function ModelNode({ id, data, selected }) {
               )}
             </div>
           )}
+          <WeightOverlay weight={data.weight} reasoning={data.reasoning} />
         </div>
       </div>
     </>

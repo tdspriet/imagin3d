@@ -1,6 +1,7 @@
 import React from 'react'
 import { NodeResizer } from 'reactflow'
 import NodeLayerControls from './NodeLayerControls'
+import WeightOverlay from './WeightOverlay'
 import './ImageNode.css'
 
 /**
@@ -26,6 +27,7 @@ function ImageNode({ id, data, selected }) {
             alt="Moodboard image"
             draggable={false}
           />
+          <WeightOverlay weight={data.weight} reasoning={data.reasoning} />
         </div>
       </div>
     </>

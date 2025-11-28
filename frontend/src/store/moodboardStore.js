@@ -61,15 +61,28 @@ const serializeDataForBackend = (nodes = []) => {
       .sort((a, b) => a - b)
 
     return {
-      id: index + 1,
-      title: cluster.data?.title || 'Cluster',
-      elements: insideNodeIds
+      originalId: cluster.id,
+      formatted: {
+        id: index + 1,
+        title: cluster.data?.title || 'Cluster',
+        elements: insideNodeIds
+      }
     }
   })
 
+  // REVERSE ID MAPS
+  const reverseNodeIdMap = new Map(elements.map(e => [e.formatted.id, e.originalId]))
+  const reverseClusterIdMap = new Map(clusters.map(c => [c.formatted.id, c.originalId]))
+
   return {
-    elements: elements.map(e => e.formatted),
-    clusters
+    payload: {
+      elements: elements.map(e => e.formatted),
+      clusters: clusters.map(c => c.formatted)
+    },
+    idMaps: {
+      elements: reverseNodeIdMap,  // backend ID -> frontend ID
+      clusters: reverseClusterIdMap  // backend ID -> frontend ID
+    }
   }
 }
 
@@ -533,6 +546,20 @@ export const useMoodboardStore = create((set, get) => ({
     set((state) => ({ fitViewTrigger: state.fitViewTrigger + 1 }))
   },
 
+  // Clear weights from all nodes
+  clearWeights: () => {
+    set((state) => ({
+      nodes: state.nodes.map((node) => ({
+        ...node,
+        data: {
+          ...node.data,
+          weight: undefined,
+          reasoning: undefined,
+        },
+      })),
+    }))
+  },
+
   // Clear all nodes
   clearAll: () => {
     if (confirm('Are you sure you want to clear all elements?')) {
@@ -543,7 +570,7 @@ export const useMoodboardStore = create((set, get) => ({
   // Send moodboard to backend generator
   generateMoodboard: async (prompt = '') => {
     const { nodes } = get()
-    const payload = serializeDataForBackend(nodes)
+    const { payload, idMaps } = serializeDataForBackend(nodes)
 
     if ((!payload.elements || payload.elements.length === 0) && (!payload.clusters || payload.clusters.length === 0)) {
       return { count: 0, file: null }
@@ -564,7 +591,49 @@ export const useMoodboardStore = create((set, get) => ({
         throw new Error('Backend generation failed')
       }
 
-      return response.json()
+      const result = await response.json()
+
+      // Apply weights to nodes
+      if (result.weights || result.cluster_weights) {
+        set((state) => ({
+          nodes: state.nodes.map((node) => {
+            if (node.type === 'clusterNode') {
+              // CLUSTERS
+              for (const [backendId, frontendId] of idMaps.clusters.entries()) {
+                if (frontendId === node.id && result.cluster_weights?.[backendId]) {
+                  const weightInfo = result.cluster_weights[backendId]
+                  return {
+                    ...node,
+                    data: {
+                      ...node.data,
+                      weight: weightInfo.weight,
+                      reasoning: weightInfo.reasoning,
+                    },
+                  }
+                }
+              }
+            } else {
+              // ELEMENTS
+              for (const [backendId, frontendId] of idMaps.elements.entries()) {
+                if (frontendId === node.id && result.weights?.[backendId]) {
+                  const weightInfo = result.weights[backendId]
+                  return {
+                    ...node,
+                    data: {
+                      ...node.data,
+                      weight: weightInfo.weight,
+                      reasoning: weightInfo.reasoning,
+                    },
+                  }
+                }
+              }
+            }
+            return node
+          }),
+        }))
+      }
+
+      return result
     } catch (error) {
       console.error('Error generating moodboard:', error)
       throw error

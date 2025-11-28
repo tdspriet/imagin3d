@@ -19,3 +19,20 @@ export const normalizeHexColor = (value) => {
   if (!/^[0-9a-fA-F]{6}$/.test(hex)) return null
   return `#${hex.toUpperCase()}`
 }
+
+export const weightToColor = (weight, opacity = 0.3) => {
+  const clampedWeight = Math.max(0, Math.min(100, weight))
+  
+  let r, g
+  if (clampedWeight <= 50) {
+    // Red to yellow
+    r = 255
+    g = Math.round((clampedWeight / 50) * 255)
+  } else {
+    // Yellow to green
+    r = Math.round(255 - ((clampedWeight - 50) / 50) * 255)
+    g = 255
+  }
+  
+  return `rgba(${r}, ${g}, 0, ${opacity})`
+}

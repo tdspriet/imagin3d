@@ -1,5 +1,6 @@
 import { NodeResizer } from 'reactflow'
 import NodeLayerControls from './NodeLayerControls'
+import WeightOverlay from './WeightOverlay'
 import './ColorPaletteNode.css'
 
 function ColorPaletteNode({ id, data, selected }) {
@@ -26,6 +27,7 @@ function ColorPaletteNode({ id, data, selected }) {
               />
             ))}
           </div>
+          <WeightOverlay weight={data.weight} reasoning={data.reasoning} />
         </div>
       </div>
     </>

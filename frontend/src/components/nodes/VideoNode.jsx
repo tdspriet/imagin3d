@@ -1,6 +1,7 @@
 import React from 'react'
 import { NodeResizer } from 'reactflow'
 import NodeLayerControls from './NodeLayerControls'
+import WeightOverlay from './WeightOverlay'
 import './VideoNode.css'
 
 /**
@@ -25,6 +26,7 @@ function VideoNode({ id, data, selected }) {
             src={data.src}
             controls
           />
+          <WeightOverlay weight={data.weight} reasoning={data.reasoning} />
         </div>
       </div>
     </>

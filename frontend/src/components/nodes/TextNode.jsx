@@ -3,6 +3,7 @@ import { NodeResizer } from 'reactflow'
 import { MdTextIncrease, MdTextDecrease } from 'react-icons/md'
 import { useMoodboardStore } from '../../store/moodboardStore'
 import NodeLayerControls from './NodeLayerControls'
+import WeightOverlay from './WeightOverlay'
 import './TextNode.css'
 
 const DEFAULT_PLACEHOLDER = 'Double-click to edit'
@@ -189,6 +190,7 @@ function TextNode({ id, data, selected }) {
               </button>
             </div>
           )}
+          <WeightOverlay weight={data.weight} reasoning={data.reasoning} />
         </div>
       </div>
     </>

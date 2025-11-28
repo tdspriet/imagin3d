@@ -6,6 +6,7 @@
   overflow: hidden;
   display: block;
   line-height: 0;
+  position: relative;
 }
 
 .video-node video {
