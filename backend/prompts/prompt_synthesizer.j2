@@ -1,0 +1,16 @@
+User's generation intent:
+"{{ ctx.user_prompt }}"
+
+Moodboard analysis (ordered by relevance):
+{% for cluster in ctx.clusters %}
+
+Cluster: "{{ cluster.title }}" (relevance: {{ cluster.weight }}%)
+Description: {{ cluster.description }}
+{% if cluster.elements %}
+Key elements:
+{% for elem in cluster.elements %}
+- {{ elem.type | capitalize }}: "{{ elem.title }}" ({{ elem.weight }}%) - {{ elem.description }}
+{% endfor %}
+{% endif %}
+{% endfor %}
+Synthesize these into a single 3D generation prompt.

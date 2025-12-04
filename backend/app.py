@@ -458,9 +458,15 @@ async def extract(payload: MoodboardPayload) -> StreamingResponse:
             return
         logger.info("User confirmed weights, continuing pipeline...")
 
-        # ----- Prompt Synthesis -----
+        # ----- Master Prompt Generation -----
 
-        # ----- Master Prompt and Image Generation -----
+        master_prompt = await orchestrator.synthesize_master_prompt(
+            payload.prompt,
+            cluster_descriptors,
+        )
+        logger.info(f"Master prompt:\n{master_prompt}")
+
+        # ----- Master Image Generation -----
 
         # ----- 3D Generative Model -----
 

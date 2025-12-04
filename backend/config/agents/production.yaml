@@ -14,6 +14,11 @@ intent_router:
   llm:
     _target_: pydantic_ai.models.bedrock.BedrockConverseModel
     model_name: global.anthropic.claude-sonnet-4-5-20250929-v1:0
+prompt_synthesizer:
+  _target_: agents.prompt_synthesizer.PromptSynthesizer
+  llm:
+    _target_: pydantic_ai.models.bedrock.BedrockConverseModel
+    model_name: global.anthropic.claude-sonnet-4-5-20250929-v1:0
 visualizer:
   _target_: agents.visualizer.Visualizer
   llm:

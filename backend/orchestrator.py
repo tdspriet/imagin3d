@@ -14,6 +14,7 @@ import common
 from agents.descriptor import Descriptor
 from agents.clusterer import Clusterer
 from agents.intent_router import IntentRouter
+from agents.prompt_synthesizer import PromptSynthesizer
 from engines.blender import Blender
 from utils.embeddings import BedrockEmbeddingFunction
 from utils.video import extract_key_frames
@@ -32,6 +33,7 @@ blender_engine: Blender = hydra.utils.instantiate(cfg.engine)
 descriptor: Descriptor = hydra.utils.instantiate(cfg.descriptor)
 clusterer: Clusterer = hydra.utils.instantiate(cfg.clusterer)
 intent_router: IntentRouter = hydra.utils.instantiate(cfg.intent_router)
+prompt_synthesizer: PromptSynthesizer = hydra.utils.instantiate(cfg.prompt_synthesizer)
 bedrock_client = boto3.client("bedrock-runtime")
 embedding_function = BedrockEmbeddingFunction(bedrock_client)
 
@@ -137,6 +139,35 @@ async def route_token(
 def generate_embedding(title: str) -> list[float]:
     # Generate embedding for the given title
     return embedding_function([title])[0].tolist()
+
+
+async def synthesize_master_prompt(
+    user_prompt: str,
+    clusters: list[common.ClusterDescriptor],
+) -> str:
+    # Filter clusters with weight > 50 and their elements with weight > 50
+    filtered_clusters = []
+    for cluster in clusters:
+        if cluster.weight > 50:
+            filtered_elements = [
+                {
+                    "type": elem.type,
+                    "title": elem.title,
+                    "description": elem.description,
+                    "weight": elem.weight,
+                }
+                for elem in cluster.elements
+                if elem.weight > 50
+            ]
+            filtered_clusters.append({
+                "title": cluster.title,
+                "description": cluster.description,
+                "weight": cluster.weight,
+                "elements": filtered_elements,
+            })
+
+    result = await prompt_synthesizer.run(user_prompt, filtered_clusters)
+    return result.output.info.prompt
 
 
 # --- Helper functions ---

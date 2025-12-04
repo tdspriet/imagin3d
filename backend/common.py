@@ -75,6 +75,10 @@ class IntentRouterInfo(BaseModel):
     reasoning: str
 
 
+class MasterPromptInfo(BaseModel):
+    prompt: str
+
+
 # --- Token Data Models ---
 
 
