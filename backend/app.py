@@ -261,8 +261,8 @@ async def extract(payload: MoodboardPayload) -> StreamingResponse:
                 if element_id in token_lookup
             ]
 
-            # 2) Generate title, purpose and description via clusterer
-            title, purpose, description = await orchestrator.handle_cluster(
+            # 2) Generate title and description via clusterer
+            title, description = await orchestrator.handle_cluster(
                 cluster["title"], elements
             )
 
@@ -280,7 +280,6 @@ async def extract(payload: MoodboardPayload) -> StreamingResponse:
             return ClusterDescriptor(
                 id=cluster["id"],
                 title=title,
-                purpose=purpose,
                 description=description,
                 elements=elements,
             )
@@ -374,7 +373,7 @@ async def extract(payload: MoodboardPayload) -> StreamingResponse:
         for cluster_descriptor in cluster_descriptors:
             for element in cluster_descriptor.elements:
                 token_cluster_context[element.id] = (
-                    f"{cluster_descriptor.title} ({cluster_descriptor.purpose})"
+                    f"{cluster_descriptor.title},{cluster_descriptor.description}"
                 )
 
         # 3) Route design tokens and assign weights

@@ -67,7 +67,6 @@ class DesignTokenInfo(BaseModel):
 
 class ClusterDescriptorInfo(BaseModel):
     title: str
-    purpose: str
     description: str
 
 
@@ -94,7 +93,6 @@ class DesignToken(BaseModel):
 class ClusterDescriptor(BaseModel):
     id: int
     title: Optional[str] = None
-    purpose: Optional[str] = None
     description: Optional[str] = None
     elements: List[DesignToken] = Field(default_factory=list)
     weight: int = 0  # 0-100

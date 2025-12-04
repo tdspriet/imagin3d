@@ -30,7 +30,6 @@ class IntentRouter(agent.BaseAgent):
                 "item": {
                     "id": cluster.id,
                     "title": cluster.title,
-                    "purpose": cluster.purpose,
                     "description": cluster.description,
                     "element_count": len(cluster.elements),
                 },

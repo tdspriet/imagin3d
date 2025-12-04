@@ -113,7 +113,6 @@ async def handle_cluster(
     result = await clusterer.run(title, elements)
     return (
         result.output.info.title,
-        result.output.info.purpose,
         result.output.info.description,
     )
 
