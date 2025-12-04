@@ -32,7 +32,7 @@ def _feature_vector(frame: np.ndarray) -> np.ndarray:
     return lab.astype(np.float32).flatten()
 
 
-def _is_near_solid_frame(frame: np.ndarray, threshold: float = 75.0) -> bool:
+def _is_near_solid_frame(frame: np.ndarray, threshold: float = 50.0) -> bool:
     # Convert to grayscale and check standard deviation
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     std_dev = np.std(gray)
