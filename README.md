@@ -61,7 +61,7 @@ uvicorn app:app --reload
 
 ## Architecture Vision
 
-<img width="1378" height="2084" alt="architecture" src="https://github.com/user-attachments/assets/26f5bdc8-8c46-4894-b923-e260fb96bcc9" />
+<img width="1402" height="2104" alt="architecture" src="https://github.com/user-attachments/assets/1b96b0c0-859e-4cf7-9b54-fa297ed93d39" />
 
 ## Project Structure
 
