@@ -165,7 +165,6 @@ async def extract(payload: MoodboardPayload) -> StreamingResponse:
         # Turn elements into design tokens
         async def process_element(element: dict) -> DesignToken:
             element_type = element["content"]["type"]
-            logger.info(f"Handling {element_type} element #{element['id']}")
 
             # 1) Title and description generation
             match element_type:
@@ -252,7 +251,6 @@ async def extract(payload: MoodboardPayload) -> StreamingResponse:
 
         # Turn clusters into cluster descriptors
         async def process_cluster(cluster: dict) -> ClusterDescriptor:
-            logger.info(f"Handling cluster #{cluster['id']}")
 
             # 1) Gather elements for this cluster
             elements: list[DesignToken] = [
@@ -330,7 +328,6 @@ async def extract(payload: MoodboardPayload) -> StreamingResponse:
         async def route_single_cluster(
             cluster_descriptor: ClusterDescriptor,
         ) -> tuple[int, float, str]:
-            logger.info(f"Routing cluster #{cluster_descriptor.id}")
             weight, reasoning = await orchestrator.route_cluster(
                 payload.prompt, cluster_descriptor
             )
@@ -378,7 +375,6 @@ async def extract(payload: MoodboardPayload) -> StreamingResponse:
 
         # 3) Route design tokens and assign weights
         async def route_single_token(token: DesignToken) -> tuple[int, float, str]:
-            logger.info(f"Routing design token #{token.id}")
             cluster_context = token_cluster_context.get(token.id)
             weight, reasoning = await orchestrator.route_token(
                 payload.prompt, token, cluster_context
