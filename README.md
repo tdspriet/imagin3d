@@ -41,7 +41,7 @@ Make sure you have [Python 3.10+](https://www.python.org/downloads/) and [pip](h
 2. **Set the environment variables** <br>
 Create a `.env` file in the `backend` directory with the following content:<br>
 ```bash
-  BACKEND_ALLOWED_ORIGINS=http://localhost:5173 # Frontend URL
+  BACKEND_ALLOWED_ORIGINS=http://localhost:5173,http://localhost:3000
   GOOGLE_API_KEY="..."
   BEDROCK_ACCESS_KEY_ID="..."
   BEDROCK_SECRET_ACCESS_KEY="..."
