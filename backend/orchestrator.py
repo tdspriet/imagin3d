@@ -50,7 +50,6 @@ async def handle_model(element: dict) -> tuple[str, str]:
     renders_dir.mkdir(parents=True, exist_ok=True)
 
     # Create renders using Blender
-    logger.info(f"Making renders from model #{element['id']}")
     renders = await blender_engine.render_views(model_path, renders_dir)
     images = [render.image for render in renders]
 
@@ -63,7 +62,6 @@ async def handle_video(element: dict) -> tuple[str, str]:
     video_base64 = element["content"]["data"]["src"]
 
     # Extract key frames from video
-    logger.info(f"Extracting key frames from video #{element['id']}")
     frames = extract_key_frames(video_base64, frame_count=5)
 
     # Save the frames
