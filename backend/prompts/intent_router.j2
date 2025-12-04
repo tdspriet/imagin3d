@@ -10,11 +10,10 @@ Element:
 - Description: "{{ ctx.item.description }}"
 {% if ctx.cluster_context %}
 - Part of cluster: "{{ ctx.cluster_context }}"
-
+{% endif %}
 {% elif ctx.mode == "cluster" %}
 Cluster:
 - Title: "{{ ctx.item.title }}"
 - Description: "{{ ctx.item.description }}"
 - Contains {{ ctx.item.element_count }} design elements
-
 {% endif %}
