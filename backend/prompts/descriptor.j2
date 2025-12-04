@@ -1,12 +1,19 @@
 {% if ctx.type == "text" %}
-Describe this text for semantic search:
+The item contains the following text:
 {{ ctx.text }}
+
 {% elif ctx.type == "image" %}
-Describe this image: visual elements, colors, style, and mood.
+The item contains the following image.
+
 {% elif ctx.type == "video" %}
-Describe these video frames: key scenes, motion, visual style, and narrative.
+The item contains the following video content, represented as extracted frames.
+
 {% elif ctx.type == "model" %}
-Describe this 3D model: shape, structure, materials, and purpose.
+The item contains the following 3D model, represented as rendered views.
+
 {% elif ctx.type == "palette" %}
-Name this color palette (colors: {{ ctx.text }}). Provide only a creative title, description should be "None".
+The item contains the following color palette:
+{{ ctx.text }}
+Only a title is required; set the description to "None".
+
 {% endif %}

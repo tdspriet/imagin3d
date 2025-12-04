@@ -1,7 +1,6 @@
-You are analyzing a cluster of design elements from a moodboard. Your task is to identify the cluster's purpose and describe it cohesively.
-
-The cluster is titled "{{ ctx.title }}" and contains the following design elements:
+The cluster you are analyzing has the title "{{ ctx.title }}"
+It contains the following items:
 {% for token in ctx.elements %}
-- {{ token.type | capitalize }} (ID: {{ token.id }}): "{{ token.title }}"
-  Description: {{ token.description }}
+- {{ token.type | capitalize }} - Title: "{{ token.title }}"
+  Description: "{{ token.description }}"
 {% endfor %}

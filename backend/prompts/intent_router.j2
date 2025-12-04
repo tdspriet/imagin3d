@@ -1,22 +1,20 @@
-User's generation prompt: "{{ ctx.prompt }}"
+User prompt
+The user intends to generate:
+"{{ ctx.prompt }}"
 
-{% if ctx.mode == "cluster" %}
-Evaluate this CLUSTER for relevance to the user's prompt:
-- ID: {{ ctx.item.id }}
-- Title: "{{ ctx.item.title }}"
-- Purpose: {{ ctx.item.purpose }}
-- Description: {{ ctx.item.description }}
-- Contains {{ ctx.item.element_count }} design elements
-
-{% elif ctx.mode == "token" %}
-Evaluate this DESIGN TOKEN for relevance to the user's prompt:
-- ID: {{ ctx.item.id }}
+Item to evaluate
+{% if ctx.mode == "token" %}
+Element:
 - Type: {{ ctx.item.type }}
 - Title: "{{ ctx.item.title }}"
-- Description: {{ ctx.item.description }}
+- Description: "{{ ctx.item.description }}"
 {% if ctx.cluster_context %}
-- Part of cluster: {{ ctx.cluster_context }}
-{% endif %}
-{% endif %}
+- Part of cluster: "{{ ctx.cluster_context }}"
 
-Assign a weight (0-100) based on how relevant this item is to generating what the user wants.
+{% elif ctx.mode == "cluster" %}
+Cluster:
+- Title: "{{ ctx.item.title }}"
+- Description: "{{ ctx.item.description }}"
+- Contains {{ ctx.item.element_count }} design elements
+
+{% endif %}
