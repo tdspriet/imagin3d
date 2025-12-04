@@ -1,10 +1,9 @@
-from typing import Any, NewType
+from typing import NewType
 
 import pydantic_ai
 import pydantic_ai.models
 import structlog
 
-import common as common
 from agents import agent as agent
 
 logger = structlog.stdlib.get_logger(__name__)
@@ -19,7 +18,12 @@ class Visualizer(agent.BaseAgent):
         super().__init__(llm, pydantic_ai.BinaryImage)
 
     async def run(
-        self, content: Any
+        self,
+        master_prompt: str,
+        style_images: list[pydantic_ai.BinaryImage],
     ) -> pydantic_ai.AgentRunResult[pydantic_ai.BinaryImage]:
-        result, cost = await self._prompt(content)
+        result, _ = await self._prompt(
+            {"master_prompt": master_prompt},
+            extra=style_images,
+        )
         return result

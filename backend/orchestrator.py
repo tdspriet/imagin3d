@@ -15,6 +15,7 @@ from agents.descriptor import Descriptor
 from agents.clusterer import Clusterer
 from agents.intent_router import IntentRouter
 from agents.prompt_synthesizer import PromptSynthesizer
+from agents.visualizer import Visualizer
 from engines.blender import Blender
 from utils.embeddings import BedrockEmbeddingFunction
 from utils.video import extract_key_frames
@@ -34,6 +35,7 @@ descriptor: Descriptor = hydra.utils.instantiate(cfg.descriptor)
 clusterer: Clusterer = hydra.utils.instantiate(cfg.clusterer)
 intent_router: IntentRouter = hydra.utils.instantiate(cfg.intent_router)
 prompt_synthesizer: PromptSynthesizer = hydra.utils.instantiate(cfg.prompt_synthesizer)
+visualizer: Visualizer = hydra.utils.instantiate(cfg.visualizer)
 bedrock_client = boto3.client("bedrock-runtime")
 embedding_function = BedrockEmbeddingFunction(bedrock_client)
 
@@ -85,6 +87,14 @@ async def handle_image(element: dict) -> tuple[str, str]:
     base64_data = image_base64.split(",", 1)[1]
     image_bytes = base64.b64decode(base64_data)
     image = pydantic_ai.BinaryImage(data=image_bytes, media_type="image/jpeg")
+
+    # Save image to checkpoints
+    unique_name = str(element["id"])
+    images_dir = ROOT_DIR / "checkpoints" / "images" / unique_name
+    images_dir.mkdir(parents=True, exist_ok=True)
+    image_path = images_dir / "image.jpg"
+    with open(image_path, "wb") as f:
+        f.write(image_bytes)
 
     # Generate title and description
     result = await descriptor.run([image], type="image")
@@ -168,6 +178,63 @@ async def synthesize_master_prompt(
 
     result = await prompt_synthesizer.run(user_prompt, filtered_clusters)
     return result.output.info.prompt
+
+
+async def generate_master_image(
+    master_prompt: str,
+    clusters: list[common.ClusterDescriptor],
+) -> Path:
+    # Collect style images from visual elements in clusters with weight > 50
+    style_images: list[pydantic_ai.BinaryImage] = []
+    
+    for cluster in clusters:
+        if cluster.weight <= 50:
+            continue
+        
+        for elem in cluster.elements:
+            if elem.weight <= 50:
+                continue
+            
+            # Collect images based on element type
+            if elem.type == "image":
+                image_path = ROOT_DIR / "checkpoints" / "images" / str(elem.id) / "image.jpg"
+                if image_path.exists():
+                    with open(image_path, "rb") as f:
+                        style_images.append(
+                            pydantic_ai.BinaryImage(data=f.read(), media_type="image/jpeg")
+                        )
+            
+            elif elem.type == "video":
+                frames_dir = ROOT_DIR / "checkpoints" / "video_frames" / str(elem.id)
+                if frames_dir.exists():
+                    for frame_path in sorted(frames_dir.glob("*.jpg")):
+                        with open(frame_path, "rb") as f:
+                            style_images.append(
+                                pydantic_ai.BinaryImage(data=f.read(), media_type="image/jpeg")
+                            )
+            
+            elif elem.type == "model":
+                renders_dir = ROOT_DIR / "checkpoints" / "model_renders" / str(elem.id)
+                if renders_dir.exists():
+                    for render_path in sorted(renders_dir.glob("*.jpg")):
+                        with open(render_path, "rb") as f:
+                            style_images.append(
+                                pydantic_ai.BinaryImage(data=f.read(), media_type="image/jpeg")
+                            )
+    
+    logger.info(f"Collected {len(style_images)} style images for master image generation")
+    
+    # Generate master image
+    result = await visualizer.run(master_prompt, style_images)
+    
+    # Save master image to checkpoints
+    master_image_path = ROOT_DIR / "checkpoints" / "master_image.jpg"
+    
+    with open(master_image_path, "wb") as f:
+        f.write(result.output.data)
+    
+    logger.info(f"Master image saved to {master_image_path}")
+    return master_image_path
 
 
 # --- Helper functions ---
