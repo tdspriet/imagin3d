@@ -177,7 +177,14 @@ async def synthesize_master_prompt(
             })
 
     result = await prompt_synthesizer.run(user_prompt, filtered_clusters)
-    return result.output.info.prompt
+    master_prompt = result.output.info.prompt
+
+    # Save master prompt to checkpoints
+    master_prompt_path = ROOT_DIR / "checkpoints" / "master_prompt.txt"
+    with open(master_prompt_path, "w") as f:
+        f.write(master_prompt)
+
+    return master_prompt
 
 
 async def generate_master_image(
@@ -233,7 +240,6 @@ async def generate_master_image(
     with open(master_image_path, "wb") as f:
         f.write(result.output.data)
     
-    logger.info(f"Master image saved to {master_image_path}")
     return master_image_path
 
 

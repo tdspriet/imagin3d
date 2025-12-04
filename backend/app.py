@@ -462,11 +462,6 @@ async def extract(payload: MoodboardPayload) -> StreamingResponse:
         )
         logger.info(f"Master prompt:\n{master_prompt}")
 
-        # Save master prompt to file
-        master_prompt_path = ROOT_DIR / "checkpoints" / "master_prompt.txt"
-        with open(master_prompt_path, "w", encoding="utf-8") as f:
-            f.write(master_prompt)
-
         # ----- Master Image Generation -----
 
         master_image_path = await orchestrator.generate_master_image(
