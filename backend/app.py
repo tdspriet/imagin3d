@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import json
 import os
 import shutil
@@ -456,21 +457,85 @@ async def extract(payload: MoodboardPayload) -> StreamingResponse:
 
         # ----- Master Prompt Generation -----
 
+        # Send progress update for master prompt generation
+        progress_event = {
+            "type": "progress",
+            "data": {
+                "current": 0,
+                "total": 2,
+                "stage": "Generating master prompt...",
+            },
+        }
+        yield f"data: {json.dumps(progress_event)}\n\n"
+
         master_prompt = await orchestrator.synthesize_master_prompt(
             payload.prompt,
             cluster_descriptors,
         )
-        logger.info(f"Master prompt:\n{master_prompt}")
 
         # ----- Master Image Generation -----
+
+        # Send progress update for master image generation
+        progress_event = {
+            "type": "progress",
+            "data": {
+                "current": 1,
+                "total": 2,
+                "stage": "Generating master image...",
+            },
+        }
+        yield f"data: {json.dumps(progress_event)}\n\n"
 
         master_image_path = await orchestrator.generate_master_image(
             master_prompt,
             cluster_descriptors,
         )
-        logger.info(f"Master image saved to: {master_image_path}")
+
+        # Send master prompt and image to frontend for confirmation
+        master_image_base64 = ""
+        if master_image_path and Path(master_image_path).exists():
+            with open(master_image_path, "rb") as img_file:
+                img_data = base64.b64encode(img_file.read()).decode("utf-8")
+                ext = Path(master_image_path).suffix.lower()
+                mime_type = "image/png" if ext == ".png" else "image/jpeg"
+                master_image_base64 = f"data:{mime_type};base64,{img_data}"
+
+        # Create new session for master prompt confirmation
+        master_session_id = str(uuid.uuid4())
+        pending_confirmations[master_session_id] = {
+            "event": asyncio.Event(),
+            "confirmed": False,
+        }
+
+        master_prompt_event = {
+            "type": "master_prompt",
+            "data": {
+                "prompt": master_prompt,
+                "image": master_image_base64,
+            },
+            "session_id": master_session_id,
+        }
+        yield f"data: {json.dumps(master_prompt_event)}\n\n"
+
+        # Wait for user confirmation of master prompt
+        logger.info("Waiting for user confirmation of master prompt...")
+        await pending_confirmations[master_session_id]["event"].wait()
+        # Check if user confirmed or cancelled
+        master_confirmed = pending_confirmations[master_session_id]["confirmed"]
+        del pending_confirmations[master_session_id]  # Clean up
+        if not master_confirmed:
+            logger.info("User cancelled master prompt")
+            cancelled_event = {
+                "type": "cancelled",
+                "data": "Master prompt cancelled by user",
+            }
+            yield f"data: {json.dumps(cancelled_event)}\n\n"
+            return
+        logger.info("User confirmed master prompt, continuing pipeline...")
 
         # ----- 3D Generative Model -----
+
+        # ----- Final Response -----
 
         # Log completion of moodboard extraction
         logger.info("Completed moodboard extraction")
