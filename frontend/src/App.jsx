@@ -3,6 +3,7 @@ import Topbar from './components/Topbar'
 import Canvas from './components/Canvas'
 import ProgressBar from './components/ProgressBar'
 import ConfirmationBar from './components/ConfirmationBar'
+import MasterPromptDialog from './components/dialog/MasterPromptDialog'
 import { useMoodboardStore } from './store/moodboardStore'
 import './App.css'
 
@@ -13,12 +14,20 @@ import './App.css'
 function App() {
   const isGenerating = useMoodboardStore((state) => state.isGenerating)
   const progress = useMoodboardStore((state) => state.progress)
-  const awaitingConfirmation = useMoodboardStore((state) => state.awaitingConfirmation)
+
+  // Weights state
+  const awaitingWeightsConfirmation = useMoodboardStore((state) => state.awaitingWeightsConfirmation)
   const confirmWeights = useMoodboardStore((state) => state.confirmWeights)
   const cancelWeights = useMoodboardStore((state) => state.cancelWeights)
+  
+  // Master prompt state
+  const awaitingMasterPromptConfirmation = useMoodboardStore((state) => state.awaitingMasterPromptConfirmation)
+  const confirmMasterPrompt = useMoodboardStore((state) => state.confirmMasterPrompt)
+  const cancelMasterPrompt = useMoodboardStore((state) => state.cancelMasterPrompt)
+  const masterPromptData = useMoodboardStore((state) => state.masterPromptData)
 
-  // Show progress bar only when generating and not awaiting confirmation
-  const showProgressBar = isGenerating && !awaitingConfirmation && progress.total > 0
+  // Show progress bar when generating and not awaiting any confirmation
+  const showProgressBar = isGenerating && !awaitingWeightsConfirmation && !awaitingMasterPromptConfirmation && progress.total > 0
 
   return (
     <div className="app">
@@ -31,12 +40,19 @@ function App() {
           isVisible={showProgressBar}
         />
         <ConfirmationBar
-          isVisible={awaitingConfirmation}
+          isVisible={awaitingWeightsConfirmation}
           onConfirm={confirmWeights}
           onCancel={cancelWeights}
         />
       </header>
       <Canvas />
+      <MasterPromptDialog
+        isOpen={awaitingMasterPromptConfirmation}
+        onClose={cancelMasterPrompt}
+        onConfirm={confirmMasterPrompt}
+        masterPrompt={masterPromptData?.prompt}
+        masterImage={masterPromptData?.image}
+      />
     </div>
   )
 }

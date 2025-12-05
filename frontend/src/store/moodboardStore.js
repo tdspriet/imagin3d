@@ -205,8 +205,13 @@ export const useMoodboardStore = create((set, get) => ({
   reactFlowInstance: null,
   fitViewTrigger: 0,
   isGenerating: false,
-  pendingSessionId: null,
-  awaitingConfirmation: false,
+  // Weights session
+  weightsSessionId: null,
+  awaitingWeightsConfirmation: false,
+  // Master prompt session
+  masterPromptSessionId: null,
+  awaitingMasterPromptConfirmation: false,
+  masterPromptData: null, // { prompt, image }
   progress: {
     current: 0,
     total: 0,
@@ -629,8 +634,11 @@ export const useMoodboardStore = create((set, get) => ({
 
     set({ 
       isGenerating: true, 
-      awaitingConfirmation: false, 
-      pendingSessionId: null,
+      awaitingWeightsConfirmation: false, 
+      weightsSessionId: null,
+      awaitingMasterPromptConfirmation: false,
+      masterPromptSessionId: null,
+      masterPromptData: null,
       progress: { current: 0, total: 0, stage: 'Starting...' },
     })
     try {
@@ -680,20 +688,32 @@ export const useMoodboardStore = create((set, get) => ({
               // Store session ID and set awaiting confirmation
               if (session_id) {
                 set({ 
-                  pendingSessionId: session_id, 
-                  awaitingConfirmation: true,
+                  weightsSessionId: session_id, 
+                  awaitingWeightsConfirmation: true,
                   progress: { current: 0, total: 0, stage: '' }, // Clear progress
                 })
               }
             } else if (type === 'complete') {
               // Store final result
               finalResult = data
-              set({ awaitingConfirmation: false, pendingSessionId: null })
+              set({ awaitingWeightsConfirmation: false, weightsSessionId: null, awaitingMasterPromptConfirmation: false, masterPromptSessionId: null, masterPromptData: null })
             } else if (type === 'cancelled') {
               // Pipeline was cancelled
-              console.log('Pipeline cancelled by user')
-              set({ awaitingConfirmation: false, pendingSessionId: null })
+              set({ awaitingWeightsConfirmation: false, weightsSessionId: null, awaitingMasterPromptConfirmation: false, masterPromptSessionId: null, masterPromptData: null })
               return { cancelled: true }
+            } else if (type === 'master_prompt') {
+              // Master prompt and image received
+              if (session_id) {
+                set({ 
+                  masterPromptSessionId: session_id, 
+                  awaitingMasterPromptConfirmation: true,
+                  masterPromptData: {
+                    prompt: data.prompt,
+                    image: data.image,
+                  },
+                  progress: { current: 0, total: 0, stage: '' }, // Clear progress
+                })
+              }
             } else if (type === 'error') {
               console.error('Backend error:', data)
               throw new Error(data)
@@ -711,8 +731,11 @@ export const useMoodboardStore = create((set, get) => ({
     } finally {
       set({ 
         isGenerating: false, 
-        awaitingConfirmation: false, 
-        pendingSessionId: null,
+        awaitingWeightsConfirmation: false, 
+        weightsSessionId: null,
+        awaitingMasterPromptConfirmation: false,
+        masterPromptSessionId: null,
+        masterPromptData: null,
         progress: { current: 0, total: 0, stage: '' },
       })
     }
@@ -720,11 +743,14 @@ export const useMoodboardStore = create((set, get) => ({
 
   // Confirm weights to continue the pipeline
   confirmWeights: async () => {
-    const { pendingSessionId, clearWeights } = get()
-    if (!pendingSessionId) return
+    const { weightsSessionId, clearWeights } = get()
+    if (!weightsSessionId) return
+
+    // Hide confirmation bar immediately to make way for progress bar
+    set({ awaitingWeightsConfirmation: false, weightsSessionId: null })
 
     try {
-      await fetch(`${BACKEND_URL}/confirm-weights/${pendingSessionId}?confirmed=true`, {
+      await fetch(`${BACKEND_URL}/confirm-weights/${weightsSessionId}?confirmed=true`, {
         method: 'POST',
       })
       // Clear weight visualization
@@ -736,17 +762,47 @@ export const useMoodboardStore = create((set, get) => ({
 
   // Cancel weights to stop the pipeline
   cancelWeights: async () => {
-    const { pendingSessionId, clearWeights } = get()
-    if (!pendingSessionId) return
+    const { weightsSessionId, clearWeights } = get()
+    if (!weightsSessionId) return
 
     try {
-      await fetch(`${BACKEND_URL}/confirm-weights/${pendingSessionId}?confirmed=false`, {
+      await fetch(`${BACKEND_URL}/confirm-weights/${weightsSessionId}?confirmed=false`, {
         method: 'POST',
       })
       // Clear weight visualization
       clearWeights()
     } catch (error) {
       console.error('Error cancelling weights:', error)
+    }
+  },
+
+  // Confirm master prompt to continue the pipeline
+  confirmMasterPrompt: async () => {
+    const { masterPromptSessionId } = get()
+    if (!masterPromptSessionId) return
+
+    try {
+      await fetch(`${BACKEND_URL}/confirm-weights/${masterPromptSessionId}?confirmed=true`, {
+        method: 'POST',
+      })
+      set({ awaitingMasterPromptConfirmation: false, masterPromptSessionId: null, masterPromptData: null })
+    } catch (error) {
+      console.error('Error confirming master prompt:', error)
+    }
+  },
+
+  // Cancel master prompt to stop the pipeline
+  cancelMasterPrompt: async () => {
+    const { masterPromptSessionId } = get()
+    if (!masterPromptSessionId) return
+
+    try {
+      await fetch(`${BACKEND_URL}/confirm-weights/${masterPromptSessionId}?confirmed=false`, {
+        method: 'POST',
+      })
+      set({ awaitingMasterPromptConfirmation: false, masterPromptSessionId: null, masterPromptData: null })
+    } catch (error) {
+      console.error('Error cancelling master prompt:', error)
     }
   },
 
