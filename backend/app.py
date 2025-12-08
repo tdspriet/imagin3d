@@ -8,14 +8,14 @@ import shutil
 import uuid
 from datetime import datetime
 from pathlib import Path
-from dotenv import load_dotenv
+from dotenv import find_dotenv, load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 import uvicorn
 import structlog
 
-from common import (
+from backend.common import (
     ClusterDescriptor,
     DesignToken,
     GenerateResponse,
@@ -24,7 +24,18 @@ from common import (
     WeightsResponse,
 )
 
-load_dotenv()
+# Directory configuration
+ROOT_DIR = Path(__file__).parent.resolve()
+
+# Load environment
+for env_path in (
+    find_dotenv(usecwd=True),
+    Path.cwd() / "backend" / ".env",
+    ROOT_DIR / ".env",
+):
+    if env_path and Path(env_path).exists():
+        load_dotenv(env_path)
+        break
 
 # Amazon Bedrock API
 os.environ["AWS_ACCESS_KEY_ID"] = os.environ.get("BEDROCK_ACCESS_KEY_ID", "")
@@ -37,8 +48,6 @@ os.environ["AWS_DEFAULT_REGION"] = "eu-central-1"
 os.environ["GOOGLE_API_KEY"] = os.environ.get("GOOGLE_API_KEY", "")
 if os.environ["GOOGLE_API_KEY"] == "":
     raise Exception("No GOOGLE API key provided.")
-
-import orchestrator  # noqa: E402
 
 # Logging configuration
 structlog.configure(
@@ -57,21 +66,6 @@ if ALLOWED_ORIGINS:
     ]
 else:
     CORS_ORIGINS = ["*"]
-
-# Amazon Bedrock API
-os.environ["AWS_ACCESS_KEY_ID"] = os.environ.get("BEDROCK_ACCESS_KEY_ID", "")
-os.environ["AWS_SECRET_ACCESS_KEY"] = os.environ.get("BEDROCK_SECRET_ACCESS_KEY", "")
-if os.environ["AWS_ACCESS_KEY_ID"] == "" or os.environ["AWS_SECRET_ACCESS_KEY"] == "":
-    raise Exception("No AWS access keys provided.")
-os.environ["AWS_DEFAULT_REGION"] = "eu-central-1"
-
-# Google API
-os.environ["GOOGLE_API_KEY"] = os.environ.get("GOOGLE_API_KEY", "")
-if os.environ["GOOGLE_API_KEY"] == "":
-    raise Exception("No GOOGLE API key provided.")
-
-# Directory configuration
-ROOT_DIR = Path(__file__).parent.resolve()
 
 # Session management
 # Maps session_id -> {"event": asyncio.Event, "confirmed": bool}
@@ -101,6 +95,9 @@ async def confirm_weights(session_id: str, confirmed: bool = True):
 
 @app.post("/extract")
 async def extract(payload: MoodboardPayload) -> StreamingResponse:
+    from backend import orchestrator  # Lazy import to allow Pants to work
+    orchestrator._initialize()
+    
     async def generate():
         # ----- Ingestion -----
 

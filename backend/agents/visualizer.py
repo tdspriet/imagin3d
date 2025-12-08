@@ -4,7 +4,7 @@ import pydantic_ai
 import pydantic_ai.models
 import structlog
 
-from agents import agent as agent
+from backend.agents import agent
 
 logger = structlog.stdlib.get_logger(__name__)
 

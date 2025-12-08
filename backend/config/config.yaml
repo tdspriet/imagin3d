@@ -7,7 +7,7 @@ defaults:
   - override /hydra/job_logging: disabled
 
 engine:
-  _target_: engines.blender.Blender
+  _target_: backend.engines.blender.Blender
   name: "Blender"
   version: "4.5.3"
   exe: "blender"

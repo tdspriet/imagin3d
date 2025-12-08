@@ -10,34 +10,48 @@ from omegaconf import DictConfig
 import pydantic_ai
 import structlog
 
-import common
-from agents.descriptor import Descriptor
-from agents.clusterer import Clusterer
-from agents.intent_router import IntentRouter
-from agents.prompt_synthesizer import PromptSynthesizer
-from agents.visualizer import Visualizer
-from engines.blender import Blender
-from utils.embeddings import BedrockEmbeddingFunction
-from utils.video import extract_key_frames
+from backend import common
+from backend.agents.descriptor import Descriptor
+from backend.agents.clusterer import Clusterer
+from backend.agents.intent_router import IntentRouter
+from backend.agents.prompt_synthesizer import PromptSynthesizer
+from backend.agents.visualizer import Visualizer
+from backend.engines.blender import Blender
+from backend.utils.embeddings import BedrockEmbeddingFunction
+from backend.utils.video import extract_key_frames
 
 # Logging configuration
 logger = structlog.stdlib.get_logger(__name__)
 
-# Directory configuration
+# Global state
 ROOT_DIR = Path(__file__).parent.resolve()
+blender_engine: Blender | None = None
+descriptor: Descriptor | None = None
+clusterer: Clusterer | None = None
+intent_router: IntentRouter | None = None
+prompt_synthesizer: PromptSynthesizer | None = None
+visualizer: Visualizer | None = None
+bedrock_client: any = None
+embedding_function: BedrockEmbeddingFunction | None = None
 
-# Initialize via Hydra configuration
-config_dir = str(ROOT_DIR / "config")
-with initialize_config_dir(config_dir=config_dir, version_base=None):
-    cfg: DictConfig = compose(config_name="config")
-blender_engine: Blender = hydra.utils.instantiate(cfg.engine)
-descriptor: Descriptor = hydra.utils.instantiate(cfg.descriptor)
-clusterer: Clusterer = hydra.utils.instantiate(cfg.clusterer)
-intent_router: IntentRouter = hydra.utils.instantiate(cfg.intent_router)
-prompt_synthesizer: PromptSynthesizer = hydra.utils.instantiate(cfg.prompt_synthesizer)
-visualizer: Visualizer = hydra.utils.instantiate(cfg.visualizer)
-bedrock_client = boto3.client("bedrock-runtime")
-embedding_function = BedrockEmbeddingFunction(bedrock_client)
+
+def _initialize():
+    """Lazy initialization of orchestrator components."""
+    global _initialized, blender_engine, descriptor, clusterer, intent_router, prompt_synthesizer, visualizer, bedrock_client, embedding_function
+    
+    # Initialize via Hydra configuration
+    config_dir = str(ROOT_DIR / "config")
+    with initialize_config_dir(config_dir=config_dir, version_base=None):
+        cfg: DictConfig = compose(config_name="config")
+    
+    blender_engine = hydra.utils.instantiate(cfg.engine)
+    descriptor = hydra.utils.instantiate(cfg.descriptor)
+    clusterer = hydra.utils.instantiate(cfg.clusterer)
+    intent_router = hydra.utils.instantiate(cfg.intent_router)
+    prompt_synthesizer = hydra.utils.instantiate(cfg.prompt_synthesizer)
+    visualizer = hydra.utils.instantiate(cfg.visualizer)
+    bedrock_client = boto3.client("bedrock-runtime")
+    embedding_function = BedrockEmbeddingFunction(bedrock_client)
 
 
 async def handle_model(element: dict) -> tuple[str, str]:

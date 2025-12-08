@@ -35,6 +35,8 @@ npm run dev
 
 The backend uses FastAPI and Uvicorn.
 
+**Local**
+
 1. **Prerequisites** <br>
 Make sure you have [Python 3.10+](https://www.python.org/downloads/) and [pip](https://pip.pypa.io/en/stable/installation/) installed.
 
@@ -58,6 +60,24 @@ Create a `.env` file in the `backend` directory with the following content:<br>
 ``
 uvicorn app:app --reload
 ``
+
+**Coder**
+
+1. **Set the environment variables** <br>
+Create a `.env` file in the `backend` directory with the following content:<br>
+```bash
+  BACKEND_ALLOWED_ORIGINS=http://localhost:5173,http://localhost:3000
+  GOOGLE_API_KEY="..."
+  BEDROCK_ACCESS_KEY_ID="..."
+  BEDROCK_SECRET_ACCESS_KEY="..."
+```
+
+2. **Run the Backend** <br>
+```bash
+  cd backend
+  pants run backend:bin
+```
+
 
 ## Architecture Vision
 

@@ -1,26 +1,26 @@
 # @package _global_
 descriptor:
-  _target_: agents.descriptor.Descriptor
+  _target_: backend.agents.descriptor.Descriptor
   llm:
     _target_: pydantic_ai.models.google.GoogleModel
     model_name: gemini-3-pro-preview
 clusterer:
-  _target_: agents.clusterer.Clusterer
+  _target_: backend.agents.clusterer.Clusterer
   llm:
     _target_: pydantic_ai.models.bedrock.BedrockConverseModel
     model_name: global.anthropic.claude-opus-4-5-20251101-v1:0
 intent_router:
-  _target_: agents.intent_router.IntentRouter
+  _target_: backend.agents.intent_router.IntentRouter
   llm:
     _target_: pydantic_ai.models.bedrock.BedrockConverseModel
     model_name: global.anthropic.claude-sonnet-4-5-20250929-v1:0
 prompt_synthesizer:
-  _target_: agents.prompt_synthesizer.PromptSynthesizer
+  _target_: backend.agents.prompt_synthesizer.PromptSynthesizer
   llm:
     _target_: pydantic_ai.models.bedrock.BedrockConverseModel
     model_name: global.anthropic.claude-sonnet-4-5-20250929-v1:0
 visualizer:
-  _target_: agents.visualizer.Visualizer
+  _target_: backend.agents.visualizer.Visualizer
   llm:
     _target_: pydantic_ai.models.google.GoogleModel
     model_name: gemini-2.5-flash-image
