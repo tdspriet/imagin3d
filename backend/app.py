@@ -531,16 +531,30 @@ async def extract(payload: MoodboardPayload) -> StreamingResponse:
         logger.info("User confirmed master prompt, continuing pipeline...")
 
         # ----- 3D Generative Model -----
+        
+        # Send progress update for 3D model generation
+        progress_event = {
+            "type": "progress",
+            "data": {
+                "current": 1,
+                "total": 1,
+                "stage": "Generating 3D model...",
+            },
+        }
+        yield f"data: {json.dumps(progress_event)}\n\n"
+        
+        # Generate 3D model from master image using TRELLIS
+        model_path = await orchestrator.generate_3d_model(master_image_path)
 
         # ----- Final Response -----
 
         # Log completion of moodboard extraction
-        logger.info("Completed moodboard extraction")
+        logger.info("Completed moodboard extraction and 3D model generation")
 
         # Send final response
         final_response = GenerateResponse(
             count=len(payload.elements),
-            file=str(design_tokens_path),  # TODO: change to generated model file
+            file=str(model_path),  # Use the generated model file path
         )
         final_event = {"type": "complete", "data": final_response.dict()}
         yield f"data: {json.dumps(final_event)}\n\n"

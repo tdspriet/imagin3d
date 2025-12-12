@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 from pathlib import Path
+from typing import Any, Union, List
 
 import boto3
 import hydra
@@ -17,6 +18,7 @@ from backend.agents.intent_router import IntentRouter
 from backend.agents.prompt_synthesizer import PromptSynthesizer
 from backend.agents.visualizer import Visualizer
 from backend.engines.blender import Blender
+from backend.engines.trellis import TrellisEngine
 from backend.utils.embeddings import BedrockEmbeddingFunction
 from backend.utils.video import extract_key_frames
 
@@ -25,19 +27,20 @@ logger = structlog.stdlib.get_logger(__name__)
 
 # Global state
 ROOT_DIR = Path(__file__).parent.resolve()
-blender_engine: Blender | None = None
-descriptor: Descriptor | None = None
-clusterer: Clusterer | None = None
-intent_router: IntentRouter | None = None
-prompt_synthesizer: PromptSynthesizer | None = None
-visualizer: Visualizer | None = None
-bedrock_client: any = None
-embedding_function: BedrockEmbeddingFunction | None = None
+blender_engine: Union[Blender, None] = None
+trellis_engine: Union[TrellisEngine, None] = None
+descriptor: Union[Descriptor, None] = None
+clusterer: Union[Clusterer, None] = None
+intent_router: Union[IntentRouter, None] = None
+prompt_synthesizer: Union[PromptSynthesizer, None] = None
+visualizer: Union[Visualizer, None] = None
+bedrock_client: Any = None
+embedding_function: Union[BedrockEmbeddingFunction, None] = None
 
 
 def _initialize():
     """Lazy initialization of orchestrator components."""
-    global _initialized, blender_engine, descriptor, clusterer, intent_router, prompt_synthesizer, visualizer, bedrock_client, embedding_function
+    global _initialized, blender_engine, trellis_engine, descriptor, clusterer, intent_router, prompt_synthesizer, visualizer, bedrock_client, embedding_function
     
     # Initialize via Hydra configuration
     config_dir = str(ROOT_DIR / "config")
@@ -45,6 +48,7 @@ def _initialize():
         cfg: DictConfig = compose(config_name="config")
     
     blender_engine = hydra.utils.instantiate(cfg.engine)
+    trellis_engine = TrellisEngine()  # Initialize the TrellisEngine
     descriptor = hydra.utils.instantiate(cfg.descriptor)
     clusterer = hydra.utils.instantiate(cfg.clusterer)
     intent_router = hydra.utils.instantiate(cfg.intent_router)
@@ -253,6 +257,28 @@ async def generate_master_image(
         f.write(result.output.data)
     
     return master_image_path
+
+
+async def generate_3d_model(master_image_path: Path) -> Path:
+    """Generate a 3D model from the master image using TRELLIS.
+    
+    Args:
+        master_image_path: Path to the master image
+        
+    Returns:
+        Path to the generated 3D model file
+    """
+    logger.info("Generating 3D model from master image", image_path=str(master_image_path))
+    
+    # Create output directory for TRELLIS
+    output_dir = ROOT_DIR / "checkpoints" / "trellis_output"
+    output_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Use TRELLIS engine to generate 3D model
+    model_path = await trellis_engine.generate_3d_model(master_image_path, output_dir)
+    
+    logger.info("3D model generation completed", model_path=str(model_path))
+    return model_path
 
 
 # --- Helper functions ---

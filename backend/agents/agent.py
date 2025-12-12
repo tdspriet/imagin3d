@@ -1,7 +1,9 @@
 import pathlib
 import time
 from abc import ABC, abstractmethod
-from typing import Any
+from typing import Any, Generic, TypeVar
+
+T = TypeVar('T')
 
 import genai_prices
 import jinja2
@@ -14,7 +16,7 @@ from backend import common
 logger = structlog.stdlib.get_logger(__name__)
 
 
-class BaseAgent[T](ABC):
+class BaseAgent(ABC, Generic[T]):
     name: str
 
     def __init__(self, llm: pydantic_ai.models.Model | str, output_type: type[T]):
