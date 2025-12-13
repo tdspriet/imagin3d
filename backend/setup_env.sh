@@ -1,31 +1,54 @@
 #!/bin/bash
 
-# 1. Create the base environment (Standard libraries)
-echo "Creating Conda environment..."
+# 1. Install Miniconda
+mkdir -p ~/miniconda3
+wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O ~/miniconda3/miniconda.sh
+bash ~/miniconda3/miniconda.sh -b -u -p ~/miniconda3
+rm ~/miniconda3/miniconda.sh
+source ~/miniconda3/bin/activate
+conda init --all
+
+# 2. Create the environment
 conda env create -f environment.yml
-source ~/miniconda3/etc/profile.d/conda.sh # Adjust path if needed
+source ~/miniconda3/etc/profile.d/conda.sh
 conda activate trellis
 
-# 2. Install PyTorch 2.6 (Bleeding Edge)
-echo "Installing PyTorch 2.6..."
+# 2. Install torch
 pip install torch torchvision --index-url https://download.pytorch.org/whl/cu124
 
-# 3. Install Flash Attention (Custom Wheel for Torch 2.6)
-echo "Installing Flash Attention..."
+# 3. Install flash-attn
 pip install https://github.com/mjun0812/flash-attention-prebuild-wheels/releases/download/v0.0.8/flash_attn-2.7.4.post1%2Bcu124torch2.6-cp310-cp310-linux_x86_64.whl
 
-# 4. Install Gaussian Rasterizer (Patched for GCC 13+/CUDA 12)
-echo "Installing Gaussian Rasterization..."
+# 4. Install kaolin
+pip install kaolin==0.18.0 -f https://nvidia-kaolin.s3.us-east-2.amazonaws.com/torch-2.6.0_cu124.html
+
+# 5. Install utils3d
+pip install git+https://github.com/EasternJournalist/utils3d.git@9a4eb15e4021b67b12c460c7057d642626897ec8
+
+# 6. Install nvdiffrast
+pip install git+https://github.com/NVlabs/nvdiffrast.git@729261dc64c4241ea36efda84fbf532cc8b425b8
+
+# 7. Install gaussian rasterizion
 git clone --recursive https://github.com/graphdeco-inria/diff-gaussian-rasterization.git
 cd diff-gaussian-rasterization
-# Apply the <cstdint> fix
+# Apply a fix
 sed -i '1i#include <cstdint>' cuda_rasterizer/rasterizer_impl.h
 pip install . --no-build-isolation
 cd ..
 rm -rf diff-gaussian-rasterization
 
-# 5. Install Simple KNN
+# 8. Install Simple KNN
 echo "Installing Simple KNN..."
 pip install git+https://github.com/camenduru/simple-knn.git --no-build-isolation
 
-echo "Environment setup complete! Don't forget to 'conda activate trellis'"
+# 9. Download models
+git clone https://huggingface.co/microsoft/TRELLIS-image-large
+mv TRELLIS-image-large/ckpts .
+rm -rf TRELLIS-image-large
+
+echo ""
+echo "Environment setup complete!"
+echo ""
+echo "Next steps:"
+echo "  1. Make sure your GitHub Token is set in Coder"
+echo "  2. Restart your terminal"

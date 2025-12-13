@@ -162,7 +162,6 @@ dependencies:
       - dataclasses-json==0.6.7
       - decorator==5.2.1
       - deprecated==1.3.1
-      # - diff-gaussian-rasterization==0.0.0
       - distro==1.9.0
       - easydict==1.13
       - einops==0.8.1
@@ -173,7 +172,6 @@ dependencies:
       - fastjsonschema==2.21.2
       - filelock==3.19.1
       - fire==0.7.1
-      # - flash-attn==2.7.4.post1
       - flask==3.1.2
       - flatbuffers==25.9.23
       - fonttools==4.61.0
@@ -208,7 +206,6 @@ dependencies:
       - jupyter-client==7.4.9
       - jupyter-core==5.9.1
       - jupyterlab-widgets==3.0.16
-      - kaolin==0.18.0
       - kiwisolver==1.4.9
       - lark==1.3.1
       - lazy-loader==0.4
@@ -227,7 +224,6 @@ dependencies:
       - ninja==1.13.0
       - numba==0.63.1
       - numpy==2.1.2
-      - nvdiffrast==0.3.3
       - nvidia-cublas-cu12==12.4.5.8
       - nvidia-cuda-cupti-cu12==12.4.127
       - nvidia-cuda-nvrtc-cu12==12.4.127
@@ -305,8 +301,6 @@ dependencies:
       - threadpoolctl==3.6.0
       - tifffile==2025.5.10
       - tokenizers==0.22.1
-      # - torch==2.6.0+cu124
-      # - torchvision==0.21.0+cu124
       - tornado==6.5.3
       - tqdm==4.67.1
       - traitlets==5.14.3
@@ -317,7 +311,6 @@ dependencies:
       - typing-inspection==0.4.2
       - tzdata==2025.2
       - usd-core==25.11
-      - utils3d==0.0.2
       - uvicorn==0.38.0
       - uvloop==0.22.1
       - vtk==9.5.2
@@ -330,4 +323,3 @@ dependencies:
       - wrapt==2.0.1
       - xatlas==0.0.11
       - zipp==3.23.0
-# prefix: /root/miniconda3/envs/trellis
