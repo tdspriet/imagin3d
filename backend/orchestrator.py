@@ -64,7 +64,7 @@ async def handle_model(element: dict) -> tuple[str, str]:
 
     # Create renders directory
     unique_name = str(element["id"])
-    renders_dir = ROOT_DIR / "checkpoints" / "model_renders" / unique_name
+    renders_dir = ROOT_DIR / "artifacts" / "model_renders" / unique_name
     renders_dir.mkdir(parents=True, exist_ok=True)
 
     # Create renders using Blender
@@ -84,7 +84,7 @@ async def handle_video(element: dict) -> tuple[str, str]:
 
     # Save the frames
     unique_name = str(element["id"])
-    frames_dir = ROOT_DIR / "checkpoints" / "video_frames" / unique_name
+    frames_dir = ROOT_DIR / "artifacts" / "video_frames" / unique_name
     frames_dir.mkdir(parents=True, exist_ok=True)
     for i, frame in enumerate(frames):
         frame_path = frames_dir / f"frame_{i}.jpg"
@@ -104,9 +104,9 @@ async def handle_image(element: dict) -> tuple[str, str]:
     image_bytes = base64.b64decode(base64_data)
     image = pydantic_ai.BinaryImage(data=image_bytes, media_type="image/jpeg")
 
-    # Save image to checkpoints
+    # Save image to artifacts
     unique_name = str(element["id"])
-    images_dir = ROOT_DIR / "checkpoints" / "images" / unique_name
+    images_dir = ROOT_DIR / "artifacts" / "images" / unique_name
     images_dir.mkdir(parents=True, exist_ok=True)
     image_path = images_dir / "image.jpg"
     with open(image_path, "wb") as f:
@@ -195,8 +195,8 @@ async def synthesize_master_prompt(
     result = await prompt_synthesizer.run(user_prompt, filtered_clusters)
     master_prompt = result.output.info.prompt
 
-    # Save master prompt to checkpoints
-    master_prompt_path = ROOT_DIR / "checkpoints" / "master_prompt.txt"
+    # Save master prompt to artifacts
+    master_prompt_path = ROOT_DIR / "artifacts" / "master_prompt.txt"
     with open(master_prompt_path, "w") as f:
         f.write(master_prompt)
 
@@ -220,7 +220,7 @@ async def generate_master_image(
             
             # Collect images based on element type
             if elem.type == "image":
-                image_path = ROOT_DIR / "checkpoints" / "images" / str(elem.id) / "image.jpg"
+                image_path = ROOT_DIR / "artifacts" / "images" / str(elem.id) / "image.jpg"
                 if image_path.exists():
                     with open(image_path, "rb") as f:
                         style_images.append(
@@ -228,7 +228,7 @@ async def generate_master_image(
                         )
             
             elif elem.type == "video":
-                frames_dir = ROOT_DIR / "checkpoints" / "video_frames" / str(elem.id)
+                frames_dir = ROOT_DIR / "artifacts" / "video_frames" / str(elem.id)
                 if frames_dir.exists():
                     for frame_path in sorted(frames_dir.glob("*.jpg")):
                         with open(frame_path, "rb") as f:
@@ -237,7 +237,7 @@ async def generate_master_image(
                             )
             
             elif elem.type == "model":
-                renders_dir = ROOT_DIR / "checkpoints" / "model_renders" / str(elem.id)
+                renders_dir = ROOT_DIR / "artifacts" / "model_renders" / str(elem.id)
                 if renders_dir.exists():
                     for render_path in sorted(renders_dir.glob("*.jpg")):
                         with open(render_path, "rb") as f:
@@ -250,8 +250,8 @@ async def generate_master_image(
     # Generate master image
     result = await visualizer.run(master_prompt, style_images)
     
-    # Save master image to checkpoints
-    master_image_path = ROOT_DIR / "checkpoints" / "master_image.jpg"
+    # Save master image to artifacts
+    master_image_path = ROOT_DIR / "artifacts" / "master_image.jpg"
     
     with open(master_image_path, "wb") as f:
         f.write(result.output.data)
@@ -260,18 +260,10 @@ async def generate_master_image(
 
 
 async def generate_3d_model(master_image_path: Path) -> Path:
-    """Generate a 3D model from the master image using TRELLIS.
-    
-    Args:
-        master_image_path: Path to the master image
-        
-    Returns:
-        Path to the generated 3D model file
-    """
     logger.info("Generating 3D model from master image", image_path=str(master_image_path))
     
     # Create output directory for TRELLIS
-    output_dir = ROOT_DIR / "checkpoints" / "trellis_output"
+    output_dir = ROOT_DIR / "artifacts" / "trellis"
     output_dir.mkdir(parents=True, exist_ok=True)
     
     # Use TRELLIS engine to generate 3D model

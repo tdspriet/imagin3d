@@ -143,17 +143,17 @@ async def extract(payload: MoodboardPayload) -> StreamingResponse:
         }
         yield f"data: {json.dumps(progress_event)}\n\n"
 
-        # Clear checkpoints directory
-        checkpoints_dir = ROOT_DIR / "checkpoints"
-        if checkpoints_dir.exists():
-            shutil.rmtree(checkpoints_dir)
-        checkpoints_dir.mkdir(parents=True, exist_ok=True)
+        # Clear artifacts directory
+        artifacts_dir = ROOT_DIR / "artifacts"
+        if artifacts_dir.exists():
+            shutil.rmtree(artifacts_dir)
+        artifacts_dir.mkdir(parents=True, exist_ok=True)
 
         # Timestamp
         timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
 
         # Dump raw elements and clusters to JSON file
-        raw_path = ROOT_DIR / "checkpoints" / "raw" / f"moodboard-{timestamp}.json"
+        raw_path = ROOT_DIR / "artifacts" / "raw" / f"moodboard-{timestamp}.json"
         raw_path.parent.mkdir(parents=True, exist_ok=True)
         with raw_path.open("w", encoding="utf-8") as target_file:
             json.dump(payload.dict(), target_file, ensure_ascii=False, indent=2)
@@ -227,7 +227,7 @@ async def extract(payload: MoodboardPayload) -> StreamingResponse:
         # Dump design tokens to JSON file
         design_tokens_path = (
             ROOT_DIR
-            / "checkpoints"
+            / "artifacts"
             / "design_tokens"
             / f"design-tokens-{timestamp}.json"
         )
@@ -304,7 +304,7 @@ async def extract(payload: MoodboardPayload) -> StreamingResponse:
         for cluster_descriptor in cluster_descriptors:
             cluster_descriptors_dir = (
                 ROOT_DIR
-                / "checkpoints"
+                / "artifacts"
                 / "cluster_descriptors"
                 / str(cluster_descriptor.id)
             )
