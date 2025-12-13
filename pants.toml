@@ -1,6 +1,0 @@
-[GLOBAL]
-pants_version = "2.29.1"
-backend_packages = ["pants.backend.python"]
-
-[python]
-interpreter_constraints = ["==3.12.*"]
