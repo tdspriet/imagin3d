@@ -45,7 +45,7 @@ bash setup/setup.sh
 
 2. **Set the environment variables** <br>
 Create a `.env` file in the `backend` directory with the following content:<br>
-```bash
+```sh
   BACKEND_ALLOWED_ORIGINS=http://localhost:5173,http://localhost:3000
   GOOGLE_API_KEY="..."
   BEDROCK_ACCESS_KEY_ID="..."
@@ -53,9 +53,10 @@ Create a `.env` file in the `backend` directory with the following content:<br>
 ```
 
 3. **Run the Backend** <br>
-``
-python run.py
-``
+```sh
+  conda activate trellis
+  python run.py
+```
 
 ## Architecture Vision
 
