@@ -1,6 +1,6 @@
 hydra:
   run:
-    dir: checkpoints/hydra/${now:%Y-%m-%d}-${now:%H-%M-%S}
+    dir: artifacts/hydra/${now:%Y-%m-%d}-${now:%H-%M-%S}
   job:
     name: imagin3d
     chdir: false

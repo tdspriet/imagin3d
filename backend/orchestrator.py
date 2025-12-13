@@ -282,7 +282,7 @@ async def _save_model_file(element: dict) -> Path:
     base64_data = model_data.split(",", 1)[1]
     model_bytes = base64.b64decode(base64_data)
 
-    models_dir = ROOT_DIR / "checkpoints" / "models"
+    models_dir = ROOT_DIR / "artifacts" / "models"
     models_dir.mkdir(parents=True, exist_ok=True)
     model_path = models_dir / model_filename
 
