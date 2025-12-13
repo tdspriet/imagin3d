@@ -39,7 +39,6 @@ embedding_function: Union[BedrockEmbeddingFunction, None] = None
 
 
 def _initialize():
-    """Lazy initialization of orchestrator components."""
     global _initialized, blender_engine, trellis_engine, descriptor, clusterer, intent_router, prompt_synthesizer, visualizer, bedrock_client, embedding_function
     
     # Initialize via Hydra configuration

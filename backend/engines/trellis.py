@@ -60,15 +60,6 @@ class TrellisEngine:
         self._is_initialized = True
     
     async def generate_3d_model(self, image_path: Path, output_dir: Path) -> Path:
-        """Generate a 3D model from an image using TRELLIS.
-        
-        Args:
-            image_path: Path to the input image
-            output_dir: Directory to store outputs
-        
-        Returns:
-            Path to the generated model file
-        """
         self.initialize()
         
         # Ensure the output directory exists
