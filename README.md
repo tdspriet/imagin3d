@@ -26,7 +26,7 @@ Make sure you have [Node.js](https://nodejs.org/) and [npm](https://www.npmjs.co
 npm install
 ``
 
-1. **Run the Frontend**<br>
+3. **Run the Frontend**<br>
 ``
 npm run dev
 ``
@@ -37,8 +37,10 @@ The backend uses FastAPI and Uvicorn.
 
 **Local**
 
-1. **Prerequisites** <br>
-Make sure you have [Python 3.10+](https://www.python.org/downloads/) and [pip](https://pip.pypa.io/en/stable/installation/) installed.
+1. **Run the setup script** <br>
+``
+  bash setup.sh
+``
 
 2. **Set the environment variables** <br>
 Create a `.env` file in the `backend` directory with the following content:<br>
@@ -49,39 +51,12 @@ Create a `.env` file in the `backend` directory with the following content:<br>
   BEDROCK_SECRET_ACCESS_KEY="..."
 ```
 
-3. **Make the virtual environment** <br>
-```bash
-  python -m venv .venv
-  source .venv/bin/activate  # Windows: .venv\Scripts\activate
-  pip install -r requirements.txt
-```
-
-4. **Run the Backend** <br>
+3. **Run the Backend** <br>
 ``
-uvicorn app:app --reload
+python run.py
 ``
-
-**Coder**
-
-1. **Set the environment variables** <br>
-Create a `.env` file in the `backend` directory with the following content:<br>
-```bash
-  BACKEND_ALLOWED_ORIGINS=http://localhost:5173,http://localhost:3000
-  GOOGLE_API_KEY="..."
-  BEDROCK_ACCESS_KEY_ID="..."
-  BEDROCK_SECRET_ACCESS_KEY="..."
-```
-
-2. **Run the Backend** <br>
-```bash
-  cd backend
-  pants run backend:bin
-```
-
 
 ## Architecture Vision
-
-<img width="1402" height="2104" alt="architecture" src="https://github.com/user-attachments/assets/1b96b0c0-859e-4cf7-9b54-fa297ed93d39" />
 
 ## Project Structure
 
