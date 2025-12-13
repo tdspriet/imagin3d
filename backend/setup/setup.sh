@@ -9,7 +9,7 @@ source ~/miniconda3/bin/activate
 conda init --all
 
 # 2. Create the environment
-conda env create -f environment.yml
+conda env create -f setup/environment.yml
 source ~/miniconda3/etc/profile.d/conda.sh
 conda activate trellis
 
