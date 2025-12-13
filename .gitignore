@@ -11,8 +11,10 @@ __pycache__
 # Secrets
 .env
 
-# Checkpoints
+# Run Checkpoints
 checkpoints
+
+# Models
 ckpts
 
 # Notes
