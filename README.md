@@ -40,7 +40,7 @@ The backend uses FastAPI and Uvicorn.
 
 1. **Run the setup script** <br>
 ``
-  bash setup/setup.sh
+bash setup/setup.sh
 ``
 
 2. **Set the environment variables** <br>
