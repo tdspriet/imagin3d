@@ -12,6 +12,7 @@ Imagin3D is a moodboard platform that enables users to generate 3D models from v
 **Clone the repository**<br>
 ``
 git clone https://github.com/tdspriet/imagin3d.git
+git submodule update --init --recursive
 ``
 
 ### Frontend
