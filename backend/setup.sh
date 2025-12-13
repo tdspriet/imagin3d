@@ -46,6 +46,11 @@ git clone https://huggingface.co/microsoft/TRELLIS-image-large
 mv TRELLIS-image-large/ckpts .
 rm -rf TRELLIS-image-large
 
+# 10. Perist pythonpath
+if ! grep -q "PYTHONPATH=/workspaces/imagin3d" ~/.zshrc; then
+    echo 'export PYTHONPATH=/workspaces/imagin3d:$PYTHONPATH' >> ~/.zshrc
+fi
+
 echo ""
 echo "Environment setup complete!"
 echo ""
