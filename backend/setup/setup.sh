@@ -29,16 +29,9 @@ pip install git+https://github.com/EasternJournalist/utils3d.git@9a4eb15e4021b67
 pip install git+https://github.com/NVlabs/nvdiffrast.git@729261dc64c4241ea36efda84fbf532cc8b425b8
 
 # 7. Install gaussian rasterizion
-git clone --recursive https://github.com/graphdeco-inria/diff-gaussian-rasterization.git
-cd diff-gaussian-rasterization
-# Apply a fix
-sed -i '1i#include <cstdint>' cuda_rasterizer/rasterizer_impl.h
-pip install . --no-build-isolation
-cd ..
-rm -rf diff-gaussian-rasterization
+pip install "git+https://github.com/autonomousvision/mip-splatting.git#subdirectory=submodules/diff-gaussian-rasterization"  --no-build-isolation
 
 # 8. Install Simple KNN
-echo "Installing Simple KNN..."
 pip install git+https://github.com/camenduru/simple-knn.git --no-build-isolation
 
 # 9. Download models
