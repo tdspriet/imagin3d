@@ -10,14 +10,15 @@ Imagin3D is a moodboard platform that enables users to generate 3D models from v
 ## Installation
 
 **Clone the repository**<br>
-```bash
+```sh
 git clone https://github.com/tdspriet/imagin3d.git
+cd imagin3d
 git submodule update --init --recursive
 ```
 
 ### Frontend
 
-The frontend uses React and Vite.
+The local frontend uses React and Vite.
 
 1. **Prerequisites** <br>
 Make sure you have [Node.js](https://nodejs.org/) and [npm](https://www.npmjs.com/get-npm) installed.
@@ -34,9 +35,7 @@ npm run dev
 
 ### Backend 
 
-The backend uses FastAPI and Uvicorn.
-
-**Local**
+The Coder backend uses FastAPI and Uvicorn.
 
 1. **Run the setup script** <br>
 ``
