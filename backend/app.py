@@ -12,6 +12,7 @@ from dotenv import find_dotenv, load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
+from fastapi.staticfiles import StaticFiles
 import uvicorn
 import structlog
 
@@ -79,6 +80,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Mount artifacts directory
+app.mount("/artifacts", StaticFiles(directory=ROOT_DIR / "artifacts"), name="artifacts")
 
 
 @app.post("/confirm-weights/{session_id}")
@@ -552,9 +556,11 @@ async def extract(payload: MoodboardPayload) -> StreamingResponse:
         logger.info("Completed moodboard extraction and 3D model generation")
 
         # Send final response
+        relative_path = model_path.relative_to(ROOT_DIR / "artifacts")
+        model_url = f"/artifacts/{relative_path}"
         final_response = GenerateResponse(
             count=len(payload.elements),
-            file=str(model_path),  # Use the generated model file path
+            file=model_url,
         )
         final_event = {"type": "complete", "data": final_response.dict()}
         yield f"data: {json.dumps(final_event)}\n\n"

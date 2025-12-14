@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import subprocess
+import asyncio
 import tempfile
 from pathlib import Path
 import structlog
@@ -51,18 +51,16 @@ class TrellisEngine:
         # Make the command
         cmd = f"cd {self.trellis_path} && python {script_path}"
         
-        process = subprocess.Popen(
+        process = await asyncio.create_subprocess_shell(
             cmd,
-            shell=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
         )
         
-        _, stderr = process.communicate()
+        _, stderr = await process.communicate()
         
         if process.returncode != 0:
-            raise RuntimeError(f"TRELLIS generation failed: {stderr}")
+            raise RuntimeError(f"TRELLIS generation failed: {stderr.decode()}")
         
         # Return the GLB file path as the main output
         if output_glb.exists():
