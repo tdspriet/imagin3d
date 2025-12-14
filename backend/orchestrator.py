@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any, Union, List
 
 import boto3
+import numpy as np
 import hydra
 from hydra import compose, initialize_config_dir
 from omegaconf import DictConfig
@@ -270,6 +271,68 @@ async def generate_3d_model(master_image_path: Path) -> Path:
     
     logger.info("3D model generation completed", model_path=str(model_path))
     return model_path
+
+
+async def evaluate_model(
+    model_path: Path,
+    clusters: list[common.ClusterDescriptor],
+) -> int:
+    # TODO: check this WIP objective evaluation score
+    
+    # 1. Calculate moodboard centroid
+
+    embeddings = []
+    weights = []
+
+    for cluster in clusters:
+        if cluster.weight < 50:
+            continue
+            
+        for token in cluster.elements:
+            if token.weight < 50:
+                continue
+            
+            if token.embedding and len(token.embedding) > 0:
+                embeddings.append(token.embedding)
+                weights.append(token.weight)
+        
+    embeddings_np = np.array(embeddings)
+    weights_np = np.array(weights)
+    
+    if np.sum(weights_np) == 0:
+        weights_np = np.ones_like(weights_np) / len(weights_np)
+    else:
+        weights_np = weights_np / np.sum(weights_np)
+
+    centroid = np.average(embeddings_np, axis=0, weights=weights_np)
+    
+    # 2. Generate embedding for the generated model
+    
+    unique_name = f"generated"
+    renders_dir = ROOT_DIR / "artifacts" / "model_renders" / unique_name
+    renders_dir.mkdir(parents=True, exist_ok=True)
+    
+    renders = await blender_engine.render_views(model_path, renders_dir)
+    images = [render.image for render in renders]
+    
+    result = await descriptor.run(images, type="model")
+    title = result.output.info.title
+    
+    model_embedding = np.array(generate_embedding(title))
+    
+    # 3. Calculate distance/score
+
+    dot_product = np.dot(centroid, model_embedding)
+    norm_centroid = np.linalg.norm(centroid)
+    norm_model = np.linalg.norm(model_embedding)
+    
+    if norm_centroid == 0 or norm_model == 0:
+        return 0
+        
+    cosine_sim = dot_product / (norm_centroid * norm_model)
+    
+    score = int(max(0, cosine_sim) * 100)
+    return score
 
 
 # --- Helper functions ---

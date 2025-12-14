@@ -565,6 +565,14 @@ async def extract(payload: MoodboardPayload) -> StreamingResponse:
         final_event = {"type": "complete", "data": final_response.dict()}
         yield f"data: {json.dumps(final_event)}\n\n"
 
+        # ----- Evaluation -----
+        
+        # Calculate score
+        score = await orchestrator.evaluate_model(model_path, cluster_descriptors)
+        
+        score_event = {"type": "score", "data": {"score": score}}
+        yield f"data: {json.dumps(score_event)}\n\n"
+
     return StreamingResponse(
         generate(),
         media_type="text/event-stream",
