@@ -45,8 +45,9 @@ if ! grep -q "PYTHONPATH=/workspaces/imagin3d" ~/.zshrc; then
 fi
 
 echo ""
-echo "Environment setup complete!"
+echo "Environment setup complete"
+echo "(make sure your GitHub Token is set in Coder!)"
 echo ""
 echo "Next steps:"
-echo "  1. Make sure your GitHub Token is set in Coder"
-echo "  2. Restart your terminal"
+echo "  1. Restart your terminal"
+echo "  2. Run the backend"
