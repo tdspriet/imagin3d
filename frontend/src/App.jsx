@@ -4,6 +4,7 @@ import Canvas from './components/Canvas'
 import ProgressBar from './components/ProgressBar'
 import ConfirmationBar from './components/ConfirmationBar'
 import MasterPromptDialog from './components/dialog/MasterPromptDialog'
+import ModelDialog from './components/dialog/ModelDialog'
 import { useMoodboardStore } from './store/moodboardStore'
 import './App.css'
 
@@ -25,6 +26,10 @@ function App() {
   const confirmMasterPrompt = useMoodboardStore((state) => state.confirmMasterPrompt)
   const cancelMasterPrompt = useMoodboardStore((state) => state.cancelMasterPrompt)
   const masterPromptData = useMoodboardStore((state) => state.masterPromptData)
+
+  // Model dialog state
+  const modelDialog = useMoodboardStore((state) => state.modelDialog)
+  const closeModelDialog = useMoodboardStore((state) => state.closeModelDialog)
 
   // Show progress bar when generating and not awaiting any confirmation
   const showProgressBar = isGenerating && !awaitingWeightsConfirmation && !awaitingMasterPromptConfirmation && progress.total > 0
@@ -52,6 +57,11 @@ function App() {
         onConfirm={confirmMasterPrompt}
         masterPrompt={masterPromptData?.prompt}
         masterImage={masterPromptData?.image}
+      />
+      <ModelDialog
+        isOpen={modelDialog.isOpen}
+        onClose={closeModelDialog}
+        modelUrl={modelDialog.modelUrl}
       />
     </div>
   )

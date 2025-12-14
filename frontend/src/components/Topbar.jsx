@@ -170,9 +170,6 @@ function Topbar() {
     
     try {
       const result = await generateMoodboard(prompt)
-      if (result?.file) {
-        console.log(`Generated extraction ${result.file} with ${result.count} elements`)
-      }
     } catch (error) {
       console.error('Failed to extract:', error)
     }

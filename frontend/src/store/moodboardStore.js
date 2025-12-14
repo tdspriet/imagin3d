@@ -217,6 +217,11 @@ export const useMoodboardStore = create((set, get) => ({
     total: 0,
     stage: '',
   },
+  // Model dialog state
+  modelDialog: {
+    isOpen: false,
+    modelUrl: null,
+  },
 
   // Set ReactFlow instance
   setReactFlowInstance: (instance) => set({ reactFlowInstance: instance }),
@@ -697,6 +702,12 @@ export const useMoodboardStore = create((set, get) => ({
               // Store final result
               finalResult = data
               set({ awaitingWeightsConfirmation: false, weightsSessionId: null, awaitingMasterPromptConfirmation: false, masterPromptSessionId: null, masterPromptData: null })
+              
+              // Open model dialog
+              if (data.file) {
+                  const url = data.file.startsWith('http') ? data.file : `${BACKEND_URL}${data.file}`
+                  get().openModelDialog(url)
+              }
             } else if (type === 'cancelled') {
               // Pipeline was cancelled
               set({ awaitingWeightsConfirmation: false, weightsSessionId: null, awaitingMasterPromptConfirmation: false, masterPromptSessionId: null, masterPromptData: null })
@@ -805,6 +816,9 @@ export const useMoodboardStore = create((set, get) => ({
       console.error('Error cancelling master prompt:', error)
     }
   },
+
+  openModelDialog: (url) => set({ modelDialog: { isOpen: true, modelUrl: url } }),
+  closeModelDialog: () => set({ modelDialog: { isOpen: false, modelUrl: null } }),
 
   // Save moodboard to JSON file
   saveMoodboard: () => {
