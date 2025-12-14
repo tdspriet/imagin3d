@@ -645,6 +645,7 @@ export const useMoodboardStore = create((set, get) => ({
       masterPromptSessionId: null,
       masterPromptData: null,
       progress: { current: 0, total: 0, stage: 'Starting...' },
+      score: null,
     })
     try {
       const response = await fetch(`${BACKEND_URL}/extract`, {
@@ -725,6 +726,8 @@ export const useMoodboardStore = create((set, get) => ({
                   progress: { current: 0, total: 0, stage: '' }, // Clear progress
                 })
               }
+            } else if (type === 'score') {
+              set({ score: data.score })
             } else if (type === 'error') {
               console.error('Backend error:', data)
               throw new Error(data)

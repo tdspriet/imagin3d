@@ -3,6 +3,7 @@ import { Canvas } from '@react-three/fiber'
 import { OrbitControls, } from '@react-three/drei'
 import * as THREE from 'three'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader'
+import { useMoodboardStore } from '../../store/moodboardStore'
 import './ModelDialog.css'
 
 function Model3D({ url, onError }) {
@@ -91,6 +92,8 @@ function ModelDialog({
     onClose?.()
   }, [onClose])
 
+  const score = useMoodboardStore((state) => state.score)
+
   useEffect(() => {
     if (!isOpen) return
 
@@ -165,20 +168,25 @@ function ModelDialog({
         </div>
 
         <div className="model-dialog__actions">
-          <button
-            type="button"
-            className="model-dialog__btn model-dialog__btn--secondary"
-            onClick={handleClose}
-          >
-            Close
-          </button>
-          <button
-            type="button"
-            className="model-dialog__btn model-dialog__btn--primary"
-            onClick={handleDownload}
-          >
-            Download
-          </button>
+          <div className="model-dialog__score">
+             {score !== null ? `Score: ${score}%` : 'Calculating score...'}
+          </div>
+          <div className="model-dialog__buttons">
+            <button
+              type="button"
+              className="model-dialog__btn model-dialog__btn--secondary"
+              onClick={handleClose}
+            >
+              Close
+            </button>
+            <button
+              type="button"
+              className="model-dialog__btn model-dialog__btn--primary"
+              onClick={handleDownload}
+            >
+              Download
+            </button>
+          </div>
         </div>
       </div>
     </div>

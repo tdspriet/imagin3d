@@ -89,8 +89,20 @@
 
 .model-dialog__actions {
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
+  align-items: center;
   gap: 12px;
+}
+
+.model-dialog__buttons {
+  display: flex;
+  gap: 12px;
+}
+
+.model-dialog__score {
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: var(--color-text-secondary);
 }
 
 .model-dialog__btn {
