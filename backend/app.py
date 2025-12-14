@@ -536,7 +536,7 @@ async def extract(payload: MoodboardPayload) -> StreamingResponse:
         progress_event = {
             "type": "progress",
             "data": {
-                "current": 1,
+                "current": 0,
                 "total": 1,
                 "stage": "Generating 3D model...",
             },

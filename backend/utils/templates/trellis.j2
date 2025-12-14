@@ -1,0 +1,50 @@
+import os
+os.environ['SPCONV_ALGO'] = 'native'
+
+import imageio
+from PIL import Image
+from trellis.pipelines import TrellisImageTo3DPipeline
+from trellis.utils import render_utils, postprocessing_utils
+
+# Load the pipeline
+pipeline = TrellisImageTo3DPipeline.from_pretrained("microsoft/TRELLIS-image-large")
+pipeline.cuda()
+
+# Load an image
+image = Image.open("{{ image_path }}")
+
+# Run the pipeline
+outputs = pipeline.run(
+    image,
+    seed=1,
+    sparse_structure_sampler_params={
+        "steps": 12,
+        "cfg_strength": 7.5,
+    },
+    slat_sampler_params={
+        "steps": 12,
+        "cfg_strength": 3,
+    },
+)
+
+# Render the outputs
+video = render_utils.render_video(outputs['gaussian'][0])['color']
+imageio.mimsave("{{ output_video_gs }}", video, fps=30)
+
+video = render_utils.render_video(outputs['radiance_field'][0])['color']
+imageio.mimsave("{{ output_video_rf }}", video, fps=30)
+
+video = render_utils.render_video(outputs['mesh'][0])['normal']
+imageio.mimsave("{{ output_video_mesh }}", video, fps=30)
+
+# GLB files can be extracted from the outputs
+glb = postprocessing_utils.to_glb(
+    outputs['gaussian'][0],
+    outputs['mesh'][0],
+    simplify=0.95,
+    texture_size=1024,
+)
+glb.export("{{ output_glb }}")
+
+# Save Gaussians as PLY files
+outputs['gaussian'][0].save_ply("{{ output_ply }}")

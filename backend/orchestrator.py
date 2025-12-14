@@ -18,7 +18,7 @@ from backend.agents.intent_router import IntentRouter
 from backend.agents.prompt_synthesizer import PromptSynthesizer
 from backend.agents.visualizer import Visualizer
 from backend.engines.blender import Blender
-from backend.engines.trellis import TrellisEngine
+from backend.utils.trellis import TrellisEngine
 from backend.utils.embeddings import BedrockEmbeddingFunction
 from backend.utils.video import extract_key_frames
 
