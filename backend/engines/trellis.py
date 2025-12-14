@@ -11,7 +11,6 @@ from PIL import Image
 logger = structlog.stdlib.get_logger(__name__)
 
 class TrellisEngine:
-    """TRELLIS 3D model generation engine."""
 
     def __init__(self):
         # Check if TRELLIS environment is activated
@@ -19,7 +18,6 @@ class TrellisEngine:
         self.trellis_path = Path("/workspaces/imagin3d/trellis")
     
     def _ensure_conda_initialized(self):
-        """Ensures conda is initialized for shell usage."""
         # Conda setup for subprocess calls
         self.conda_path = os.path.expanduser("~/miniconda3/etc/profile.d/conda.sh")
         if not Path(self.conda_path).exists():
@@ -27,11 +25,8 @@ class TrellisEngine:
             self.conda_path = os.path.expanduser("~/anaconda3/etc/profile.d/conda.sh")
             if not Path(self.conda_path).exists():
                 raise RuntimeError("Conda installation not found. Please install Conda.")
-            
-        logger.info("Conda initialization path found", path=self.conda_path)
     
     def initialize(self):
-        """Initialize the TRELLIS engine."""
         if self._is_initialized:
             return
         
@@ -40,12 +35,10 @@ class TrellisEngine:
         # Check if we're already in the trellis environment
         current_env = os.environ.get('CONDA_DEFAULT_ENV')
         if current_env == 'trellis':
-            logger.info("Already in TRELLIS conda environment")
             self._is_initialized = True
             return
             
         # Otherwise check if trellis conda environment exists
-        logger.info("Checking TRELLIS conda environment")
         result = subprocess.run(
             f"source {self.conda_path} && conda env list | grep trellis",
             shell=True,
@@ -56,7 +49,6 @@ class TrellisEngine:
         if "trellis" not in result.stdout:
             raise RuntimeError("TRELLIS conda environment not found. Please create it by running `. ./trellis/setup.sh --new-env --basic --xformers --flash-attn --diffoctreerast --spconv --mipgaussian --kaolin --nvdiffrast`")
         
-        logger.info("TRELLIS conda environment found")
         self._is_initialized = True
     
     async def generate_3d_model(self, image_path: Path, output_dir: Path) -> Path:
@@ -132,8 +124,6 @@ print("All files generated successfully")
         with open(script_path, "w") as f:
             f.write(script_content)
         
-        logger.info("Running TRELLIS 3D model generation", image_path=str(image_path))
-        
         # Run the script either in the current environment or activate trellis
         current_env = os.environ.get('CONDA_DEFAULT_ENV')
         if current_env == 'trellis':
@@ -142,8 +132,6 @@ print("All files generated successfully")
         else:
             # Need to activate the trellis environment first
             cmd = f"source {self.conda_path} && conda activate trellis && cd {self.trellis_path} && python {script_path}"
-        
-        logger.info(f"Running TRELLIS command: {cmd}")
         
         process = subprocess.Popen(
             cmd,
@@ -158,10 +146,6 @@ print("All files generated successfully")
         if process.returncode != 0:
             logger.error("TRELLIS generation failed", stderr=stderr)
             raise RuntimeError(f"TRELLIS generation failed: {stderr}")
-        else:
-            logger.info("TRELLIS generation completed", stdout=stdout)
-            
-        logger.info("TRELLIS generation completed")
         
         # Return the GLB file path as the main output
         if output_glb.exists():
