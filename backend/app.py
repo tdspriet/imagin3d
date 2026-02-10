@@ -81,6 +81,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Create artifacts directory if it doesn't exist
+artifacts_dir = ROOT_DIR / "artifacts"
+artifacts_dir.mkdir(parents=True, exist_ok=True)
+
 # Mount artifacts directory
 app.mount("/artifacts", StaticFiles(directory=ROOT_DIR / "artifacts"), name="artifacts")
 
