@@ -5,7 +5,7 @@ import { create } from 'zustand'
 const BACKEND_URL = 'http://localhost:8000'.replace(/\/$/, '')
 
 // Z-index constants
-const SELECTED_Z_OFFSET = 1000
+const SELECTED_Z_OFFSET = 2000
 const CLUSTER_Z_OFFSET = -1000
 // Default font sizes
 const DEFAULT_FONT_SIZE = 16
@@ -120,7 +120,7 @@ const computeSizeRatios = (node) => {
 }
 
 
-const applyLayerOrder = (nodes) => {
+const applyLayerOrder = (nodes, isGenerating = false) => {
   const clusterNodes = []
   const contentNodes = []
 
@@ -161,11 +161,15 @@ const applyLayerOrder = (nodes) => {
       contentCounter += 1
     }
 
+    const selectionOffset = isSelected
+      ? (isClusterNode && !isGenerating ? 500 : SELECTED_Z_OFFSET)
+      : 0
+
     return {
       ...node,
       style: {
         ...(node.style || {}),
-        zIndex: baseZIndex + (isSelected ? SELECTED_Z_OFFSET : 0),
+        zIndex: baseZIndex + selectionOffset,
       },
     }
   })
@@ -194,6 +198,36 @@ const isNodeInsideCluster = (node, cluster) => {
   )
 }
 
+const buildEditedWeightsPayload = (nodes = [], idMaps = null) => {
+  if (!idMaps) {
+    return { weights: {}, cluster_weights: {} }
+  }
+
+  const nodeLookup = new Map(nodes.map((node) => [node.id, node]))
+  const weights = {}
+  const cluster_weights = {}
+
+  if (idMaps.elements instanceof Map) {
+    for (const [backendId, frontendId] of idMaps.elements.entries()) {
+      const node = nodeLookup.get(frontendId)
+      if (typeof node?.data?.weight === 'number') {
+        weights[backendId] = Math.max(0, Math.min(100, Math.round(node.data.weight)))
+      }
+    }
+  }
+
+  if (idMaps.clusters instanceof Map) {
+    for (const [backendId, frontendId] of idMaps.clusters.entries()) {
+      const node = nodeLookup.get(frontendId)
+      if (typeof node?.data?.weight === 'number') {
+        cluster_weights[backendId] = Math.max(0, Math.min(100, Math.round(node.data.weight)))
+      }
+    }
+  }
+
+  return { weights, cluster_weights }
+}
+
 /**
  * Moodboard Store
  * Manages the state of all nodes and canvas operations
@@ -207,6 +241,7 @@ export const useMoodboardStore = create((set, get) => ({
   isGenerating: false,
   // Weights session
   weightsSessionId: null,
+  weightsIdMaps: null,
   awaitingWeightsConfirmation: false,
   // Master prompt session
   masterPromptSessionId: null,
@@ -222,12 +257,13 @@ export const useMoodboardStore = create((set, get) => ({
     isOpen: false,
     modelUrl: null,
   },
+  score: null,
 
   // Set ReactFlow instance
   setReactFlowInstance: (instance) => set({ reactFlowInstance: instance }),
 
   // Set nodes
-  setNodes: (nodes) => set({ nodes: applyLayerOrder(nodes) }),
+  setNodes: (nodes) => set((state) => ({ nodes: applyLayerOrder(nodes, state.isGenerating) })),
 
   // Update specific node data
   updateNodeData: (nodeId, newData) => {
@@ -238,6 +274,11 @@ export const useMoodboardStore = create((set, get) => ({
           : node
       ),
     }))
+  },
+
+  updateNodeWeight: (nodeId, nextWeight) => {
+    const w = Math.max(0, Math.min(100, Math.round(Number(nextWeight) || 0)))
+    get().updateNodeData(nodeId, { weight: w })
   },
 
   // Update node style dimensions (width/height)
@@ -292,7 +333,7 @@ export const useMoodboardStore = create((set, get) => ({
           }
         }
       })
-      return { nodes: applyLayerOrder(updatedNodes) }
+      return { nodes: applyLayerOrder(updatedNodes, state.isGenerating) }
     })
   },
 
@@ -307,7 +348,7 @@ export const useMoodboardStore = create((set, get) => ({
       const reordered = [...state.nodes]
       const [node] = reordered.splice(index, 1)
       reordered.splice(index + 1, 0, node)
-      return { nodes: applyLayerOrder(reordered) }
+      return { nodes: applyLayerOrder(reordered, state.isGenerating) }
     })
   },
 
@@ -322,7 +363,7 @@ export const useMoodboardStore = create((set, get) => ({
       const reordered = [...state.nodes]
       const [node] = reordered.splice(index, 1)
       reordered.splice(index - 1, 0, node)
-      return { nodes: applyLayerOrder(reordered) }
+      return { nodes: applyLayerOrder(reordered, state.isGenerating) }
     })
   },
 
@@ -359,7 +400,7 @@ export const useMoodboardStore = create((set, get) => ({
       }
 
       set((state) => ({
-        nodes: applyLayerOrder([...state.nodes, newNode]),
+        nodes: applyLayerOrder([...state.nodes, newNode], state.isGenerating),
       }))
     }
 
@@ -402,7 +443,7 @@ export const useMoodboardStore = create((set, get) => ({
       }
 
       set((state) => ({
-        nodes: applyLayerOrder([...state.nodes, newNode]),
+        nodes: applyLayerOrder([...state.nodes, newNode], state.isGenerating),
       }))
     }
 
@@ -446,7 +487,7 @@ export const useMoodboardStore = create((set, get) => ({
       style: { width, height },
     }
     set((state) => ({
-      nodes: applyLayerOrder([...state.nodes, newNode]),
+      nodes: applyLayerOrder([...state.nodes, newNode], state.isGenerating),
     }))
   },
 
@@ -484,7 +525,7 @@ export const useMoodboardStore = create((set, get) => ({
       style: { width, height },
     }
     set((state) => ({
-      nodes: applyLayerOrder([...state.nodes, newNode]),
+      nodes: applyLayerOrder([...state.nodes, newNode], state.isGenerating),
     }))
   },
 
@@ -508,7 +549,7 @@ export const useMoodboardStore = create((set, get) => ({
     }
     
     set((state) => ({
-      nodes: applyLayerOrder([...state.nodes, newNode]),
+      nodes: applyLayerOrder([...state.nodes, newNode], state.isGenerating),
     }))
   },
 
@@ -532,7 +573,7 @@ export const useMoodboardStore = create((set, get) => ({
     }
 
     set((state) => ({
-      nodes: applyLayerOrder([...state.nodes, newNode]),
+      nodes: applyLayerOrder([...state.nodes, newNode], state.isGenerating),
     }))
   },
 
@@ -554,7 +595,7 @@ export const useMoodboardStore = create((set, get) => ({
     }
 
     set((state) => ({
-      nodes: applyLayerOrder([...state.nodes, newNode]),
+      nodes: applyLayerOrder([...state.nodes, newNode], state.isGenerating),
     }))
   },
 
@@ -571,7 +612,6 @@ export const useMoodboardStore = create((set, get) => ({
         data: {
           ...node.data,
           weight: undefined,
-          reasoning: undefined,
         },
       })),
     }))
@@ -588,35 +628,11 @@ export const useMoodboardStore = create((set, get) => ({
   applyWeights: (weightsData, idMaps) => {
     set((state) => ({
       nodes: state.nodes.map((node) => {
-        if (node.type === 'clusterNode') {
-          // CLUSTERS
-          for (const [backendId, frontendId] of idMaps.clusters.entries()) {
-            if (frontendId === node.id && weightsData.cluster_weights?.[backendId]) {
-              const weightInfo = weightsData.cluster_weights[backendId]
-              return {
-                ...node,
-                data: {
-                  ...node.data,
-                  weight: weightInfo.weight,
-                  reasoning: weightInfo.reasoning,
-                },
-              }
-            }
-          }
-        } else {
-          // ELEMENTS
-          for (const [backendId, frontendId] of idMaps.elements.entries()) {
-            if (frontendId === node.id && weightsData.weights?.[backendId]) {
-              const weightInfo = weightsData.weights[backendId]
-              return {
-                ...node,
-                data: {
-                  ...node.data,
-                  weight: weightInfo.weight,
-                  reasoning: weightInfo.reasoning,
-                },
-              }
-            }
+        const map = node.type === 'clusterNode' ? idMaps.clusters : idMaps.elements
+        const source = node.type === 'clusterNode' ? weightsData.cluster_weights : weightsData.weights
+        for (const [backendId, frontendId] of map.entries()) {
+          if (frontendId === node.id && source?.[backendId] != null) {
+            return { ...node, data: { ...node.data, weight: source[backendId] } }
           }
         }
         return node
@@ -641,6 +657,7 @@ export const useMoodboardStore = create((set, get) => ({
       isGenerating: true, 
       awaitingWeightsConfirmation: false, 
       weightsSessionId: null,
+      weightsIdMaps: null,
       awaitingMasterPromptConfirmation: false,
       masterPromptSessionId: null,
       masterPromptData: null,
@@ -695,6 +712,7 @@ export const useMoodboardStore = create((set, get) => ({
               if (session_id) {
                 set({ 
                   weightsSessionId: session_id, 
+                  weightsIdMaps: idMaps,
                   awaitingWeightsConfirmation: true,
                   progress: { current: 0, total: 0, stage: '' }, // Clear progress
                 })
@@ -702,7 +720,7 @@ export const useMoodboardStore = create((set, get) => ({
             } else if (type === 'complete') {
               // Store final result
               finalResult = data
-              set({ awaitingWeightsConfirmation: false, weightsSessionId: null, awaitingMasterPromptConfirmation: false, masterPromptSessionId: null, masterPromptData: null })
+              set({ awaitingWeightsConfirmation: false, weightsSessionId: null, weightsIdMaps: null, awaitingMasterPromptConfirmation: false, masterPromptSessionId: null, masterPromptData: null })
               
               // Open model dialog
               if (data.file) {
@@ -711,7 +729,7 @@ export const useMoodboardStore = create((set, get) => ({
               }
             } else if (type === 'cancelled') {
               // Pipeline was cancelled
-              set({ awaitingWeightsConfirmation: false, weightsSessionId: null, awaitingMasterPromptConfirmation: false, masterPromptSessionId: null, masterPromptData: null })
+              set({ awaitingWeightsConfirmation: false, weightsSessionId: null, weightsIdMaps: null, awaitingMasterPromptConfirmation: false, masterPromptSessionId: null, masterPromptData: null })
               return { cancelled: true }
             } else if (type === 'master_prompt') {
               // Master prompt and image received
@@ -747,6 +765,7 @@ export const useMoodboardStore = create((set, get) => ({
         isGenerating: false, 
         awaitingWeightsConfirmation: false, 
         weightsSessionId: null,
+        weightsIdMaps: null,
         awaitingMasterPromptConfirmation: false,
         masterPromptSessionId: null,
         masterPromptData: null,
@@ -757,15 +776,21 @@ export const useMoodboardStore = create((set, get) => ({
 
   // Confirm weights to continue the pipeline
   confirmWeights: async () => {
-    const { weightsSessionId, clearWeights } = get()
+    const { weightsSessionId, weightsIdMaps, nodes, clearWeights } = get()
     if (!weightsSessionId) return
+    const editedWeightsPayload = buildEditedWeightsPayload(nodes, weightsIdMaps)
 
     // Hide confirmation bar immediately to make way for progress bar
-    set({ awaitingWeightsConfirmation: false, weightsSessionId: null })
+    set({ awaitingWeightsConfirmation: false, weightsSessionId: null, weightsIdMaps: null })
 
     try {
-      await fetch(`${BACKEND_URL}/confirm-weights/${weightsSessionId}?confirmed=true`, {
+      await fetch(`${BACKEND_URL}/confirm-weights/${weightsSessionId}`, {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          confirmed: true,
+          ...editedWeightsPayload,
+        }),
       })
       // Clear weight visualization
       clearWeights()
@@ -780,9 +805,12 @@ export const useMoodboardStore = create((set, get) => ({
     if (!weightsSessionId) return
 
     try {
-      await fetch(`${BACKEND_URL}/confirm-weights/${weightsSessionId}?confirmed=false`, {
+      await fetch(`${BACKEND_URL}/confirm-weights/${weightsSessionId}`, {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ confirmed: false }),
       })
+      set({ weightsIdMaps: null })
       // Clear weight visualization
       clearWeights()
     } catch (error) {
@@ -854,10 +882,10 @@ export const useMoodboardStore = create((set, get) => ({
   loadMoodboard: (data) => {
     try {
       if (data.nodes && Array.isArray(data.nodes)) {
-        set({
-          nodes: applyLayerOrder(data.nodes),
+        set((state) => ({
+          nodes: applyLayerOrder(data.nodes, state.isGenerating),
           edges: [],
-        })
+        }))
         // Trigger fit view after loading
         setTimeout(() => {
           set((state) => ({ fitViewTrigger: state.fitViewTrigger + 1 }))

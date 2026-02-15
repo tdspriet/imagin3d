@@ -1,5 +1,6 @@
 import React from 'react'
 import { NodeResizer } from 'reactflow'
+import { useMoodboardStore } from '../../store/moodboardStore'
 import NodeLayerControls from './NodeLayerControls'
 import WeightOverlay from './WeightOverlay'
 import './VideoNode.css'
@@ -9,10 +10,12 @@ import './VideoNode.css'
  * Displays a video with resizable handles that maintain aspect ratio
  */
 function VideoNode({ id, data, selected }) {
+  const isGenerating = useMoodboardStore((s) => s.isGenerating)
+
   return (
     <>
       <NodeResizer
-        isVisible={selected}
+        isVisible={selected && !isGenerating}
         minWidth={100}
         minHeight={100}
         keepAspectRatio={true}
@@ -20,13 +23,13 @@ function VideoNode({ id, data, selected }) {
         handleClassName="node-resizer-handle"
       />
       <div className="node-frame">
-        <NodeLayerControls id={id} isVisible={selected} />
+        <NodeLayerControls id={id} isVisible={selected && !isGenerating} />
         <div className="video-node">
           <video
             src={data.src}
             controls
           />
-          <WeightOverlay weight={data.weight} reasoning={data.reasoning} />
+          <WeightOverlay nodeId={id} weight={data.weight} />
         </div>
       </div>
     </>

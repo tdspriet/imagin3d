@@ -1,4 +1,5 @@
 import { useRef, useState, Suspense, useEffect, memo } from 'react'
+import { useMoodboardStore } from '../../store/moodboardStore'
 import { Canvas } from '@react-three/fiber'
 import { OrbitControls, PerspectiveCamera } from '@react-three/drei'
 import { NodeResizer } from 'reactflow'
@@ -117,6 +118,7 @@ function ModelNode({ id, data, selected }) {
   const canvasRef = useRef(null)
   const glRef = useRef(null)
   const themeListenerRef = useRef(null)
+  const isGenerating = useMoodboardStore((s) => s.isGenerating)
 
   // Handle WebGL context loss
   useEffect(() => {
@@ -177,7 +179,7 @@ function ModelNode({ id, data, selected }) {
   return (
     <>
       <NodeResizer
-        isVisible={selected}
+        isVisible={selected && !isGenerating}
         minWidth={150}
         minHeight={150}
         keepAspectRatio={true}
@@ -189,7 +191,7 @@ function ModelNode({ id, data, selected }) {
         <div className="model-titlebar react-flow-drag-handle" title="Drag to move node">
           <span className="model-title">{modelName}</span>
         </div>
-        <NodeLayerControls id={id} isVisible={selected} />
+        <NodeLayerControls id={id} isVisible={selected && !isGenerating} />
         <div className="model-node" ref={canvasRef}>
           {error ? (
             <div className="model-error">
@@ -260,7 +262,7 @@ function ModelNode({ id, data, selected }) {
               )}
             </div>
           )}
-          <WeightOverlay weight={data.weight} reasoning={data.reasoning} />
+          <WeightOverlay nodeId={id} weight={data.weight} />
         </div>
       </div>
     </>

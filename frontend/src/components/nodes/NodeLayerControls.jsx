@@ -6,6 +6,7 @@ import './NodeControls.css'
 function NodeLayerControls({ id, isVisible }) {
   const bringNodeForward = useMoodboardStore((state) => state.bringNodeForward)
   const sendNodeBackward = useMoodboardStore((state) => state.sendNodeBackward)
+  const isGenerating = useMoodboardStore((state) => state.isGenerating)
 
   const stopPropagation = useCallback((event) => {
     event.stopPropagation()
@@ -28,7 +29,7 @@ function NodeLayerControls({ id, isVisible }) {
     [sendNodeBackward, id, stopPropagation]
   )
 
-  if (!isVisible) {
+  if (!isVisible || isGenerating) {
     return null
   }
 

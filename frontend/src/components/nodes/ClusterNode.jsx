@@ -6,6 +6,7 @@ import './ClusterNode.css'
 
 function ClusterNode({ id, data, selected }) {
   const { updateNodeData } = useMoodboardStore()
+  const isGenerating = useMoodboardStore((s) => s.isGenerating)
   const [isEditingTitle, setIsEditingTitle] = useState(false)
   const [title, setTitle] = useState(data?.title || 'Cluster')
   const inputRef = useRef(null)
@@ -36,11 +37,11 @@ function ClusterNode({ id, data, selected }) {
     (event) => {
       event.stopPropagation()
       event.preventDefault()
-      if (!isEditingTitle) {
+      if (!isEditingTitle && !isGenerating) {
         setIsEditingTitle(true)
       }
     },
-    [isEditingTitle]
+    [isEditingTitle, isGenerating]
   )
 
   const handleTitleKeyDown = useCallback(
@@ -69,7 +70,7 @@ function ClusterNode({ id, data, selected }) {
   return (
     <>
       <NodeResizer
-        isVisible={selected}
+        isVisible={selected && !isGenerating}
         minWidth={240}
         minHeight={160}
         handleClassName="node-resizer-handle"
@@ -99,7 +100,7 @@ function ClusterNode({ id, data, selected }) {
           )}
         </div>
         <div className="cluster-node-body" aria-hidden="true">
-          <WeightOverlay weight={data?.weight} reasoning={data?.reasoning} />
+          <WeightOverlay nodeId={id} weight={data?.weight} />
         </div>
       </div>
     </>

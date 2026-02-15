@@ -1,8 +1,7 @@
 .weight-overlay {
   position: absolute;
   inset: 0;
-  pointer-events: auto;
-  cursor: help;
+  pointer-events: none;
   border-radius: inherit;
   z-index: 10;
   display: flex;
@@ -11,12 +10,61 @@
   padding: 6px;
 }
 
+.weight-overlay__controls {
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  background: rgba(0, 0, 0, 0.6);
+  border-radius: 999px;
+  padding: 2px;
+}
+
 .weight-overlay__badge {
-  background: rgba(0, 0, 0, 0.7);
-  color: white;
+  color: #fff;
   font-size: 11px;
   font-weight: 600;
-  padding: 2px 6px;
-  border-radius: 4px;
-  line-height: 1.2;
+  padding: 0 6px;
+  min-width: 24px;
+  text-align: center;
+  line-height: 20px;
+}
+
+.weight-overlay__btn {
+  width: 20px;
+  height: 20px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.weight-overlay__btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.weight-overlay__badge--editable {
+  cursor: text;
+}
+
+.weight-overlay__input {
+  width: 34px;
+  height: 20px;
+  border: none;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  text-align: center;
+  outline: none;
+  padding: 0 4px;
 }

@@ -34,6 +34,7 @@ const nodeTypes = {
  */
 function Canvas() {
   const { nodes, setNodes, onNodesChange, edges, fitViewTrigger, setReactFlowInstance } = useMoodboardStore()
+  const isGenerating = useMoodboardStore((s) => s.isGenerating)
   const reactFlowWrapper = useRef(null)
   const [localNodes, setLocalNodes] = useNodesState(nodes)
   const [localEdges, setLocalEdges] = useEdgesState(edges)
@@ -47,11 +48,15 @@ function Canvas() {
   // Handle node changes (position, selection, etc.)
   const handleNodesChange = useCallback(
     (changes) => {
-      const updatedNodes = applyNodeChanges(changes, localNodes)
+      const filtered = isGenerating
+        ? changes.filter((c) => c.type !== 'position' && c.type !== 'dimensions')
+        : changes
+      if (filtered.length === 0) return
+      const updatedNodes = applyNodeChanges(filtered, localNodes)
       setLocalNodes(updatedNodes)
       setNodes(updatedNodes)
     },
-    [localNodes, setLocalNodes, setNodes]
+    [localNodes, setLocalNodes, setNodes, isGenerating]
   )
 
   // Handle ReactFlow initialization
@@ -75,6 +80,7 @@ function Canvas() {
   // Handle keyboard events (Delete key)
   useEffect(() => {
     const handleKeyDown = (event) => {
+      if (isGenerating) return
       if (event.key === 'Delete' || event.key === 'Backspace') {
         const selectedNodes = localNodes.filter((node) => node.selected)
         if (selectedNodes.length > 0) {
@@ -88,7 +94,7 @@ function Canvas() {
 
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [localNodes, setLocalNodes, setNodes])
+  }, [localNodes, setLocalNodes, setNodes, isGenerating])
 
   return (
     <div className="canvas-container" ref={reactFlowWrapper}>
@@ -98,6 +104,8 @@ function Canvas() {
         onNodesChange={handleNodesChange}
         onInit={onInit}
         nodeTypes={nodeTypes}
+        nodesConnectable={!isGenerating}
+        zoomOnDoubleClick={false}
         fitView
         proOptions={{ hideAttribution: true }}
         minZoom={0.1}

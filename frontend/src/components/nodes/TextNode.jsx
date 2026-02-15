@@ -22,6 +22,7 @@ function TextNode({ id, data, selected }) {
   const contentRef = useRef(null)
   const lastHeightRef = useRef(null)
   const { updateNodeData, setNodeDimensions } = useMoodboardStore()
+  const isGenerating = useMoodboardStore((s) => s.isGenerating)
 
   const applyHeight = useCallback(
     (measuredHeight) => {
@@ -66,7 +67,7 @@ function TextNode({ id, data, selected }) {
 
   // Handle double-click to enter edit mode
   const handleDoubleClick = () => {
-    setIsEditing(true)
+    if (!isGenerating) setIsEditing(true)
   }
 
   // Handle text change
@@ -144,14 +145,14 @@ function TextNode({ id, data, selected }) {
   return (
     <>
       <NodeResizer
-        isVisible={selected}
+        isVisible={selected && !isGenerating}
         minWidth={100}
         minHeight={30}
         lineClassName="node-resizer-line"
         handleClassName="node-resizer-handle"
       />
       <div className="node-frame">
-        <NodeLayerControls id={id} isVisible={selected && !isEditing} />
+        <NodeLayerControls id={id} isVisible={selected && !isEditing && !isGenerating} />
         <div className="text-node" onDoubleClick={handleDoubleClick} ref={containerRef}>
           {isEditing ? (
             <textarea
@@ -172,7 +173,7 @@ function TextNode({ id, data, selected }) {
               {text}
             </div>
           )}
-          {selected && !isEditing && (
+          {selected && !isEditing && !isGenerating && (
             <div className="font-size-controls" onDoubleClick={handleControlDoubleClick}>
               <button
                 onClick={increaseFontSize}
@@ -190,7 +191,7 @@ function TextNode({ id, data, selected }) {
               </button>
             </div>
           )}
-          <WeightOverlay weight={data.weight} reasoning={data.reasoning} />
+          <WeightOverlay nodeId={id} weight={data.weight} />
         </div>
       </div>
     </>

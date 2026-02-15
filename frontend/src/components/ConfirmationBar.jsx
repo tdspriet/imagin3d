@@ -8,7 +8,7 @@ function ConfirmationBar({ onConfirm, onCancel, isVisible }) {
   return (
     <div className="confirmation-bar">
       <span className="confirmation-bar__message">
-        Review the assigned weights. Confirm to continue or cancel to stop.
+        Review and adjust weights. Confirm to continue or cancel to stop.
       </span>
       <div className="confirmation-bar__actions">
         <button

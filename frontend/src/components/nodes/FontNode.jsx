@@ -12,6 +12,7 @@ function FontNode({ id, data, selected }) {
   const [fontSize, setFontSize] = useState(data.fontSize || 24)
   const [fontFamily] = useState(data.fontFamily || 'Arial')
   const { updateNodeData, setNodeDimensions } = useMoodboardStore()
+  const isGenerating = useMoodboardStore((s) => s.isGenerating)
   const displayRef = useRef(null)
   const lastWidthRef = useRef(null)
   const lastHeightRef = useRef(null)
@@ -102,7 +103,7 @@ function FontNode({ id, data, selected }) {
 
   return (
     <div className="node-frame">
-      <NodeLayerControls id={id} isVisible={selected} />
+      <NodeLayerControls id={id} isVisible={selected && !isGenerating} />
       <div className="font-node">
         <div
           className="font-display"
@@ -114,7 +115,7 @@ function FontNode({ id, data, selected }) {
         >
           {fontFamily}
         </div>
-        {selected && (
+        {selected && !isGenerating && (
           <div className="font-size-controls" onDoubleClick={handleControlDoubleClick}>
             <button
               onClick={increaseFontSize}
