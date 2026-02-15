@@ -9,7 +9,7 @@ import uuid
 from datetime import datetime
 from pathlib import Path
 from dotenv import find_dotenv, load_dotenv
-from fastapi import Body, FastAPI, Query
+from fastapi import Body, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
@@ -92,15 +92,14 @@ app.mount("/artifacts", StaticFiles(directory=ROOT_DIR / "artifacts"), name="art
 @app.post("/confirm-weights/{session_id}")
 async def confirm_weights(
     session_id: str,
-    confirmed: bool = Query(True),
-    payload: WeightsResponse | None = Body(default=None),
+    payload: WeightsResponse = Body(...),
 ):
     if session_id not in pending_confirmations:
         return {"error": "Session not found or already expired"}
 
     session = pending_confirmations[session_id]
-    session["confirmed"] = payload.confirmed if payload is not None else confirmed
-    if payload is not None and (payload.weights or payload.cluster_weights):
+    session["confirmed"] = payload.confirmed
+    if payload.weights or payload.cluster_weights:
         session["edited_weights"] = {
             "weights": payload.weights,
             "cluster_weights": payload.cluster_weights,
