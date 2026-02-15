@@ -14,13 +14,19 @@ class MoodboardPayload(BaseModel):
     prompt: str = Field(default="")
 
 
-class WeightsResponse(BaseModel):
-    weights: Dict[int, WeightInfo] = Field(
+class WeightsRequest(BaseModel):
+    weights: Dict[int, int] = Field(
         default_factory=dict
     )  # element_id -> weight info
-    cluster_weights: Dict[int, WeightInfo] = Field(
+    cluster_weights: Dict[int, int] = Field(
         default_factory=dict
     )  # cluster_id -> weight info
+
+
+class WeightsResponse(BaseModel):
+    confirmed: bool = True
+    weights: Dict[int, int] = Field(default_factory=dict)
+    cluster_weights: Dict[int, int] = Field(default_factory=dict)
 
 
 class GenerateResponse(BaseModel):
@@ -50,12 +56,6 @@ class Cost(NamedTuple):
 
     def add(self, other: Cost) -> Cost:
         return Cost(self.time + other.time, self.price + other.price)
-
-
-class WeightInfo(BaseModel):
-    weight: int  # 0-100
-    reasoning: str
-
 
 # --- LLM Data Models ---
 
@@ -91,7 +91,6 @@ class DesignToken(BaseModel):
     size: Dict[str, float]
     position: Dict[str, float]
     weight: int = 0  # 0-100
-    reasoning: Optional[str] = None
 
 
 class ClusterDescriptor(BaseModel):
@@ -100,4 +99,3 @@ class ClusterDescriptor(BaseModel):
     description: Optional[str] = None
     elements: List[DesignToken] = Field(default_factory=list)
     weight: int = 0  # 0-100
-    reasoning: Optional[str] = None

@@ -9,7 +9,7 @@ import uuid
 from datetime import datetime
 from pathlib import Path
 from dotenv import find_dotenv, load_dotenv
-from fastapi import FastAPI
+from fastapi import Body, FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
@@ -21,8 +21,8 @@ from backend.common import (
     DesignToken,
     GenerateResponse,
     MoodboardPayload,
-    WeightInfo,
     WeightsResponse,
+    WeightsRequest,
 )
 
 # Directory configuration
@@ -90,15 +90,26 @@ app.mount("/artifacts", StaticFiles(directory=ROOT_DIR / "artifacts"), name="art
 
 
 @app.post("/confirm-weights/{session_id}")
-async def confirm_weights(session_id: str, confirmed: bool = True):
+async def confirm_weights(
+    session_id: str,
+    confirmed: bool = Query(True),
+    payload: WeightsResponse | None = Body(default=None),
+):
     if session_id not in pending_confirmations:
         return {"error": "Session not found or already expired"}
 
     session = pending_confirmations[session_id]
-    session["confirmed"] = confirmed
+    session["confirmed"] = payload.confirmed if payload is not None else confirmed
+    if payload is not None and (payload.weights or payload.cluster_weights):
+        session["edited_weights"] = {
+            "weights": payload.weights,
+            "cluster_weights": payload.cluster_weights,
+        }
     session["event"].set()
 
-    return {"status": "confirmed" if confirmed else "cancelled"}
+    return {
+        "status": "confirmed" if session["confirmed"] else "cancelled",
+    }
 
 
 @app.post("/extract")
@@ -327,14 +338,14 @@ async def extract(payload: MoodboardPayload) -> StreamingResponse:
         # ----- Intent Router -----
 
         # Initialize weight tracking
-        element_weights: dict[int, WeightInfo] = {}
-        cluster_weights: dict[int, WeightInfo] = {}
+        element_weights: dict[int, int] = {}
+        cluster_weights: dict[int, int] = {}
 
         # 1) Route clusters and assign weights
         async def route_single_cluster(
             cluster_descriptor: ClusterDescriptor,
-        ) -> tuple[int, float, str]:
-            weight, reasoning = await orchestrator.route_cluster(
+        ) -> tuple[int, int]:
+            weight = await orchestrator.route_cluster(
                 payload.prompt, cluster_descriptor
             )
             # Signal progress
@@ -346,7 +357,7 @@ async def extract(payload: MoodboardPayload) -> StreamingResponse:
                     "stage": "Weighing clusters...",
                 }
             )
-            return cluster_descriptor.id, weight, reasoning
+            return cluster_descriptor.id, weight
 
         # Start routing all clusters in parallel
         cluster_routing_tasks = [
@@ -366,10 +377,9 @@ async def extract(payload: MoodboardPayload) -> StreamingResponse:
 
         # Apply the routing results to cluster descriptors
         cluster_descriptor_lookup = {cd.id: cd for cd in cluster_descriptors}
-        for cluster_id, weight, reasoning in cluster_routing_results:
+        for cluster_id, weight in cluster_routing_results:
             cluster_descriptor_lookup[cluster_id].weight = weight
-            cluster_descriptor_lookup[cluster_id].reasoning = reasoning
-            cluster_weights[cluster_id] = WeightInfo(weight=weight, reasoning=reasoning)
+            cluster_weights[cluster_id] = weight
 
         # 2) Provide cluster context for design tokens
         token_cluster_context: dict[int, str] = {}
@@ -380,9 +390,9 @@ async def extract(payload: MoodboardPayload) -> StreamingResponse:
                 )
 
         # 3) Route design tokens and assign weights
-        async def route_single_token(token: DesignToken) -> tuple[int, float, str]:
+        async def route_single_token(token: DesignToken) -> tuple[int, int]:
             cluster_context = token_cluster_context.get(token.id)
-            weight, reasoning = await orchestrator.route_token(
+            weight = await orchestrator.route_token(
                 payload.prompt, token, cluster_context
             )
             # Signal progress
@@ -394,7 +404,7 @@ async def extract(payload: MoodboardPayload) -> StreamingResponse:
                     "stage": "Weighing elements...",
                 }
             )
-            return token.id, weight, reasoning
+            return token.id, weight
 
         # Start routing all tokens in parallel
         token_routing_tasks = [
@@ -414,10 +424,9 @@ async def extract(payload: MoodboardPayload) -> StreamingResponse:
 
         # Apply the routing results to design tokens
         token_lookup_for_routing = {token.id: token for token in design_tokens}
-        for token_id, weight, reasoning in token_routing_results:
+        for token_id, weight in token_routing_results:
             token_lookup_for_routing[token_id].weight = weight
-            token_lookup_for_routing[token_id].reasoning = reasoning
-            element_weights[token_id] = WeightInfo(weight=weight, reasoning=reasoning)
+            element_weights[token_id] = weight
 
         # 4) Update cluster elements with weighted tokens
         for cluster_descriptor in cluster_descriptors:
@@ -433,7 +442,7 @@ async def extract(payload: MoodboardPayload) -> StreamingResponse:
             "event": asyncio.Event(),
             "confirmed": False,
         }
-        weights_response = WeightsResponse(
+        weights_response = WeightsRequest(
             weights=element_weights,
             cluster_weights=cluster_weights,
         )
@@ -446,9 +455,11 @@ async def extract(payload: MoodboardPayload) -> StreamingResponse:
 
         # Wait for user confirmation
         logger.info("Waiting for user confirmation of weights...")
-        await pending_confirmations[session_id]["event"].wait()
+        confirmation_session = pending_confirmations[session_id]
+        await confirmation_session["event"].wait()
         # Check if user confirmed or cancelled
-        confirmed = pending_confirmations[session_id]["confirmed"]
+        confirmed = confirmation_session["confirmed"]
+        edited_weights = confirmation_session.get("edited_weights", {})
         del pending_confirmations[session_id]  # Clean up
         if not confirmed:
             logger.info("User cancelled the pipeline")
@@ -458,6 +469,24 @@ async def extract(payload: MoodboardPayload) -> StreamingResponse:
             }
             yield f"data: {json.dumps(cancelled_event)}\n\n"
             return
+        if edited_weights:
+            edited_element_weights = edited_weights.get("weights", {})
+            edited_cluster_weights = edited_weights.get("cluster_weights", {})
+
+            for token_id, user_weight in edited_element_weights.items():
+                if token_id in token_lookup_for_routing:
+                    clamped_weight = max(0, min(100, int(user_weight)))
+                    token_lookup_for_routing[token_id].weight = clamped_weight
+                    if token_id in element_weights:
+                        element_weights[token_id] = clamped_weight
+
+            for cluster_id, user_weight in edited_cluster_weights.items():
+                if cluster_id in cluster_descriptor_lookup:
+                    clamped_weight = max(0, min(100, int(user_weight)))
+                    cluster_descriptor_lookup[cluster_id].weight = clamped_weight
+                    if cluster_id in cluster_weights:
+                        cluster_weights[cluster_id] = clamped_weight
+
         logger.info("User confirmed weights, continuing pipeline...")
 
         # ----- Master Prompt Generation -----

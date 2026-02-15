@@ -148,18 +148,18 @@ async def handle_cluster(
 async def route_cluster(
     prompt: str,
     cluster: common.ClusterDescriptor,
-) -> tuple[int, str]:
+) -> int:
     result = await intent_router.run_for_cluster(prompt, cluster)
-    return result.output.info.weight, result.output.info.reasoning
+    return result.output.info.weight
 
 
 async def route_token(
     prompt: str,
     token: common.DesignToken,
     cluster_context: str | None = None,
-) -> tuple[int, str]:
+) -> int:
     result = await intent_router.run_for_token(prompt, token, cluster_context)
-    return result.output.info.weight, result.output.info.reasoning
+    return result.output.info.weight
 
 
 def generate_embedding(title: str) -> list[float]:
@@ -285,11 +285,11 @@ async def evaluate_model(
     weights = []
 
     for cluster in clusters:
-        if cluster.weight < 50:
+        if cluster.weight <= 50:
             continue
             
         for token in cluster.elements:
-            if token.weight < 50:
+            if token.weight <= 50:
                 continue
             
             if token.embedding and len(token.embedding) > 0:
