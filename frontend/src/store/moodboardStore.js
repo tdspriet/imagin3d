@@ -730,6 +730,7 @@ export const useMoodboardStore = create((set, get) => ({
                 masterPromptSessionId: null,
                 masterPromptData: null,
                 masterPromptIsLoading: false,
+                progress: { current: 0, total: 0, stage: '' },
               })
               
               // Open model dialog
