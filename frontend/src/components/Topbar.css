@@ -117,13 +117,13 @@
 }
 
 .btn-warning {
-  color: #ffc107;
-  border-color: #ffc107;
+  color: var(--accent-progress);
+  border-color: var(--accent-progress);
 }
 
 .btn-warning:hover {
-  background-color: #ffe8a1;
-  border-color: #ffca2c;
+  background-color: color-mix(in oklab, var(--accent-progress) 18%, var(--color-button-bg));
+  border-color: var(--accent-progress-light);
 }
 
 .btn-icon {

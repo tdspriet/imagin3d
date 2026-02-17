@@ -25,7 +25,10 @@ function App() {
   const awaitingMasterPromptConfirmation = useMoodboardStore((state) => state.awaitingMasterPromptConfirmation)
   const confirmMasterPrompt = useMoodboardStore((state) => state.confirmMasterPrompt)
   const cancelMasterPrompt = useMoodboardStore((state) => state.cancelMasterPrompt)
+  const regenerateMasterPromptImage = useMoodboardStore((state) => state.regenerateMasterPromptImage)
+  const editMasterPromptImage = useMoodboardStore((state) => state.editMasterPromptImage)
   const masterPromptData = useMoodboardStore((state) => state.masterPromptData)
+  const masterPromptIsLoading = useMoodboardStore((state) => state.masterPromptIsLoading)
 
   // Model dialog state
   const modelDialog = useMoodboardStore((state) => state.modelDialog)
@@ -55,8 +58,12 @@ function App() {
         isOpen={awaitingMasterPromptConfirmation}
         onClose={cancelMasterPrompt}
         onConfirm={confirmMasterPrompt}
+        onRegenerate={regenerateMasterPromptImage}
+        onSendEdit={editMasterPromptImage}
         masterPrompt={masterPromptData?.prompt}
         masterImage={masterPromptData?.image}
+        referenceImages={masterPromptData?.referenceImages || []}
+        isLoading={masterPromptIsLoading}
       />
       <ModelDialog
         isOpen={modelDialog.isOpen}

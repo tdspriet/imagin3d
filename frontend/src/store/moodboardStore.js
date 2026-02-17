@@ -246,7 +246,8 @@ export const useMoodboardStore = create((set, get) => ({
   // Master prompt session
   masterPromptSessionId: null,
   awaitingMasterPromptConfirmation: false,
-  masterPromptData: null, // { prompt, image }
+  masterPromptData: null, // { prompt, image, referenceImages }
+  masterPromptIsLoading: false,
   progress: {
     current: 0,
     total: 0,
@@ -661,6 +662,7 @@ export const useMoodboardStore = create((set, get) => ({
       awaitingMasterPromptConfirmation: false,
       masterPromptSessionId: null,
       masterPromptData: null,
+      masterPromptIsLoading: false,
       progress: { current: 0, total: 0, stage: 'Starting...' },
       score: null,
     })
@@ -720,7 +722,15 @@ export const useMoodboardStore = create((set, get) => ({
             } else if (type === 'complete') {
               // Store final result
               finalResult = data
-              set({ awaitingWeightsConfirmation: false, weightsSessionId: null, weightsIdMaps: null, awaitingMasterPromptConfirmation: false, masterPromptSessionId: null, masterPromptData: null })
+              set({
+                awaitingWeightsConfirmation: false,
+                weightsSessionId: null,
+                weightsIdMaps: null,
+                awaitingMasterPromptConfirmation: false,
+                masterPromptSessionId: null,
+                masterPromptData: null,
+                masterPromptIsLoading: false,
+              })
               
               // Open model dialog
               if (data.file) {
@@ -729,7 +739,15 @@ export const useMoodboardStore = create((set, get) => ({
               }
             } else if (type === 'cancelled') {
               // Pipeline was cancelled
-              set({ awaitingWeightsConfirmation: false, weightsSessionId: null, weightsIdMaps: null, awaitingMasterPromptConfirmation: false, masterPromptSessionId: null, masterPromptData: null })
+              set({
+                awaitingWeightsConfirmation: false,
+                weightsSessionId: null,
+                weightsIdMaps: null,
+                awaitingMasterPromptConfirmation: false,
+                masterPromptSessionId: null,
+                masterPromptData: null,
+                masterPromptIsLoading: false,
+              })
               return { cancelled: true }
             } else if (type === 'master_prompt') {
               // Master prompt and image received
@@ -740,7 +758,9 @@ export const useMoodboardStore = create((set, get) => ({
                   masterPromptData: {
                     prompt: data.prompt,
                     image: data.image,
+                    referenceImages: data.reference_images || [],
                   },
+                  masterPromptIsLoading: false,
                   progress: { current: 0, total: 0, stage: '' }, // Clear progress
                 })
               }
@@ -769,6 +789,7 @@ export const useMoodboardStore = create((set, get) => ({
         awaitingMasterPromptConfirmation: false,
         masterPromptSessionId: null,
         masterPromptData: null,
+        masterPromptIsLoading: false,
         progress: { current: 0, total: 0, stage: '' },
       })
     }
@@ -824,10 +845,17 @@ export const useMoodboardStore = create((set, get) => ({
     if (!masterPromptSessionId) return
 
     try {
-      await fetch(`${BACKEND_URL}/confirm-weights/${masterPromptSessionId}?confirmed=true`, {
+      await fetch(`${BACKEND_URL}/confirm-weights/${masterPromptSessionId}`, {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ confirmed: true }),
       })
-      set({ awaitingMasterPromptConfirmation: false, masterPromptSessionId: null, masterPromptData: null })
+      set({
+        awaitingMasterPromptConfirmation: false,
+        masterPromptSessionId: null,
+        masterPromptData: null,
+        masterPromptIsLoading: false,
+      })
     } catch (error) {
       console.error('Error confirming master prompt:', error)
     }
@@ -839,12 +867,87 @@ export const useMoodboardStore = create((set, get) => ({
     if (!masterPromptSessionId) return
 
     try {
-      await fetch(`${BACKEND_URL}/confirm-weights/${masterPromptSessionId}?confirmed=false`, {
+      await fetch(`${BACKEND_URL}/confirm-weights/${masterPromptSessionId}`, {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ confirmed: false }),
       })
-      set({ awaitingMasterPromptConfirmation: false, masterPromptSessionId: null, masterPromptData: null })
+      set({
+        awaitingMasterPromptConfirmation: false,
+        masterPromptSessionId: null,
+        masterPromptData: null,
+        masterPromptIsLoading: false,
+      })
     } catch (error) {
       console.error('Error cancelling master prompt:', error)
+    }
+  },
+
+  regenerateMasterPromptImage: async (prompt) => {
+    const { masterPromptSessionId } = get()
+    const nextPrompt = (prompt || '').trim()
+    if (!masterPromptSessionId || !nextPrompt) return
+
+    set({ masterPromptIsLoading: true })
+    try {
+      const response = await fetch(`${BACKEND_URL}/master-prompt/${masterPromptSessionId}/regenerate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: nextPrompt }),
+      })
+      if (!response.ok) {
+        throw new Error(`Failed to regenerate master image (${response.status})`)
+      }
+
+      const data = await response.json()
+      set((state) => ({
+        masterPromptData: state.masterPromptData
+          ? {
+              ...state.masterPromptData,
+              image: data.image || state.masterPromptData.image,
+            }
+          : {
+              prompt: nextPrompt,
+              image: data.image || '',
+              referenceImages: [],
+            },
+      }))
+    } catch (error) {
+      console.error('Error regenerating master prompt image:', error)
+    } finally {
+      set({ masterPromptIsLoading: false })
+    }
+  },
+
+  editMasterPromptImage: async (editPrompt) => {
+    const { masterPromptSessionId, masterPromptData } = get()
+    const nextEditPrompt = (editPrompt || '').trim()
+    if (!masterPromptSessionId || !masterPromptData?.image || !nextEditPrompt) return
+
+    set({ masterPromptIsLoading: true })
+    try {
+      const response = await fetch(`${BACKEND_URL}/master-prompt/${masterPromptSessionId}/edit-image`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt: nextEditPrompt,
+          image: masterPromptData.image,
+        }),
+      })
+      if (!response.ok) {
+        throw new Error(`Failed to edit master image (${response.status})`)
+      }
+
+      const data = await response.json()
+      set((state) => ({
+        masterPromptData: state.masterPromptData
+          ? { ...state.masterPromptData, image: data.image || state.masterPromptData.image }
+          : state.masterPromptData,
+      }))
+    } catch (error) {
+      console.error('Error editing master prompt image:', error)
+    } finally {
+      set({ masterPromptIsLoading: false })
     }
   },
 
