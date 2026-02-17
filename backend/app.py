@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import base64
 import json
 import os
 import shutil
@@ -23,7 +22,11 @@ from backend.common import (
     MoodboardPayload,
     WeightsResponse,
     WeightsRequest,
+    MasterImageRegenerateRequest,
+    MasterImageEditRequest,
+    encode_image_to_data_url,
 )
+from backend import orchestrator
 
 # Directory configuration
 ROOT_DIR = Path(__file__).parent.resolve()
@@ -111,11 +114,61 @@ async def confirm_weights(
     }
 
 
+@app.post("/master-prompt/{session_id}/regenerate")
+async def regenerate_master_prompt_image(
+    session_id: str,
+    payload: MasterImageRegenerateRequest = Body(...),
+):
+    if session_id not in pending_confirmations:
+        return {"error": "Session not found or already expired"}
+
+    prompt = payload.prompt.strip()
+    if not prompt:
+        return {"error": "Prompt is required"}
+
+    session = pending_confirmations[session_id]
+    clusters = session.get("clusters")
+    if not clusters:
+        return {"error": "Session has no cluster context"}
+
+    master_image_path = await orchestrator.generate_master_image(prompt, clusters)
+    session["master_image_path"] = str(master_image_path)
+
+    master_prompt_path = ROOT_DIR / "artifacts" / "master_prompt.txt"
+    with open(master_prompt_path, "w", encoding="utf-8") as f:
+        f.write(prompt)
+
+    return {
+        "image": encode_image_to_data_url(master_image_path),
+    }
+
+
+@app.post("/master-prompt/{session_id}/edit-image")
+async def edit_master_prompt_image(
+    session_id: str,
+    payload: MasterImageEditRequest = Body(...),
+):
+    if session_id not in pending_confirmations:
+        return {"error": "Session not found or already expired"}
+
+    edit_prompt = payload.prompt.strip()
+    if not edit_prompt:
+        return {"error": "Edit prompt is required"}
+
+    session = pending_confirmations[session_id]
+
+    master_image_path = await orchestrator.edit_master_image(edit_prompt, payload.image)
+    session["master_image_path"] = str(master_image_path)
+
+    return {
+        "image": encode_image_to_data_url(master_image_path),
+    }
+
+
 @app.post("/extract")
 async def extract(payload: MoodboardPayload) -> StreamingResponse:
-    from backend import orchestrator  # Lazy import to allow Pants to work
     orchestrator._initialize()
-    
+
     async def generate():
         # ----- Ingestion -----
 
@@ -244,10 +297,7 @@ async def extract(payload: MoodboardPayload) -> StreamingResponse:
 
         # Dump design tokens to JSON file
         design_tokens_path = (
-            ROOT_DIR
-            / "artifacts"
-            / "design_tokens"
-            / f"design-tokens-{timestamp}.json"
+            ROOT_DIR / "artifacts" / "design_tokens" / f"design-tokens-{timestamp}.json"
         )
         design_tokens_path.parent.mkdir(parents=True, exist_ok=True)
         with design_tokens_path.open("w", encoding="utf-8") as f:
@@ -523,21 +573,22 @@ async def extract(payload: MoodboardPayload) -> StreamingResponse:
             master_prompt,
             cluster_descriptors,
         )
+        reference_images = orchestrator.get_reference_images_preview(
+            cluster_descriptors
+        )
 
         # Send master prompt and image to frontend for confirmation
         master_image_base64 = ""
         if master_image_path and Path(master_image_path).exists():
-            with open(master_image_path, "rb") as img_file:
-                img_data = base64.b64encode(img_file.read()).decode("utf-8")
-                ext = Path(master_image_path).suffix.lower()
-                mime_type = "image/png" if ext == ".png" else "image/jpeg"
-                master_image_base64 = f"data:{mime_type};base64,{img_data}"
+            master_image_base64 = encode_image_to_data_url(Path(master_image_path))
 
         # Create new session for master prompt confirmation
         master_session_id = str(uuid.uuid4())
         pending_confirmations[master_session_id] = {
             "event": asyncio.Event(),
             "confirmed": False,
+            "clusters": cluster_descriptors,  # Keep cluster context for potential regeneration
+            "master_image_path": str(master_image_path),
         }
 
         master_prompt_event = {
@@ -545,6 +596,7 @@ async def extract(payload: MoodboardPayload) -> StreamingResponse:
             "data": {
                 "prompt": master_prompt,
                 "image": master_image_base64,
+                "reference_images": reference_images,
             },
             "session_id": master_session_id,
         }
@@ -554,7 +606,9 @@ async def extract(payload: MoodboardPayload) -> StreamingResponse:
         logger.info("Waiting for user confirmation of master prompt...")
         await pending_confirmations[master_session_id]["event"].wait()
         # Check if user confirmed or cancelled
-        master_confirmed = pending_confirmations[master_session_id]["confirmed"]
+        master_session = pending_confirmations[master_session_id]
+        master_confirmed = master_session["confirmed"]
+        master_image_path = Path(master_session["master_image_path"])
         del pending_confirmations[master_session_id]  # Clean up
         if not master_confirmed:
             logger.info("User cancelled master prompt")
@@ -567,7 +621,7 @@ async def extract(payload: MoodboardPayload) -> StreamingResponse:
         logger.info("User confirmed master prompt, continuing pipeline...")
 
         # ----- 3D Generative Model -----
-        
+
         # Send progress update for 3D model generation
         progress_event = {
             "type": "progress",
@@ -578,7 +632,7 @@ async def extract(payload: MoodboardPayload) -> StreamingResponse:
             },
         }
         yield f"data: {json.dumps(progress_event)}\n\n"
-        
+
         # Generate 3D model from master image using TRELLIS
         model_path = await orchestrator.generate_3d_model(master_image_path)
 
@@ -598,10 +652,10 @@ async def extract(payload: MoodboardPayload) -> StreamingResponse:
         yield f"data: {json.dumps(final_event)}\n\n"
 
         # ----- Evaluation -----
-        
+
         # Calculate score
         score = await orchestrator.evaluate_model(model_path, cluster_descriptors)
-        
+
         score_event = {"type": "score", "data": {"score": score}}
         yield f"data: {json.dumps(score_event)}\n\n"
 

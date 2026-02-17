@@ -40,13 +40,23 @@ embedding_function: Union[BedrockEmbeddingFunction, None] = None
 
 
 def _initialize():
-    global _initialized, blender_engine, trellis_engine, descriptor, clusterer, intent_router, prompt_synthesizer, visualizer, bedrock_client, embedding_function
-    
+    global \
+        _initialized, \
+        blender_engine, \
+        trellis_engine, \
+        descriptor, \
+        clusterer, \
+        intent_router, \
+        prompt_synthesizer, \
+        visualizer, \
+        bedrock_client, \
+        embedding_function
+
     # Initialize via Hydra configuration
     config_dir = str(ROOT_DIR / "config")
     with initialize_config_dir(config_dir=config_dir, version_base=None):
         cfg: DictConfig = compose(config_name="config")
-    
+
     blender_engine = hydra.utils.instantiate(cfg.engine)
     trellis_engine = TrellisEngine()  # Initialize the TrellisEngine
     descriptor = hydra.utils.instantiate(cfg.descriptor)
@@ -185,12 +195,14 @@ async def synthesize_master_prompt(
                 for elem in cluster.elements
                 if elem.weight > 50
             ]
-            filtered_clusters.append({
-                "title": cluster.title,
-                "description": cluster.description,
-                "weight": cluster.weight,
-                "elements": filtered_elements,
-            })
+            filtered_clusters.append(
+                {
+                    "title": cluster.title,
+                    "description": cluster.description,
+                    "weight": cluster.weight,
+                    "elements": filtered_elements,
+                }
+            )
 
     result = await prompt_synthesizer.run(user_prompt, filtered_clusters)
     master_prompt = result.output.info.prompt
@@ -207,68 +219,69 @@ async def generate_master_image(
     master_prompt: str,
     clusters: list[common.ClusterDescriptor],
 ) -> Path:
-    # Collect style images from visual elements in clusters with weight > 50
-    style_images: list[pydantic_ai.BinaryImage] = []
-    
-    for cluster in clusters:
-        if cluster.weight <= 50:
-            continue
-        
-        for elem in cluster.elements:
-            if elem.weight <= 50:
-                continue
-            
-            # Collect images based on element type
-            if elem.type == "image":
-                image_path = ROOT_DIR / "artifacts" / "images" / str(elem.id) / "image.jpg"
-                if image_path.exists():
-                    with open(image_path, "rb") as f:
-                        style_images.append(
-                            pydantic_ai.BinaryImage(data=f.read(), media_type="image/jpeg")
-                        )
-            
-            elif elem.type == "video":
-                frames_dir = ROOT_DIR / "artifacts" / "video_frames" / str(elem.id)
-                if frames_dir.exists():
-                    for frame_path in sorted(frames_dir.glob("*.jpg")):
-                        with open(frame_path, "rb") as f:
-                            style_images.append(
-                                pydantic_ai.BinaryImage(data=f.read(), media_type="image/jpeg")
-                            )
-            
-            elif elem.type == "model":
-                renders_dir = ROOT_DIR / "artifacts" / "model_renders" / str(elem.id)
-                if renders_dir.exists():
-                    for render_path in sorted(renders_dir.glob("*.jpg")):
-                        with open(render_path, "rb") as f:
-                            style_images.append(
-                                pydantic_ai.BinaryImage(data=f.read(), media_type="image/jpeg")
-                            )
-    
-    logger.info(f"Collected {len(style_images)} style images for master image generation")
-    
+    style_images = _collect_style_images(clusters)
+    logger.info(
+        f"Collected {len(style_images)} style images for master image generation"
+    )
+
     # Generate master image
     result = await visualizer.run(master_prompt, style_images)
-    
+
     # Save master image to artifacts
     master_image_path = ROOT_DIR / "artifacts" / "master_image.jpg"
-    
+
     with open(master_image_path, "wb") as f:
         f.write(result.output.data)
-    
+
     return master_image_path
 
 
+async def edit_master_image(
+    edit_prompt: str,
+    image_data_url: str,
+) -> Path:
+    source_image = common.decode_data_url_to_binary_image(image_data_url)
+    prompt = (
+        "Edit the attached image according to this instruction: "
+        f"{edit_prompt}. Keep the full subject in-frame on a pure white background."
+    )
+
+    result = await visualizer.run(prompt, [source_image])
+
+    master_image_path = ROOT_DIR / "artifacts" / "master_image.jpg"
+    with open(master_image_path, "wb") as f:
+        f.write(result.output.data)
+
+    return master_image_path
+
+
+def get_reference_images_preview(
+    clusters: list[common.ClusterDescriptor],
+    max_images: int = 8,
+) -> list[str]:
+    image_paths = _collect_style_image_paths(clusters)
+    previews: list[str] = []
+    for path in image_paths[:max_images]:
+        with open(path, "rb") as f:
+            encoded = base64.b64encode(f.read()).decode("utf-8")
+        ext = path.suffix.lower()
+        mime_type = "image/png" if ext == ".png" else "image/jpeg"
+        previews.append(f"data:{mime_type};base64,{encoded}")
+    return previews
+
+
 async def generate_3d_model(master_image_path: Path) -> Path:
-    logger.info("Generating 3D model from master image", image_path=str(master_image_path))
-    
+    logger.info(
+        "Generating 3D model from master image", image_path=str(master_image_path)
+    )
+
     # Create output directory for TRELLIS
     output_dir = ROOT_DIR / "artifacts" / "trellis"
     output_dir.mkdir(parents=True, exist_ok=True)
-    
+
     # Use TRELLIS engine to generate 3D model
     model_path = await trellis_engine.generate_3d_model(master_image_path, output_dir)
-    
+
     logger.info("3D model generation completed", model_path=str(model_path))
     return model_path
 
@@ -278,7 +291,7 @@ async def evaluate_model(
     clusters: list[common.ClusterDescriptor],
 ) -> int:
     # TODO: check this WIP objective evaluation score
-    
+
     # 1. Calculate moodboard centroid
 
     embeddings = []
@@ -287,50 +300,50 @@ async def evaluate_model(
     for cluster in clusters:
         if cluster.weight <= 50:
             continue
-            
+
         for token in cluster.elements:
             if token.weight <= 50:
                 continue
-            
+
             if token.embedding and len(token.embedding) > 0:
                 embeddings.append(token.embedding)
                 weights.append(token.weight)
-        
+
     embeddings_np = np.array(embeddings)
     weights_np = np.array(weights)
-    
+
     if np.sum(weights_np) == 0:
         weights_np = np.ones_like(weights_np) / len(weights_np)
     else:
         weights_np = weights_np / np.sum(weights_np)
 
     centroid = np.average(embeddings_np, axis=0, weights=weights_np)
-    
+
     # 2. Generate embedding for the generated model
-    
+
     unique_name = f"generated"
     renders_dir = ROOT_DIR / "artifacts" / "model_renders" / unique_name
     renders_dir.mkdir(parents=True, exist_ok=True)
-    
+
     renders = await blender_engine.render_views(model_path, renders_dir)
     images = [render.image for render in renders]
-    
+
     result = await descriptor.run(images, type="model")
     title = result.output.info.title
-    
+
     model_embedding = np.array(generate_embedding(title))
-    
+
     # 3. Calculate distance/score
 
     dot_product = np.dot(centroid, model_embedding)
     norm_centroid = np.linalg.norm(centroid)
     norm_model = np.linalg.norm(model_embedding)
-    
+
     if norm_centroid == 0 or norm_model == 0:
         return 0
-        
+
     cosine_sim = dot_product / (norm_centroid * norm_model)
-    
+
     score = int(max(0, cosine_sim) * 100)
     return score
 
@@ -353,3 +366,50 @@ async def _save_model_file(element: dict) -> Path:
         f.write(model_bytes)
 
     return model_path
+
+
+# -- Helper Functions ---
+
+
+def _collect_style_images(
+    clusters: list[common.ClusterDescriptor],
+) -> list[pydantic_ai.BinaryImage]:
+    image_paths = _collect_style_image_paths(clusters)
+    style_images: list[pydantic_ai.BinaryImage] = []
+
+    for image_path in image_paths:
+        with open(image_path, "rb") as f:
+            style_images.append(
+                pydantic_ai.BinaryImage(data=f.read(), media_type="image/jpeg")
+            )
+    return style_images
+
+
+def _collect_style_image_paths(
+    clusters: list[common.ClusterDescriptor],
+) -> list[Path]:
+    image_paths: list[Path] = []
+    for cluster in clusters:
+        if cluster.weight <= 50:
+            continue
+
+        for elem in cluster.elements:
+            if elem.weight <= 50:
+                continue
+
+            if elem.type == "image":
+                image_path = (
+                    ROOT_DIR / "artifacts" / "images" / str(elem.id) / "image.jpg"
+                )
+                if image_path.exists():
+                    image_paths.append(image_path)
+            elif elem.type == "video":
+                frames_dir = ROOT_DIR / "artifacts" / "video_frames" / str(elem.id)
+                if frames_dir.exists():
+                    image_paths.extend(sorted(frames_dir.glob("*.jpg")))
+            elif elem.type == "model":
+                renders_dir = ROOT_DIR / "artifacts" / "model_renders" / str(elem.id)
+                if renders_dir.exists():
+                    image_paths.extend(sorted(renders_dir.glob("*.jpg")))
+
+    return image_paths
