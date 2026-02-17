@@ -636,6 +636,16 @@ async def extract(payload: MoodboardPayload) -> StreamingResponse:
         # Generate 3D model from master image using TRELLIS
         model_path = await orchestrator.generate_3d_model(master_image_path)
 
+        progress_event = {
+            "type": "progress",
+            "data": {
+                "current": 1,
+                "total": 1,
+                "stage": "Generating 3D model...",
+            },
+        }
+        yield f"data: {json.dumps(progress_event)}\n\n"
+
         # ----- Final Response -----
 
         # Log completion of moodboard extraction
