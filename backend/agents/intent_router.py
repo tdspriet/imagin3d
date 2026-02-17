@@ -18,6 +18,13 @@ class IntentRouter(agent.BaseAgent):
     def __init__(self, llm: pydantic_ai.models.Model | str):
         super().__init__(llm, self.Output)
 
+    @staticmethod
+    def _extract_scale(token: common.DesignToken) -> float:
+        size_x = float(token.size.get("x", 1.0))
+        size_y = float(token.size.get("y", 1.0))
+        # Prefer the dominant resize ratio so enlarged elements are clearly prioritized.
+        return max(size_x, size_y)
+
     async def run_for_cluster(
         self,
         prompt: str,
@@ -53,7 +60,7 @@ class IntentRouter(agent.BaseAgent):
                     "type": token.type,
                     "title": token.title,
                     "description": token.description,
-                    # TODO: also add size and position?
+                    "scale": self._extract_scale(token),
                 },
             }
         )
