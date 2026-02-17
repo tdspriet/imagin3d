@@ -243,7 +243,7 @@ async def edit_master_image(
     source_image = common.decode_data_url_to_binary_image(image_data_url)
     prompt = (
         "Edit the attached image according to this instruction: "
-        f"{edit_prompt}. Keep the full subject in-frame on a pure white background."
+        f"{edit_prompt}. The subject must be fully in-frame isolated against a seamless pure white background."
     )
 
     result = await visualizer.run(prompt, [source_image])
