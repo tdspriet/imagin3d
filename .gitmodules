@@ -3,4 +3,4 @@
 	url = https://github.com/microsoft/TRELLIS
 [submodule "trellis2"]
 	path = trellis2
-	url = https://github.com/microsoft/TRELLIS.2.git
+	url = git@github.com:microsoft/TRELLIS.2.git
