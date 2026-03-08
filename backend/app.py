@@ -233,47 +233,59 @@ async def extract(payload: MoodboardPayload) -> StreamingResponse:
 
         # Turn elements into design tokens
         async def process_element(element: dict) -> DesignToken:
-            element_type = element["content"]["type"]
+            try:
+                element_type = element["content"]["type"]
 
-            # 1) Title and description generation
-            match element_type:
-                case "model":
-                    title, description = await orchestrator.handle_model(element)
-                case "video":
-                    title, description = await orchestrator.handle_video(element)
-                case "palette":
-                    title, description = await orchestrator.handle_palette(element)
-                case "image":
-                    title, description = await orchestrator.handle_image(element)
-                case "text":
-                    title, description = await orchestrator.handle_text(element)
+                # 1) Title and description generation
+                match element_type:
+                    case "model":
+                        title, description = await orchestrator.handle_model(element)
+                    case "video":
+                        title, description = await orchestrator.handle_video(element)
+                    case "palette":
+                        title, description = await orchestrator.handle_palette(element)
+                    case "image":
+                        title, description = await orchestrator.handle_image(element)
+                    case "text":
+                        title, description = await orchestrator.handle_text(element)
 
-            # 2) Generate embedding based on title
-            embedding = orchestrator.generate_embedding(title)
+                # 2) Generate embedding based on title
+                embedding = orchestrator.generate_embedding(title)
 
-            # 3) Signal progress
-            current = await increment_progress()
-            await progress_queue.put(
-                {
-                    "current": current,
-                    "total": total_steps,
-                    "stage": "Processing elements...",
-                }
-            )
+                # 3) Signal progress
+                current = await increment_progress()
+                await progress_queue.put(
+                    {
+                        "current": current,
+                        "total": total_steps,
+                        "stage": "Processing elements...",
+                    }
+                )
 
-            # 4) Create and return the design token
-            return DesignToken(
-                id=element["id"],
-                type=element_type,
-                title=title,
-                description=description,
-                embedding=embedding,
-                size={"x": element["size"]["x"], "y": element["size"]["y"]},
-                position={
-                    "x": element["position"]["x"],
-                    "y": element["position"]["y"],
-                },
-            )
+                # 4) Create and return the design token
+                return DesignToken(
+                    id=element["id"],
+                    type=element_type,
+                    title=title,
+                    description=description,
+                    embedding=embedding,
+                    size={"x": element["size"]["x"], "y": element["size"]["y"]},
+                    position={
+                        "x": element["position"]["x"],
+                        "y": element["position"]["y"],
+                    },
+                )
+            except Exception:
+                # Signal progress even on failure so the queue consumer doesn't hang
+                current = await increment_progress()
+                await progress_queue.put(
+                    {
+                        "current": current,
+                        "total": total_steps,
+                        "stage": "Processing elements...",
+                    }
+                )
+                raise
 
         with raw_path.open("r", encoding="utf-8") as source_file:
             data = json.load(source_file)
