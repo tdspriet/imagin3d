@@ -53,6 +53,7 @@ Create a `.env` file in the `backend` directory with the following content:<br>
 
 3. **Run the Backend** <br>
 ```sh
+  source /workspaces/miniconda3/etc/profile.d/conda.sh
   conda activate trellis
   python run.py
 ```

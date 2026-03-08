@@ -1,16 +1,16 @@
 #!/bin/bash
 
 # 1. Install Miniconda
-mkdir -p ~/miniconda3
-wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O ~/miniconda3/miniconda.sh
-bash ~/miniconda3/miniconda.sh -b -u -p ~/miniconda3
-rm ~/miniconda3/miniconda.sh
-source ~/miniconda3/bin/activate
+mkdir -p /workspaces/miniconda3
+wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O /workspaces/miniconda3/miniconda.sh
+bash /workspaces/miniconda3/miniconda.sh -b -u -p /workspaces/miniconda3
+rm /workspaces/miniconda3/miniconda.sh
+source /workspaces/miniconda3/bin/activate
 conda init --all
 
 # 2. Create the environment
 conda env create -f setup/environment.yml
-source ~/miniconda3/etc/profile.d/conda.sh
+source /workspaces/miniconda3/etc/profile.d/conda.sh
 conda activate trellis
 
 # 2. Install torch
@@ -46,8 +46,5 @@ fi
 
 echo ""
 echo "Environment setup complete"
-echo "(make sure your GitHub Token is set in Coder!)"
+echo "Please restart your terminal"
 echo ""
-echo "Next steps:"
-echo "  1. Restart your terminal"
-echo "  2. Run the backend"
