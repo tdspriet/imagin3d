@@ -27,6 +27,7 @@ from backend.utils.video import extract_key_frames
 logger = structlog.stdlib.get_logger(__name__)
 
 # Global state
+RELEVANCE_THRESHOLD = 40
 ROOT_DIR = Path(__file__).parent.resolve()
 blender_engine: Union[Blender, None] = None
 trellis_engine: Union[TrellisEngine, None] = None
@@ -181,20 +182,19 @@ async def synthesize_master_prompt(
     user_prompt: str,
     clusters: list[common.ClusterDescriptor],
 ) -> str:
-    # Filter clusters with weight > 50 and their elements with weight > 50
     filtered_clusters = []
     for cluster in clusters:
-        if cluster.weight > 50:
-            filtered_elements = [
-                {
-                    "type": elem.type,
-                    "title": elem.title,
-                    "description": elem.description,
-                    "weight": elem.weight,
-                }
-                for elem in cluster.elements
-                if elem.weight > 50
-            ]
+        filtered_elements = [
+            {
+                "type": elem.type,
+                "title": elem.title,
+                "description": elem.description,
+                "weight": (elem.weight * cluster.weight) / 100,
+            }
+            for elem in cluster.elements
+            if (elem.weight * cluster.weight) / 100 > RELEVANCE_THRESHOLD
+        ]
+        if filtered_elements:
             filtered_clusters.append(
                 {
                     "title": cluster.title,
@@ -298,16 +298,13 @@ async def evaluate_model(
     weights = []
 
     for cluster in clusters:
-        if cluster.weight <= 50:
-            continue
-
         for token in cluster.elements:
-            if token.weight <= 50:
+            if (token.weight * cluster.weight) / 100 <= RELEVANCE_THRESHOLD:
                 continue
 
             if token.embedding and len(token.embedding) > 0:
                 embeddings.append(token.embedding)
-                weights.append(token.weight)
+                weights.append((token.weight * cluster.weight) / 100)
 
     embeddings_np = np.array(embeddings)
     weights_np = np.array(weights)
@@ -390,11 +387,8 @@ def _collect_style_image_paths(
 ) -> list[Path]:
     image_paths: list[Path] = []
     for cluster in clusters:
-        if cluster.weight <= 50:
-            continue
-
         for elem in cluster.elements:
-            if elem.weight <= 50:
+            if (elem.weight * cluster.weight) / 100 <= RELEVANCE_THRESHOLD:
                 continue
 
             if elem.type == "image":
