@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import base64
+import io
 from pathlib import Path
 from typing import Any, Union, List
 
 import boto3
 import numpy as np
 import hydra
+from PIL import Image
 from hydra import compose, initialize_config_dir
 from omegaconf import DictConfig
 import pydantic_ai
@@ -110,9 +112,15 @@ async def handle_video(element: dict) -> tuple[str, str]:
 async def handle_image(element: dict) -> tuple[str, str]:
     image_base64 = element["content"]["data"]["src"]
 
-    # Process image into BinaryImage
+    # Process image into BinaryImage, converting to JPEG
     base64_data = image_base64.split(",", 1)[1]
-    image_bytes = base64.b64decode(base64_data)
+    raw_bytes = base64.b64decode(base64_data)
+    img = Image.open(io.BytesIO(raw_bytes))
+    if img.mode in ("RGBA", "P", "LA"):
+        img = img.convert("RGB")
+    buf = io.BytesIO()
+    img.save(buf, format="JPEG")
+    image_bytes = buf.getvalue()
     image = pydantic_ai.BinaryImage(data=image_bytes, media_type="image/jpeg")
 
     # Save image to artifacts
