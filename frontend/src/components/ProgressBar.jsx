@@ -24,7 +24,7 @@ function ProgressBar({ current, total, stage, isVisible }) {
     const tick = () => {
       if (!startTimeRef.current) return
       const elapsed = Date.now() - startTimeRef.current
-      const nextPercentage = Math.min(99, Math.round((elapsed / TRELLIS_ESTIMATE_MS) * 100))
+      const nextPercentage = Math.min(95, Math.round((elapsed / TRELLIS_ESTIMATE_MS) * 100))
       setEstimatedPercentage(nextPercentage)
     }
 
