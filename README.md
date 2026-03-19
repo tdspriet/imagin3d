@@ -41,7 +41,7 @@ The Coder backend uses FastAPI and Uvicorn.
 ```bash
   setup/setup2.sh # or "setup/setup1.sh" for TrellisV1
 ```
-> **Note:** When running the TrellisV2 setup script, you will be asked to log into your Hugging Face account. <br> You must have requested and received access to the required gated repositories on this account.
+> **Note:** When running the TrellisV2 setup script, you will be asked to log into your Hugging Face account. You must have requested and received access to the required gated repositories on this account.
 
 2. **Set the environment variables** <br>
 Create a `.env` file in the `backend` directory with the following content:<br>
@@ -59,7 +59,9 @@ Create a `.env` file in the `backend` directory with the following content:<br>
   python run.py
 ```
 
-## Architecture Vision
+## Architecture
+
+<img width="1882" height="1602" alt="architecture_mixed" src="https://github.com/user-attachments/assets/d1543e60-91f4-46e5-857b-d74b78492cd6" />
 
 ## Project Structure
 
