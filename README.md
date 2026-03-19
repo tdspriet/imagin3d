@@ -38,9 +38,10 @@ npm run dev
 The Coder backend uses FastAPI and Uvicorn.
 
 1. **Run the setup script** <br>
-``
-bash setup/setup.sh
-``
+```bash
+  setup/setup2.sh # or "setup/setup1.sh" for TrellisV1
+```
+> **Note:** When running the TrellisV2 setup script, you will be asked to log into your Hugging Face account. <br> You must have requested and received access to the required gated repositories on this account.
 
 2. **Set the environment variables** <br>
 Create a `.env` file in the `backend` directory with the following content:<br>
@@ -54,7 +55,7 @@ Create a `.env` file in the `backend` directory with the following content:<br>
 3. **Run the Backend** <br>
 ```sh
   source /workspaces/miniconda3/etc/profile.d/conda.sh
-  conda activate trellis
+  conda activate trellis2 # or "conda activate trellis" for TrellisV1
   python run.py
 ```
 
