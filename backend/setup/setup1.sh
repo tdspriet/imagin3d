@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e
 
 # 1. Install Miniconda
 mkdir -p /workspaces/miniconda3
@@ -45,6 +46,6 @@ if ! grep -q "PYTHONPATH=/workspaces/imagin3d" ~/.zshrc; then
 fi
 
 echo ""
-echo "Environment setup complete"
-echo "Please restart your terminal"
+echo "Environment setup complete!"
+echo "Please restart your terminal or run: source ~/.bashrc"
 echo ""

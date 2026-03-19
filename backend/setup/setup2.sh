@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e
 
 # 1. Fix system dependencies
 sudo apt-get update
@@ -18,17 +19,25 @@ conda init bash
 cd /workspaces/imagin3d/trellis2 
 bash ./setup.sh --new-env --basic --nvdiffrast --nvdiffrec --cumesh --o-voxel --flexgemm
 
-# 5. Activate new environment and install pre-built flash-attn
-conda activate trellis2
+# 5. Activate new environment
+source /workspaces/miniconda3/bin/activate trellis2
+
+# 6. Install Flash Attention
 pip install https://github.com/mjun0812/flash-attention-prebuild-wheels/releases/download/v0.0.8/flash_attn-2.7.4.post1%2Bcu124torch2.6-cp310-cp310-linux_x86_64.whl
 
-# 6. Install extra dependencies
+# 7. Install extra dependencies and force correct Pillow version
 pip install python-dotenv structlog pydantic-ai hydra-core huggingface_hub
+pip install --upgrade transformers
+pip uninstall -y pillow
+pip install --no-cache-dir "pillow>=10.0.0" 
 
-# 7. Login using Hugging Face
+# 8. Login using Hugging Face
 python -c "from huggingface_hub import login; login()"
+
+# 9. Pre-download and dynamically patch models
+python patch_birefnet.py
 
 echo ""
 echo "Environment setup complete!"
-echo "Please restart your terminal or run: source ~/.bashrc"
+echo "Please restart your terminal."
 echo ""
