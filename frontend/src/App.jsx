@@ -5,7 +5,7 @@ import ProgressBar from './components/ProgressBar'
 import ConfirmationBar from './components/ConfirmationBar'
 import MasterPromptDialog from './components/dialog/MasterPromptDialog'
 import ModelDialog from './components/dialog/ModelDialog'
-import { useMoodboardStore } from './store/moodboardStore'
+import { WORKSPACE_KEYS, useMoodboardStore } from './store/moodboardStore'
 import './App.css'
 
 /**
@@ -13,8 +13,14 @@ import './App.css'
  * Simple moodboard creator with drag-and-drop functionality
  */
 function App() {
+  const mode = useMoodboardStore((state) => state.mode)
+  const activeWorkspaceKey = useMoodboardStore((state) => state.activeWorkspaceKey)
+  const setActiveWorkspace = useMoodboardStore((state) => state.setActiveWorkspace)
+  const enterComparativeMode = useMoodboardStore((state) => state.enterComparativeMode)
+  const exitComparativeMode = useMoodboardStore((state) => state.exitComparativeMode)
   const isGenerating = useMoodboardStore((state) => state.isGenerating)
   const progress = useMoodboardStore((state) => state.progress)
+  const comparisonResults = useMoodboardStore((state) => state.comparisonResults)
 
   // Weights state
   const awaitingWeightsConfirmation = useMoodboardStore((state) => state.awaitingWeightsConfirmation)
@@ -28,7 +34,7 @@ function App() {
   const regenerateMasterPromptImage = useMoodboardStore((state) => state.regenerateMasterPromptImage)
   const editMasterPromptImage = useMoodboardStore((state) => state.editMasterPromptImage)
   const masterPromptData = useMoodboardStore((state) => state.masterPromptData)
-  const masterPromptIsLoading = useMoodboardStore((state) => state.masterPromptIsLoading)
+  const masterPromptLoadingByPane = useMoodboardStore((state) => state.masterPromptLoadingByPane)
 
   // Model dialog state
   const modelDialog = useMoodboardStore((state) => state.modelDialog)
@@ -36,6 +42,32 @@ function App() {
 
   // Show progress bar when generating and not awaiting any confirmation
   const showProgressBar = isGenerating && !awaitingWeightsConfirmation && !awaitingMasterPromptConfirmation && progress.total > 0
+  const isComparative = mode === 'comparative'
+
+  const renderComparativePane = (workspaceKey, label, subtitle) => {
+    const paneResult = comparisonResults[workspaceKey]
+    const isActive = activeWorkspaceKey === workspaceKey
+
+    return (
+      <section className={`app__pane${isActive ? ' app__pane--active' : ''}`} key={workspaceKey}>
+        <header className="app__pane-header">
+          <div>
+            <h2>{label}</h2>
+            <p>{subtitle}</p>
+          </div>
+          <div className={`app__pane-status app__pane-status--${paneResult.status}`}>
+            <span>{paneResult.message}</span>
+            {typeof paneResult.score === 'number' ? <strong>{paneResult.score}%</strong> : null}
+          </div>
+        </header>
+        <Canvas
+          workspaceKey={workspaceKey}
+          onActivate={() => setActiveWorkspace(workspaceKey)}
+          isActive={isActive}
+        />
+      </section>
+    )
+  }
 
   return (
     <div className="app">
@@ -51,22 +83,39 @@ function App() {
           isVisible={awaitingWeightsConfirmation}
           onConfirm={confirmWeights}
           onCancel={cancelWeights}
+          isComparative={isComparative}
         />
       </header>
-      <Canvas />
+      {isComparative ? (
+        <main className="app__split-view">
+          {renderComparativePane(WORKSPACE_KEYS.LEFT, 'Left Pane', 'Baseline workspace')}
+          {renderComparativePane(WORKSPACE_KEYS.RIGHT, 'Right Pane', 'Modified workspace')}
+        </main>
+      ) : (
+        <Canvas workspaceKey={WORKSPACE_KEYS.SINGLE} isActive />
+      )}
+      <button
+        type="button"
+        className={`app__compare-toggle${isComparative ? ' app__compare-toggle--active' : ''}`}
+        onClick={isComparative ? exitComparativeMode : enterComparativeMode}
+        disabled={isGenerating}
+      >
+        <span className="app__compare-toggle-label">Comparative View</span>
+        <span className="app__compare-toggle-caption">
+          {isComparative ? 'Return to one workspace' : 'Duplicate the current workspace side by side'}
+        </span>
+      </button>
       <MasterPromptDialog
         isOpen={awaitingMasterPromptConfirmation}
         onClose={cancelMasterPrompt}
         onConfirm={confirmMasterPrompt}
         onRegenerate={regenerateMasterPromptImage}
         onSendEdit={editMasterPromptImage}
-        masterPrompt={masterPromptData?.prompt}
-        masterImage={masterPromptData?.image}
-        referenceImages={masterPromptData?.referenceImages || []}
-        isLoading={masterPromptIsLoading}
+        data={masterPromptData}
+        loadingByPane={masterPromptLoadingByPane}
       />
       <ModelDialog
-        isOpen={modelDialog.isOpen}
+        isOpen={!isComparative && modelDialog.isOpen}
         onClose={closeModelDialog}
         modelUrl={modelDialog.modelUrl}
       />

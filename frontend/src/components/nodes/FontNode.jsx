@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef, useLayoutEffect } from 'react'
 import { useMoodboardStore } from '../../store/moodboardStore'
+import { useWorkspaceKey } from '../workspaceContext'
 import NodeLayerControls from './NodeLayerControls'
 import './FontNode.css'
 
@@ -11,6 +12,7 @@ import './FontNode.css'
 function FontNode({ id, data, selected }) {
   const [fontSize, setFontSize] = useState(data.fontSize || 24)
   const [fontFamily] = useState(data.fontFamily || 'Arial')
+  const workspaceKey = useWorkspaceKey()
   const { updateNodeData, setNodeDimensions } = useMoodboardStore()
   const isGenerating = useMoodboardStore((s) => s.isGenerating)
   const displayRef = useRef(null)
@@ -49,16 +51,16 @@ function FontNode({ id, data, selected }) {
     }
 
     if (Object.keys(dimensionUpdate).length > 0) {
-      setNodeDimensions(id, dimensionUpdate)
+      setNodeDimensions(id, dimensionUpdate, workspaceKey)
     }
-  }, [id, setNodeDimensions])
+  }, [id, setNodeDimensions, workspaceKey])
 
   // Increase font size
   const increaseFontSize = (e) => {
     e.stopPropagation()
     const newSize = fontSize + 2
     setFontSize(newSize)
-    updateNodeData(id, { ...data, fontSize: newSize })
+    updateNodeData(id, { ...data, fontSize: newSize }, workspaceKey)
   }
 
   // Decrease font size
@@ -66,7 +68,7 @@ function FontNode({ id, data, selected }) {
     e.stopPropagation()
     const newSize = Math.max(8, fontSize - 2)
     setFontSize(newSize)
-    updateNodeData(id, { ...data, fontSize: newSize })
+    updateNodeData(id, { ...data, fontSize: newSize }, workspaceKey)
   }
 
   // Load custom font on mount if already uploaded

@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { NodeResizer } from 'reactflow'
 import { useMoodboardStore } from '../../store/moodboardStore'
+import { useWorkspaceKey } from '../workspaceContext'
 import WeightOverlay from './WeightOverlay'
 import './ClusterNode.css'
 
 function ClusterNode({ id, data, selected }) {
+  const workspaceKey = useWorkspaceKey()
   const { updateNodeData } = useMoodboardStore()
   const isGenerating = useMoodboardStore((s) => s.isGenerating)
   const [isEditingTitle, setIsEditingTitle] = useState(false)
@@ -27,10 +29,10 @@ function ClusterNode({ id, data, selected }) {
       const trimmed = nextTitle.trim()
       const fallback = trimmed.length > 0 ? trimmed : 'Cluster'
       setTitle(fallback)
-      updateNodeData(id, { title: fallback })
+      updateNodeData(id, { title: fallback }, workspaceKey)
       setIsEditingTitle(false)
     },
-    [id, updateNodeData]
+    [id, updateNodeData, workspaceKey]
   )
 
   const handleHeaderDoubleClick = useCallback(

@@ -26,6 +26,10 @@
   border: 1px solid rgba(0, 0, 0, 0.08);
 }
 
+.master-prompt-dialog__content--comparative {
+  width: min(1220px, 96vw);
+}
+
 .master-prompt-dialog__close {
   position: absolute;
   top: 18px;
@@ -77,12 +81,65 @@
   margin-bottom: 14px;
 }
 
+.master-prompt-dialog__comparative-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  margin-bottom: 16px;
+}
+
+.master-prompt-dialog__pane {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  border-radius: 14px;
+  border: 1px solid color-mix(in oklab, var(--color-border) 88%, white);
+  background: linear-gradient(180deg, color-mix(in oklab, var(--color-surface-alt) 92%, white), var(--color-surface));
+}
+
+.master-prompt-dialog__pane-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.master-prompt-dialog__pane-header h3 {
+  margin: 0;
+  font-size: 1rem;
+  color: var(--color-text);
+}
+
+.master-prompt-dialog__pane-status {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--accent-success);
+  background: color-mix(in oklab, var(--accent-success) 12%, white);
+}
+
+.master-prompt-dialog__pane-status--loading {
+  color: var(--accent-progress);
+  background: color-mix(in oklab, var(--accent-progress) 14%, white);
+}
+
 .master-prompt-dialog__prompt-row {
   display: flex;
   gap: 12px;
   align-items: stretch;
   height: min(48vh, 360px);
   min-height: 280px;
+}
+
+.master-prompt-dialog__prompt-row--pane {
+  height: auto;
+  min-height: 240px;
 }
 
 .master-prompt-dialog__references-block {
@@ -302,6 +359,10 @@
   .master-prompt-dialog__prompt-row {
     flex-direction: column;
     height: auto;
+  }
+
+  .master-prompt-dialog__comparative-grid {
+    grid-template-columns: 1fr;
   }
 
   .master-prompt-dialog__references-block {

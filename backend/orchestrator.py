@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import io
+from contextvars import ContextVar
 from pathlib import Path
 from typing import Any, Union, List
 
@@ -31,6 +32,11 @@ logger = structlog.stdlib.get_logger(__name__)
 # Global state
 RELEVANCE_THRESHOLD = 40
 ROOT_DIR = Path(__file__).parent.resolve()
+DEFAULT_ARTIFACTS_DIR = ROOT_DIR / "artifacts"
+_artifacts_dir_var: ContextVar[Path] = ContextVar(
+    "artifacts_dir",
+    default=DEFAULT_ARTIFACTS_DIR,
+)
 blender_engine: Union[Blender, None] = None
 trellis_engine: Union[TrellisEngine, None] = None
 descriptor: Union[Descriptor, None] = None
@@ -40,6 +46,21 @@ prompt_synthesizer: Union[PromptSynthesizer, None] = None
 visualizer: Union[Visualizer, None] = None
 bedrock_client: Any = None
 embedding_function: Union[BedrockEmbeddingFunction, None] = None
+
+
+def get_artifacts_dir() -> Path:
+    artifacts_dir = _artifacts_dir_var.get()
+    artifacts_dir.mkdir(parents=True, exist_ok=True)
+    return artifacts_dir
+
+
+def set_artifacts_dir(path: Path):
+    path.mkdir(parents=True, exist_ok=True)
+    return _artifacts_dir_var.set(path)
+
+
+def reset_artifacts_dir(token) -> None:
+    _artifacts_dir_var.reset(token)
 
 
 def _initialize():
@@ -77,7 +98,7 @@ async def handle_model(element: dict) -> tuple[str, str]:
 
     # Create renders directory
     unique_name = str(element["id"])
-    renders_dir = ROOT_DIR / "artifacts" / "model_renders" / unique_name
+    renders_dir = get_artifacts_dir() / "model_renders" / unique_name
     renders_dir.mkdir(parents=True, exist_ok=True)
 
     # Create renders using Blender
@@ -97,7 +118,7 @@ async def handle_video(element: dict) -> tuple[str, str]:
 
     # Save the frames
     unique_name = str(element["id"])
-    frames_dir = ROOT_DIR / "artifacts" / "video_frames" / unique_name
+    frames_dir = get_artifacts_dir() / "video_frames" / unique_name
     frames_dir.mkdir(parents=True, exist_ok=True)
     for i, frame in enumerate(frames):
         frame_path = frames_dir / f"frame_{i}.jpg"
@@ -125,7 +146,7 @@ async def handle_image(element: dict) -> tuple[str, str]:
 
     # Save image to artifacts
     unique_name = str(element["id"])
-    images_dir = ROOT_DIR / "artifacts" / "images" / unique_name
+    images_dir = get_artifacts_dir() / "images" / unique_name
     images_dir.mkdir(parents=True, exist_ok=True)
     image_path = images_dir / "image.jpg"
     with open(image_path, "wb") as f:
@@ -216,7 +237,7 @@ async def synthesize_master_prompt(
     master_prompt = result.output.info.prompt
 
     # Save master prompt to artifacts
-    master_prompt_path = ROOT_DIR / "artifacts" / "master_prompt.txt"
+    master_prompt_path = get_artifacts_dir() / "master_prompt.txt"
     with open(master_prompt_path, "w") as f:
         f.write(master_prompt)
 
@@ -236,7 +257,7 @@ async def generate_master_image(
     result = await visualizer.run(master_prompt, style_images)
 
     # Save master image to artifacts
-    master_image_path = ROOT_DIR / "artifacts" / "master_image.jpg"
+    master_image_path = get_artifacts_dir() / "master_image.jpg"
 
     with open(master_image_path, "wb") as f:
         f.write(result.output.data)
@@ -256,7 +277,7 @@ async def edit_master_image(
 
     result = await visualizer.run(prompt, [source_image])
 
-    master_image_path = ROOT_DIR / "artifacts" / "master_image.jpg"
+    master_image_path = get_artifacts_dir() / "master_image.jpg"
     with open(master_image_path, "wb") as f:
         f.write(result.output.data)
 
@@ -278,17 +299,24 @@ def get_reference_images_preview(
     return previews
 
 
-async def generate_3d_model(master_image_path: Path) -> Path:
+async def generate_3d_model(
+    master_image_path: Path,
+    seed: int | None = None,
+) -> Path:
     logger.info(
         "Generating 3D model from master image", image_path=str(master_image_path)
     )
 
     # Create output directory for TRELLIS
-    output_dir = ROOT_DIR / "artifacts" / "trellis"
+    output_dir = get_artifacts_dir() / "trellis"
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # Use TRELLIS engine to generate 3D model
-    model_path = await trellis_engine.generate_3d_model(master_image_path, output_dir)
+    model_path = await trellis_engine.generate_3d_model(
+        master_image_path,
+        output_dir,
+        seed=seed,
+    )
 
     logger.info("3D model generation completed", model_path=str(model_path))
     return model_path
@@ -327,7 +355,7 @@ async def evaluate_model(
     # 2. Generate embedding for the generated model
 
     unique_name = f"generated"
-    renders_dir = ROOT_DIR / "artifacts" / "model_renders" / unique_name
+    renders_dir = get_artifacts_dir() / "model_renders" / unique_name
     renders_dir.mkdir(parents=True, exist_ok=True)
 
     renders = await blender_engine.render_views(model_path, renders_dir)
@@ -363,7 +391,7 @@ async def _save_model_file(element: dict) -> Path:
     base64_data = model_data.split(",", 1)[1]
     model_bytes = base64.b64decode(base64_data)
 
-    models_dir = ROOT_DIR / "artifacts" / "models"
+    models_dir = get_artifacts_dir() / "models"
     models_dir.mkdir(parents=True, exist_ok=True)
     model_path = models_dir / model_filename
 
@@ -401,16 +429,16 @@ def _collect_style_image_paths(
 
             if elem.type == "image":
                 image_path = (
-                    ROOT_DIR / "artifacts" / "images" / str(elem.id) / "image.jpg"
+                    get_artifacts_dir() / "images" / str(elem.id) / "image.jpg"
                 )
                 if image_path.exists():
                     image_paths.append(image_path)
             elif elem.type == "video":
-                frames_dir = ROOT_DIR / "artifacts" / "video_frames" / str(elem.id)
+                frames_dir = get_artifacts_dir() / "video_frames" / str(elem.id)
                 if frames_dir.exists():
                     image_paths.extend(sorted(frames_dir.glob("*.jpg")))
             elif elem.type == "model":
-                renders_dir = ROOT_DIR / "artifacts" / "model_renders" / str(elem.id)
+                renders_dir = get_artifacts_dir() / "model_renders" / str(elem.id)
                 if renders_dir.exists():
                     image_paths.extend(sorted(renders_dir.glob("*.jpg")))
 

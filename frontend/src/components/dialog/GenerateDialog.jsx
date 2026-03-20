@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react'
 import './GenerateDialog.css'
 
-function GenerateDialog({ isOpen, onClose, onGenerate, isGenerating }) {
+function GenerateDialog({ isOpen, onClose, onGenerate, isGenerating, isComparative = false }) {
   const [prompt, setPrompt] = useState('')
 
   const handleClose = useCallback(() => {
@@ -56,8 +56,12 @@ function GenerateDialog({ isOpen, onClose, onGenerate, isGenerating }) {
         </button>
 
         <header className="generate-dialog__header">
-          <h2>Generate 3D Model</h2>
-          <p>Describe what you want to generate from your moodboard.</p>
+          <h2>{isComparative ? 'Generate Comparative Pair' : 'Generate 3D Model'}</h2>
+          <p>
+            {isComparative
+              ? 'Use one shared prompt to generate both panes for comparison.'
+              : 'Describe what you want to generate from your moodboard.'}
+          </p>
         </header>
 
         <form onSubmit={handleSubmit} className="generate-dialog__form">
@@ -65,7 +69,9 @@ function GenerateDialog({ isOpen, onClose, onGenerate, isGenerating }) {
             className="generate-dialog__input"
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
-            placeholder="e.g., A modern minimalist lamp inspired by the colors and shapes in my moodboard..."
+            placeholder={isComparative
+              ? 'e.g., A sculptural table lamp based on both moodboards so I can compare the design changes...'
+              : 'e.g., A modern minimalist lamp inspired by the colors and shapes in my moodboard...'}
             rows={4}
             disabled={isGenerating}
             autoFocus
@@ -84,7 +90,7 @@ function GenerateDialog({ isOpen, onClose, onGenerate, isGenerating }) {
               className="generate-dialog__btn generate-dialog__btn--primary"
               disabled={!prompt.trim() || isGenerating}
             >
-              {isGenerating ? 'Generating...' : 'Generate'}
+              {isGenerating ? 'Generating...' : isComparative ? 'Generate Both' : 'Generate'}
             </button>
           </div>
         </form>
