@@ -23,7 +23,6 @@ export const normalizeHexColor = (value) => {
 export const weightToColor = (weight, opacity = 0.3) => {
   const clampedWeight = Math.max(0, Math.min(100, weight))
   
-  // TODO: check if weights should not be just red (not used) or green (used)
   let r, g
   if (clampedWeight <= 50) {
     // Red to yellow
