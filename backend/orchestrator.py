@@ -61,9 +61,7 @@ def _initialize():
         cfg: DictConfig = compose(config_name="config")
 
     blender_engine = hydra.utils.instantiate(cfg.engine)
-    trellis_engine = TrellisEngine(
-        version=2
-    )  # TODO: version selection via config
+    trellis_engine = hydra.utils.instantiate(cfg.trellis)
     descriptor = hydra.utils.instantiate(cfg.descriptor)
     clusterer = hydra.utils.instantiate(cfg.clusterer)
     intent_router = hydra.utils.instantiate(cfg.intent_router)

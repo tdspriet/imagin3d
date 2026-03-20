@@ -16,5 +16,8 @@ engine:
   num_views: 5
   timeout_s: 60
 
+trellis:
+  _target_: backend.utils.trellis.TrellisEngine
+
 logging:
   filename: ${now:%Y-%m-%d}-${now:%H-%M-%S}.log

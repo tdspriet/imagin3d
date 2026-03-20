@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 import tempfile
 from pathlib import Path
 from typing import Literal
@@ -25,7 +26,9 @@ _VERSIONS = {
 
 
 class TrellisEngine:
-    def __init__(self, version: Literal[1, 2] = 2):
+    def __init__(self, version: Literal[1, 2] | None = None):
+        if version is None:
+            version = 2 if os.getenv("CONDA_DEFAULT_ENV") == "trellis2" else 1
         if version not in _VERSIONS:
             raise ValueError(f"Unsupported TRELLIS version: {version}. Use 1 or 2.")
         self.version = version
