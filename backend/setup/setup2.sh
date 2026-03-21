@@ -1,6 +1,9 @@
 #!/bin/bash
 set -e
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+
 # 1. Fix system dependencies
 sudo apt-get update
 sudo apt-get install -y libjpeg-dev
@@ -16,7 +19,7 @@ source /workspaces/miniconda3/etc/profile.d/conda.sh
 conda init bash
 
 # 4. Run the TRELLIS.2 setup script
-cd /workspaces/imagin3d/trellis2 
+cd "${REPO_ROOT}/trellis2"
 bash ./setup.sh --new-env --basic --nvdiffrast --nvdiffrec --cumesh --o-voxel --flexgemm
 
 # 5. Activate new environment
@@ -35,7 +38,7 @@ pip install --no-cache-dir "pillow>=10.0.0"
 python -c "from huggingface_hub import login; login()"
 
 # 9. Pre-download and dynamically patch models
-python patch.py
+python "${SCRIPT_DIR}/patch.py"
 
 echo ""
 echo "Environment setup complete!"
