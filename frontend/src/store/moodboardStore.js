@@ -1,19 +1,18 @@
 import { create } from 'zustand'
 
-// Backend configuration
-// NOTE: this should not be hardcoded in production
 const BACKEND_URL = 'http://localhost:8000'.replace(/\/$/, '')
-
-// Z-index constants
+const WORKSPACE_KEYS = {
+  SINGLE: 'single',
+  LEFT: 'left',
+  RIGHT: 'right',
+}
 const SELECTED_Z_OFFSET = 2000
 const CLUSTER_Z_OFFSET = -1000
-// Default font sizes
 const DEFAULT_FONT_SIZE = 16
 const FONT_NODE_BASE_SIZE = 24
-// Default sizes for various nodes
+
 const DEFAULT_SIZES = {
   TOPBAR_HEIGHT: 60,
-  
   IMAGE: { width: 300, height: 200, maxDimension: 400, fallbackAspectRatio: 1.5 },
   VIDEO: { width: 400, height: 225, maxDimension: 450, aspectRatio: 16 / 9 },
   TEXT: { width: 200, height: 40 },
@@ -23,41 +22,90 @@ const DEFAULT_SIZES = {
   CLUSTER: { width: 640, height: 420 },
 }
 
+const createWorkspaceState = () => ({
+  nodes: [],
+  edges: [],
+  reactFlowInstance: null,
+  fitViewTrigger: 0,
+})
+
+const createComparisonResults = () => ({
+  left: { status: 'idle', message: 'Ready', modelUrl: null, score: null },
+  right: { status: 'idle', message: 'Ready', modelUrl: null, score: null },
+})
+
 const addInitialSize = (data, width, height) => ({
   ...data,
   initialSize: { width, height },
 })
 
+const cloneSerializable = (value) => {
+  if (typeof structuredClone === 'function') {
+    return structuredClone(value)
+  }
+  return JSON.parse(JSON.stringify(value))
+}
+
+const cloneWorkspaceState = (workspace) => ({
+  nodes: cloneSerializable(workspace.nodes || []),
+  edges: cloneSerializable(workspace.edges || []),
+  reactFlowInstance: null,
+  fitViewTrigger: 0,
+})
+
+const resolveWorkspaceKey = (state, workspaceKey = null) => {
+  if (workspaceKey) return workspaceKey
+  if (state.mode === 'comparative') {
+    return state.activeWorkspaceKey === WORKSPACE_KEYS.RIGHT ? WORKSPACE_KEYS.RIGHT : WORKSPACE_KEYS.LEFT
+  }
+  return WORKSPACE_KEYS.SINGLE
+}
+
+const getWorkspace = (state, workspaceKey = null) => {
+  return state.workspaces[resolveWorkspaceKey(state, workspaceKey)]
+}
+
+const updateWorkspaceState = (state, workspaceKey, updater) => {
+  const key = resolveWorkspaceKey(state, workspaceKey)
+  const workspace = state.workspaces[key]
+  const next = typeof updater === 'function' ? updater(workspace) : updater
+  return {
+    workspaces: {
+      ...state.workspaces,
+      [key]: {
+        ...workspace,
+        ...next,
+      },
+    },
+  }
+}
+
 const serializeDataForBackend = (nodes = []) => {
-  const clusterNodes = nodes.filter(n => n.type === 'clusterNode')
-  const contentNodes = nodes.filter(n => n.type !== 'clusterNode')
+  const clusterNodes = nodes.filter((n) => n.type === 'clusterNode')
+  const contentNodes = nodes.filter((n) => n.type !== 'clusterNode')
 
-  // ELEMENTS
-  const elements = contentNodes.map((node, index) => {
-    return {
-      originalId: node.id,
-      formatted: {
-        id: index + 1,
-        content: {
-          type: node.type.replace('Node', ''),
-          data: sanitizeNodeData(node),
-        },
-        position: {
-          x: Number(node?.position?.x, 0),
-          y: Number(node?.position?.y, 0),
-        },
-        size: computeSizeRatios(node),
-      }
-    }
-  })
+  const elements = contentNodes.map((node, index) => ({
+    originalId: node.id,
+    formatted: {
+      id: index + 1,
+      content: {
+        type: node.type.replace('Node', ''),
+        data: sanitizeNodeData(node),
+      },
+      position: {
+        x: Number(node?.position?.x, 0),
+        y: Number(node?.position?.y, 0),
+      },
+      size: computeSizeRatios(node),
+    },
+  }))
 
-  // CLUSTERS
-  const nodeIdMap = new Map(elements.map(e => [e.originalId, e.formatted.id]))
+  const nodeIdMap = new Map(elements.map((e) => [e.originalId, e.formatted.id]))
 
   const clusters = clusterNodes.map((cluster, index) => {
     const insideNodeIds = contentNodes
-      .filter(node => isNodeInsideCluster(node, cluster))
-      .map(node => nodeIdMap.get(node.id))
+      .filter((node) => isNodeInsideCluster(node, cluster))
+      .map((node) => nodeIdMap.get(node.id))
       .sort((a, b) => a - b)
 
     return {
@@ -65,24 +113,23 @@ const serializeDataForBackend = (nodes = []) => {
       formatted: {
         id: index + 1,
         title: cluster.data?.title || 'Cluster',
-        elements: insideNodeIds
-      }
+        elements: insideNodeIds,
+      },
     }
   })
 
-  // REVERSE ID MAPS
-  const reverseNodeIdMap = new Map(elements.map(e => [e.formatted.id, e.originalId]))
-  const reverseClusterIdMap = new Map(clusters.map(c => [c.formatted.id, c.originalId]))
+  const reverseNodeIdMap = new Map(elements.map((e) => [e.formatted.id, e.originalId]))
+  const reverseClusterIdMap = new Map(clusters.map((c) => [c.formatted.id, c.originalId]))
 
   return {
     payload: {
-      elements: elements.map(e => e.formatted),
-      clusters: clusters.map(c => c.formatted)
+      elements: elements.map((e) => e.formatted),
+      clusters: clusters.map((c) => c.formatted),
     },
     idMaps: {
-      elements: reverseNodeIdMap,  // backend ID -> frontend ID
-      clusters: reverseClusterIdMap  // backend ID -> frontend ID
-    }
+      elements: reverseNodeIdMap,
+      clusters: reverseClusterIdMap,
+    },
   }
 }
 
@@ -103,9 +150,7 @@ const sanitizeNodeData = (node = {}) => {
 const computeSizeRatios = (node) => {
   if (node.type === 'fontNode' || node.type === 'textNode') {
     const currentFontSize = Number(node?.data?.fontSize, DEFAULT_FONT_SIZE)
-    const defaultFontSize = DEFAULT_FONT_SIZE
-    const ratio = currentFontSize / defaultFontSize
-    return { x: ratio, y: ratio }
+    return { x: currentFontSize / DEFAULT_FONT_SIZE, y: currentFontSize / DEFAULT_FONT_SIZE }
   }
 
   const width = Number(node?.style?.width, Number(node?.width, 1))
@@ -119,7 +164,6 @@ const computeSizeRatios = (node) => {
   }
 }
 
-
 const applyLayerOrder = (nodes, isGenerating = false) => {
   const clusterNodes = []
   const contentNodes = []
@@ -127,18 +171,13 @@ const applyLayerOrder = (nodes, isGenerating = false) => {
   nodes.forEach((node) => {
     const isModelNode = node.type === 'modelNode'
     const isClusterNode = node.type === 'clusterNode'
-
     const dragHandle = isModelNode
       ? node.dragHandle || '.react-flow-drag-handle'
       : isClusterNode
         ? node.dragHandle || '.cluster-node-header'
         : node.dragHandle
 
-    const baseNode = {
-      ...node,
-      dragHandle,
-    }
-
+    const baseNode = { ...node, dragHandle }
     if (isClusterNode) {
       clusterNodes.push(baseNode)
     } else {
@@ -180,13 +219,10 @@ const isNodeInsideCluster = (node, cluster) => {
   const nodeY = Number(node.position.y)
   const nodeW = Number(node.style?.width || node.width || 0)
   const nodeH = Number(node.style?.height || node.height || 0)
-  
   const clusterX = Number(cluster.position.x)
   const clusterY = Number(cluster.position.y)
   const clusterW = Number(cluster.style?.width || cluster.width || 0)
   const clusterH = Number(cluster.style?.height || cluster.height || 0)
-
-  // Check if center of node is inside cluster
   const centerX = nodeX + nodeW / 2
   const centerY = nodeY + nodeH / 2
 
@@ -199,9 +235,7 @@ const isNodeInsideCluster = (node, cluster) => {
 }
 
 const buildEditedWeightsPayload = (nodes = [], idMaps = null) => {
-  if (!idMaps) {
-    return { weights: {}, cluster_weights: {} }
-  }
+  if (!idMaps) return { weights: {}, cluster_weights: {} }
 
   const nodeLookup = new Map(nodes.map((node) => [node.id, node]))
   const weights = {}
@@ -228,162 +262,234 @@ const buildEditedWeightsPayload = (nodes = [], idMaps = null) => {
   return { weights, cluster_weights }
 }
 
-/**
- * Moodboard Store
- * Manages the state of all nodes and canvas operations
- */
+const updateComparisonResult = (results, pane, patch) => ({
+  ...results,
+  [pane]: {
+    ...results[pane],
+    ...patch,
+  },
+})
+
+const anyMasterPromptLoading = (loadingState) => Object.values(loadingState).some(Boolean)
+
 export const useMoodboardStore = create((set, get) => ({
-  // State
-  nodes: [],
-  edges: [],
-  reactFlowInstance: null,
-  fitViewTrigger: 0,
+  mode: 'single',
+  activeWorkspaceKey: WORKSPACE_KEYS.SINGLE,
+  workspaces: {
+    single: createWorkspaceState(),
+    left: createWorkspaceState(),
+    right: createWorkspaceState(),
+  },
   isGenerating: false,
-  // Weights session
+  generationMode: 'single',
   weightsSessionId: null,
   weightsIdMaps: null,
   awaitingWeightsConfirmation: false,
-  // Master prompt session
   masterPromptSessionId: null,
   awaitingMasterPromptConfirmation: false,
-  masterPromptData: null, // { prompt, image, referenceImages }
-  masterPromptIsLoading: false,
+  masterPromptData: null,
+  masterPromptLoadingByPane: {
+    single: false,
+    left: false,
+    right: false,
+  },
   progress: {
     current: 0,
     total: 0,
     stage: '',
   },
-  // Model dialog state
   modelDialog: {
     isOpen: false,
     modelUrl: null,
   },
   score: null,
+  comparisonResults: createComparisonResults(),
 
-  // Set ReactFlow instance
-  setReactFlowInstance: (instance) => set({ reactFlowInstance: instance }),
+  setActiveWorkspace: (workspaceKey) => {
+    const { mode } = get()
+    if (mode === 'single') {
+      set({ activeWorkspaceKey: WORKSPACE_KEYS.SINGLE })
+      return
+    }
+    if (workspaceKey === WORKSPACE_KEYS.LEFT || workspaceKey === WORKSPACE_KEYS.RIGHT) {
+      set({ activeWorkspaceKey: workspaceKey })
+    }
+  },
 
-  // Set nodes
-  setNodes: (nodes) => set((state) => ({ nodes: applyLayerOrder(nodes, state.isGenerating) })),
+  enterComparativeMode: () => set((state) => {
+    const sourceWorkspace = cloneWorkspaceState(state.workspaces.single)
+    return {
+      mode: 'comparative',
+      activeWorkspaceKey: WORKSPACE_KEYS.LEFT,
+      workspaces: {
+        ...state.workspaces,
+        left: cloneWorkspaceState(sourceWorkspace),
+        right: cloneWorkspaceState(sourceWorkspace),
+      },
+      comparisonResults: createComparisonResults(),
+      modelDialog: { isOpen: false, modelUrl: null },
+    }
+  }),
 
-  // Update specific node data
-  updateNodeData: (nodeId, newData) => {
-    set((state) => ({
-      nodes: state.nodes.map((node) =>
+  exitComparativeMode: () => set((state) => {
+    const sourceKey = state.activeWorkspaceKey === WORKSPACE_KEYS.RIGHT ? WORKSPACE_KEYS.RIGHT : WORKSPACE_KEYS.LEFT
+    return {
+      mode: 'single',
+      activeWorkspaceKey: WORKSPACE_KEYS.SINGLE,
+      workspaces: {
+        single: cloneWorkspaceState(state.workspaces[sourceKey]),
+        left: createWorkspaceState(),
+        right: createWorkspaceState(),
+      },
+      comparisonResults: createComparisonResults(),
+      weightsSessionId: null,
+      weightsIdMaps: null,
+      awaitingWeightsConfirmation: false,
+      masterPromptSessionId: null,
+      awaitingMasterPromptConfirmation: false,
+      masterPromptData: null,
+      masterPromptLoadingByPane: {
+        single: false,
+        left: false,
+        right: false,
+      },
+      progress: { current: 0, total: 0, stage: '' },
+    }
+  }),
+
+  setReactFlowInstance: (instance, workspaceKey = null) => set((state) => (
+    updateWorkspaceState(state, workspaceKey, { reactFlowInstance: instance })
+  )),
+
+  setNodes: (nodes, workspaceKey = null) => set((state) => (
+    updateWorkspaceState(state, workspaceKey, {
+      nodes: applyLayerOrder(nodes, state.isGenerating),
+    })
+  )),
+
+  updateNodeData: (nodeId, newData, workspaceKey = null) => set((state) => {
+    const key = resolveWorkspaceKey(state, workspaceKey)
+    const workspace = state.workspaces[key]
+    return updateWorkspaceState(state, key, {
+      nodes: workspace.nodes.map((node) =>
         node.id === nodeId
           ? { ...node, data: { ...node.data, ...newData } }
           : node
       ),
-    }))
-  },
+    })
+  }),
 
-  updateNodeWeight: (nodeId, nextWeight) => {
+  updateNodeWeight: (nodeId, nextWeight, workspaceKey = null) => {
     const w = Math.max(0, Math.min(100, Math.round(Number(nextWeight) || 0)))
-    get().updateNodeData(nodeId, { weight: w })
+    get().updateNodeData(nodeId, { weight: w }, workspaceKey)
   },
 
-  // Update node style dimensions (width/height)
-  setNodeDimensions: (nodeId, dimensions) => {
-    set((state) => ({
-      nodes: state.nodes.map((node) =>
-        node.id === nodeId
-          ? {
-              ...node,
-              style: {
-                ...(node.style || {}),
-                ...dimensions,
-              },
-            }
-          : node
-      ),
-    }))
+  setNodeDimensions: (nodeId, dimensions, workspaceKey = null) => {
+    const key = resolveWorkspaceKey(get(), workspaceKey)
+    set((state) => {
+      const workspace = state.workspaces[key]
+      return updateWorkspaceState(state, key, {
+        nodes: workspace.nodes.map((node) =>
+          node.id === nodeId
+            ? {
+                ...node,
+                style: {
+                  ...(node.style || {}),
+                  ...dimensions,
+                },
+              }
+            : node
+        ),
+      })
+    })
 
-    const instance = get().reactFlowInstance
+    const instance = get().workspaces[key]?.reactFlowInstance
     if (instance?.updateNodeInternals) {
       requestAnimationFrame(() => instance.updateNodeInternals(nodeId))
     }
   },
 
-  // Handle node changes from ReactFlow
-  onNodesChange: (changes) => {
-    set((state) => {
-      // Apply changes manually to maintain control
-      const updatedNodes = [...state.nodes]
-      changes.forEach((change) => {
-        const nodeIndex = updatedNodes.findIndex((n) => n.id === change.id)
-        if (nodeIndex !== -1) {
-          if (change.type === 'position' && change.position) {
-            updatedNodes[nodeIndex] = {
-              ...updatedNodes[nodeIndex],
-              position: change.position,
-            }
-          } else if (change.type === 'dimensions' && change.dimensions) {
-            updatedNodes[nodeIndex] = {
-              ...updatedNodes[nodeIndex],
-              style: {
-                ...updatedNodes[nodeIndex].style,
-                width: change.dimensions.width,
-                height: change.dimensions.height,
-              },
-            }
-          } else if (change.type === 'select') {
-            updatedNodes[nodeIndex] = {
-              ...updatedNodes[nodeIndex],
-              selected: change.selected,
-            }
-          }
+  onNodesChange: (changes, workspaceKey = null) => set((state) => {
+    const key = resolveWorkspaceKey(state, workspaceKey)
+    const workspace = state.workspaces[key]
+    const updatedNodes = [...workspace.nodes]
+    changes.forEach((change) => {
+      const nodeIndex = updatedNodes.findIndex((n) => n.id === change.id)
+      if (nodeIndex === -1) return
+
+      if (change.type === 'position' && change.position) {
+        updatedNodes[nodeIndex] = { ...updatedNodes[nodeIndex], position: change.position }
+      } else if (change.type === 'dimensions' && change.dimensions) {
+        updatedNodes[nodeIndex] = {
+          ...updatedNodes[nodeIndex],
+          style: {
+            ...updatedNodes[nodeIndex].style,
+            width: change.dimensions.width,
+            height: change.dimensions.height,
+          },
         }
-      })
-      return { nodes: applyLayerOrder(updatedNodes, state.isGenerating) }
-    })
-  },
-
-  // Move node one layer forward (on top)
-  bringNodeForward: (nodeId) => {
-    set((state) => {
-      const index = state.nodes.findIndex((node) => node.id === nodeId)
-      if (index === -1 || state.nodes[index]?.type === 'clusterNode' || index === state.nodes.length - 1) {
-        return {}
+      } else if (change.type === 'select') {
+        updatedNodes[nodeIndex] = {
+          ...updatedNodes[nodeIndex],
+          selected: change.selected,
+        }
       }
-
-      const reordered = [...state.nodes]
-      const [node] = reordered.splice(index, 1)
-      reordered.splice(index + 1, 0, node)
-      return { nodes: applyLayerOrder(reordered, state.isGenerating) }
     })
-  },
 
-  // Move node one layer backward (to bottom)
-  sendNodeBackward: (nodeId) => {
-    set((state) => {
-      const index = state.nodes.findIndex((node) => node.id === nodeId)
-      if (index <= 0 || state.nodes[index]?.type === 'clusterNode') {
-        return {}
-      }
-
-      const reordered = [...state.nodes]
-      const [node] = reordered.splice(index, 1)
-      reordered.splice(index - 1, 0, node)
-      return { nodes: applyLayerOrder(reordered, state.isGenerating) }
+    return updateWorkspaceState(state, key, {
+      nodes: applyLayerOrder(updatedNodes, state.isGenerating),
     })
+  }),
+
+  bringNodeForward: (nodeId, workspaceKey = null) => set((state) => {
+    const key = resolveWorkspaceKey(state, workspaceKey)
+    const workspace = state.workspaces[key]
+    const index = workspace.nodes.findIndex((node) => node.id === nodeId)
+    if (index === -1 || workspace.nodes[index]?.type === 'clusterNode' || index === workspace.nodes.length - 1) {
+      return {}
+    }
+
+    const reordered = [...workspace.nodes]
+    const [node] = reordered.splice(index, 1)
+    reordered.splice(index + 1, 0, node)
+    return updateWorkspaceState(state, key, {
+      nodes: applyLayerOrder(reordered, state.isGenerating),
+    })
+  }),
+
+  sendNodeBackward: (nodeId, workspaceKey = null) => set((state) => {
+    const key = resolveWorkspaceKey(state, workspaceKey)
+    const workspace = state.workspaces[key]
+    const index = workspace.nodes.findIndex((node) => node.id === nodeId)
+    if (index <= 0 || workspace.nodes[index]?.type === 'clusterNode') {
+      return {}
+    }
+
+    const reordered = [...workspace.nodes]
+    const [node] = reordered.splice(index, 1)
+    reordered.splice(index - 1, 0, node)
+    return updateWorkspaceState(state, key, {
+      nodes: applyLayerOrder(reordered, state.isGenerating),
+    })
+  }),
+
+  getCenterPosition: (workspaceKey = null) => {
+    const workspace = getWorkspace(get(), workspaceKey)
+    const instance = workspace.reactFlowInstance
+    if (!instance?.getViewport) {
+      return { x: 120, y: 120 }
+    }
+
+    const { x, y, zoom } = instance.getViewport()
+    return {
+      x: (window.innerWidth / 2 - x) / zoom,
+      y: ((window.innerHeight - DEFAULT_SIZES.TOPBAR_HEIGHT) / 2 - y) / zoom,
+    }
   },
 
-  // Get center position of current viewport
-  getCenterPosition: () => {
-    const { reactFlowInstance } = get()
-
-    const { x, y, zoom } = reactFlowInstance.getViewport()
-
-    // Calculate center of visible area
-    const centerX = (window.innerWidth / 2 - x) / zoom
-    const centerY = ((window.innerHeight - DEFAULT_SIZES.TOPBAR_HEIGHT) / 2 - y) / zoom // Subtract topbar height
-
-    return { x: centerX, y: centerY }
-  },
-
-  // Add image node
-  addImage: (src) => {
-    const position = get().getCenterPosition()
+  addImage: (src, workspaceKey = null) => {
+    const key = resolveWorkspaceKey(get(), workspaceKey)
+    const position = get().getCenterPosition(key)
     const nodeId = `image-${Date.now()}`
     const image = new Image()
 
@@ -400,20 +506,21 @@ export const useMoodboardStore = create((set, get) => ({
         style: { width: safeWidth, height: safeHeight },
       }
 
-      set((state) => ({
-        nodes: applyLayerOrder([...state.nodes, newNode], state.isGenerating),
-      }))
+      set((state) => {
+        const workspace = state.workspaces[key]
+        return updateWorkspaceState(state, key, {
+          nodes: applyLayerOrder([...workspace.nodes, newNode], state.isGenerating),
+        })
+      })
     }
 
     image.onload = () => {
       const naturalWidth = image.naturalWidth || DEFAULT_SIZES.IMAGE.width
       const naturalHeight = image.naturalHeight || DEFAULT_SIZES.IMAGE.height
-      const maxDimension = DEFAULT_SIZES.IMAGE.maxDimension
-      const dominantSize = Math.max(naturalWidth, naturalHeight)
-      const scale = dominantSize > maxDimension ? maxDimension / dominantSize : 1
-      const width = naturalWidth * scale
-      const height = naturalHeight * scale
-      appendNode(width, height, naturalWidth / naturalHeight)
+      const scale = Math.max(naturalWidth, naturalHeight) > DEFAULT_SIZES.IMAGE.maxDimension
+        ? DEFAULT_SIZES.IMAGE.maxDimension / Math.max(naturalWidth, naturalHeight)
+        : 1
+      appendNode(naturalWidth * scale, naturalHeight * scale, naturalWidth / naturalHeight)
     }
 
     image.onerror = () => {
@@ -423,9 +530,9 @@ export const useMoodboardStore = create((set, get) => ({
     image.src = src
   },
 
-  // Add video node
-  addVideo: (src) => {
-    const position = get().getCenterPosition()
+  addVideo: (src, workspaceKey = null) => {
+    const key = resolveWorkspaceKey(get(), workspaceKey)
+    const position = get().getCenterPosition(key)
     const nodeId = `video-${Date.now()}`
     const video = document.createElement('video')
     video.preload = 'metadata'
@@ -443,20 +550,21 @@ export const useMoodboardStore = create((set, get) => ({
         style: { width: safeWidth, height: safeHeight },
       }
 
-      set((state) => ({
-        nodes: applyLayerOrder([...state.nodes, newNode], state.isGenerating),
-      }))
+      set((state) => {
+        const workspace = state.workspaces[key]
+        return updateWorkspaceState(state, key, {
+          nodes: applyLayerOrder([...workspace.nodes, newNode], state.isGenerating),
+        })
+      })
     }
 
     const handleLoadedMetadata = () => {
       const naturalWidth = video.videoWidth || DEFAULT_SIZES.VIDEO.width
       const naturalHeight = video.videoHeight || DEFAULT_SIZES.VIDEO.height
-      const maxDimension = DEFAULT_SIZES.VIDEO.maxDimension
-      const dominantSize = Math.max(naturalWidth, naturalHeight)
-      const scale = dominantSize > maxDimension ? maxDimension / dominantSize : 1
-      const width = naturalWidth * scale
-      const height = naturalHeight * scale
-      appendNode(width, height, naturalWidth / naturalHeight)
+      const scale = Math.max(naturalWidth, naturalHeight) > DEFAULT_SIZES.VIDEO.maxDimension
+        ? DEFAULT_SIZES.VIDEO.maxDimension / Math.max(naturalWidth, naturalHeight)
+        : 1
+      appendNode(naturalWidth * scale, naturalHeight * scale, naturalWidth / naturalHeight)
       cleanup()
     }
 
@@ -475,9 +583,9 @@ export const useMoodboardStore = create((set, get) => ({
     video.src = src
   },
 
-  // Add text node
-  addText: () => {
-    const position = get().getCenterPosition()
+  addText: (workspaceKey = null) => {
+    const key = resolveWorkspaceKey(get(), workspaceKey)
+    const position = get().getCenterPosition(key)
     const width = DEFAULT_SIZES.TEXT.width
     const height = DEFAULT_SIZES.TEXT.height
     const newNode = {
@@ -487,18 +595,20 @@ export const useMoodboardStore = create((set, get) => ({
       data: addInitialSize({ text: 'Double-click to edit', fontSize: DEFAULT_FONT_SIZE }, width, height),
       style: { width, height },
     }
-    set((state) => ({
-      nodes: applyLayerOrder([...state.nodes, newNode], state.isGenerating),
-    }))
+    set((state) => {
+      const workspace = state.workspaces[key]
+      return updateWorkspaceState(state, key, {
+        nodes: applyLayerOrder([...workspace.nodes, newNode], state.isGenerating),
+      })
+    })
   },
 
-  // Add font node
-  addFont: (fontData, fontName) => {
-    const position = get().getCenterPosition()
+  addFont: (fontData, fontName, workspaceKey = null) => {
+    const key = resolveWorkspaceKey(get(), workspaceKey)
+    const position = get().getCenterPosition(key)
     const nodeId = `font-${Date.now()}`
     const uniqueFontFamily = `CustomFont-${nodeId}`
-    
-    // Create a style element to load the font
+
     const style = document.createElement('style')
     style.textContent = `
       @font-face {
@@ -507,7 +617,7 @@ export const useMoodboardStore = create((set, get) => ({
       }
     `
     document.head.appendChild(style)
-    
+
     const width = DEFAULT_SIZES.FONT.width
     const height = DEFAULT_SIZES.FONT.height
     const baseFontSize = FONT_NODE_BASE_SIZE
@@ -520,44 +630,48 @@ export const useMoodboardStore = create((set, get) => ({
         fontSize: baseFontSize,
         baseFontSize,
         fontLoaded: true,
-        uniqueFontFamily: uniqueFontFamily,
-        fontData: fontData,
+        uniqueFontFamily,
+        fontData,
       }, width, height),
       style: { width, height },
     }
-    set((state) => ({
-      nodes: applyLayerOrder([...state.nodes, newNode], state.isGenerating),
-    }))
+
+    set((state) => {
+      const workspace = state.workspaces[key]
+      return updateWorkspaceState(state, key, {
+        nodes: applyLayerOrder([...workspace.nodes, newNode], state.isGenerating),
+      })
+    })
   },
 
-  // Add 3D model node
-  addModel: (src, fileName) => {
-    const position = get().getCenterPosition()
-    const nodeId = `model-${Date.now()}`
-    
+  addModel: (src, fileName, workspaceKey = null) => {
+    const key = resolveWorkspaceKey(get(), workspaceKey)
+    const position = get().getCenterPosition(key)
     const width = DEFAULT_SIZES.MODEL.width
     const height = DEFAULT_SIZES.MODEL.height
     const newNode = {
-      id: nodeId,
+      id: `model-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       type: 'modelNode',
       position,
-      data: addInitialSize({ 
+      data: addInitialSize({
         src,
-        fileName: fileName || 'model.glb'
+        fileName: fileName || 'model.glb',
       }, width, height),
       dragHandle: '.react-flow-drag-handle',
       style: { width, height },
     }
-    
-    set((state) => ({
-      nodes: applyLayerOrder([...state.nodes, newNode], state.isGenerating),
-    }))
+
+    set((state) => {
+      const workspace = state.workspaces[key]
+      return updateWorkspaceState(state, key, {
+        nodes: applyLayerOrder([...workspace.nodes, newNode], state.isGenerating),
+      })
+    })
   },
 
-  // Add palette node
-  addPalette: (colors, options = {}) => {
-    const paletteColors = Array.isArray(colors) ? [...colors] : []
-    const position = get().getCenterPosition()
+  addPalette: (colors, options = {}, workspaceKey = null) => {
+    const key = resolveWorkspaceKey(get(), workspaceKey)
+    const position = get().getCenterPosition(key)
     const width = Number.isFinite(options.width) ? options.width : DEFAULT_SIZES.PALETTE.width
     const height = Number.isFinite(options.height) ? options.height : DEFAULT_SIZES.PALETTE.height
     const nodeId = `palette-${Date.now()}`
@@ -567,25 +681,27 @@ export const useMoodboardStore = create((set, get) => ({
       type: 'paletteNode',
       position,
       data: addInitialSize({
-        colors: paletteColors,
+        colors: Array.isArray(colors) ? [...colors] : [],
         origin: options.origin || 'manual',
       }, width, height),
       style: { width, height },
     }
 
-    set((state) => ({
-      nodes: applyLayerOrder([...state.nodes, newNode], state.isGenerating),
-    }))
+    set((state) => {
+      const workspace = state.workspaces[key]
+      return updateWorkspaceState(state, key, {
+        nodes: applyLayerOrder([...workspace.nodes, newNode], state.isGenerating),
+      })
+    })
   },
 
-  // Add cluster node
-  addCluster: (title) => {
-    const position = get().getCenterPosition()
-    const clusterTitle =
-      typeof title === 'string' && title.trim().length > 0 ? title.trim() : 'Cluster'
-
+  addCluster: (title, workspaceKey = null) => {
+    const key = resolveWorkspaceKey(get(), workspaceKey)
+    const position = get().getCenterPosition(key)
+    const clusterTitle = typeof title === 'string' && title.trim().length > 0 ? title.trim() : 'Cluster'
     const width = DEFAULT_SIZES.CLUSTER.width
     const height = DEFAULT_SIZES.CLUSTER.height
+
     const newNode = {
       id: `cluster-${Date.now()}`,
       type: 'clusterNode',
@@ -595,77 +711,101 @@ export const useMoodboardStore = create((set, get) => ({
       style: { width, height },
     }
 
-    set((state) => ({
-      nodes: applyLayerOrder([...state.nodes, newNode], state.isGenerating),
-    }))
+    set((state) => {
+      const workspace = state.workspaces[key]
+      return updateWorkspaceState(state, key, {
+        nodes: applyLayerOrder([...workspace.nodes, newNode], state.isGenerating),
+      })
+    })
   },
 
-  // Fit view to show all content
-  fitView: () => {
-    set((state) => ({ fitViewTrigger: state.fitViewTrigger + 1 }))
-  },
+  fitView: (workspaceKey = null) => set((state) => {
+    const key = resolveWorkspaceKey(state, workspaceKey)
+    const workspace = state.workspaces[key]
+    return updateWorkspaceState(state, key, { fitViewTrigger: workspace.fitViewTrigger + 1 })
+  }),
 
-  // Clear weights from all nodes
-  clearWeights: () => {
-    set((state) => ({
-      nodes: state.nodes.map((node) => ({
-        ...node,
-        data: {
-          ...node.data,
-          weight: undefined,
-        },
-      })),
-    }))
-  },
+  clearWeights: (workspaceKeys = null) => set((state) => {
+    const keys = workspaceKeys || (state.mode === 'comparative'
+      ? [WORKSPACE_KEYS.LEFT, WORKSPACE_KEYS.RIGHT]
+      : [WORKSPACE_KEYS.SINGLE])
 
-  // Clear all nodes
+    const nextWorkspaces = { ...state.workspaces }
+    keys.forEach((key) => {
+      const workspace = state.workspaces[key]
+      nextWorkspaces[key] = {
+        ...workspace,
+        nodes: workspace.nodes.map((node) => ({
+          ...node,
+          data: {
+            ...node.data,
+            weight: undefined,
+          },
+        })),
+      }
+    })
+
+    return { workspaces: nextWorkspaces }
+  }),
+
   clearAll: () => {
-    if (confirm('Are you sure you want to clear all elements?')) {
-      set({ nodes: [], edges: [] })
-    }
+    if (!confirm('Are you sure you want to clear all elements in the active workspace?')) return
+    const key = resolveWorkspaceKey(get())
+    set((state) => updateWorkspaceState(state, key, { nodes: [], edges: [] }))
   },
 
-  // Helper to apply weights to nodes
-  applyWeights: (weightsData, idMaps) => {
-    set((state) => ({
-      nodes: state.nodes.map((node) => {
-        const map = node.type === 'clusterNode' ? idMaps.clusters : idMaps.elements
-        const source = node.type === 'clusterNode' ? weightsData.cluster_weights : weightsData.weights
+  applyWeightsToWorkspace: (weightsData, idMaps, workspaceKey = null) => set((state) => {
+    const key = resolveWorkspaceKey(state, workspaceKey)
+    const workspace = state.workspaces[key]
+    return updateWorkspaceState(state, key, {
+      nodes: workspace.nodes.map((node) => {
+        const map = node.type === 'clusterNode' ? idMaps?.clusters : idMaps?.elements
+        const source = node.type === 'clusterNode' ? weightsData?.cluster_weights : weightsData?.weights
+        if (!(map instanceof Map)) return node
+
         for (const [backendId, frontendId] of map.entries()) {
           if (frontendId === node.id && source?.[backendId] != null) {
             return { ...node, data: { ...node.data, weight: source[backendId] } }
           }
         }
+
         return node
       }),
-    }))
+    })
+  }),
+
+  generateMoodboard: async (prompt = '') => {
+    if (get().mode === 'comparative') {
+      return get().generateComparativeMoodboard(prompt)
+    }
+    return get().generateSingleMoodboard(prompt)
   },
 
-  // Send moodboard generation request to backend
-  generateMoodboard: async (prompt = '') => {
-    const { nodes, applyWeights } = get()
-    const { payload, idMaps } = serializeDataForBackend(nodes)
+  generateSingleMoodboard: async (prompt = '') => {
+    const workspace = get().workspaces.single
+    const { payload, idMaps } = serializeDataForBackend(workspace.nodes)
 
-    // If no elements or clusters, skip generation
     if ((!payload.elements || payload.elements.length === 0) && (!payload.clusters || payload.clusters.length === 0)) {
       return { weights: {}, cluster_weights: {} }
     }
 
-    // Add the user prompt to the payload
     payload.prompt = prompt
 
-    set({ 
-      isGenerating: true, 
-      awaitingWeightsConfirmation: false, 
+    set({
+      isGenerating: true,
+      generationMode: 'single',
+      awaitingWeightsConfirmation: false,
       weightsSessionId: null,
       weightsIdMaps: null,
       awaitingMasterPromptConfirmation: false,
       masterPromptSessionId: null,
       masterPromptData: null,
-      masterPromptIsLoading: false,
+      masterPromptLoadingByPane: { single: false, left: false, right: false },
       progress: { current: 0, total: 0, stage: 'Starting...' },
       score: null,
+      modelDialog: { isOpen: false, modelUrl: null },
     })
+
     try {
       const response = await fetch(`${BACKEND_URL}/extract`, {
         method: 'POST',
@@ -673,11 +813,8 @@ export const useMoodboardStore = create((set, get) => ({
         body: JSON.stringify(payload),
       })
 
-      if (!response.ok) {
-        throw new Error('Backend generation failed')
-      }
+      if (!response.ok) throw new Error('Backend generation failed')
 
-      // Parse SSE stream
       const reader = response.body.getReader()
       const decoder = new TextDecoder()
       let buffer = ''
@@ -688,15 +825,11 @@ export const useMoodboardStore = create((set, get) => ({
         if (done) break
 
         buffer += decoder.decode(value, { stream: true })
-
-        // Parse SSE events from buffer (format: data: {json}\n\n)
         const events = buffer.split('\n\n')
-        buffer = events.pop() || '' // Keep incomplete event in buffer
+        buffer = events.pop() || ''
 
         for (const event of events) {
           if (!event.trim()) continue
-
-          // Extract data from "data: {json}" format
           const dataMatch = event.match(/^data:\s*(.+)$/m)
           if (!dataMatch) continue
 
@@ -705,22 +838,33 @@ export const useMoodboardStore = create((set, get) => ({
             const { type, data, session_id } = parsed
 
             if (type === 'progress') {
-              // Update progress
               set({ progress: data })
             } else if (type === 'weights') {
-              // Apply weights immediately when received
-              applyWeights(data, idMaps)
-              // Store session ID and set awaiting confirmation
+              get().applyWeightsToWorkspace(data, idMaps, WORKSPACE_KEYS.SINGLE)
               if (session_id) {
-                set({ 
-                  weightsSessionId: session_id, 
+                set({
+                  weightsSessionId: session_id,
                   weightsIdMaps: idMaps,
                   awaitingWeightsConfirmation: true,
-                  progress: { current: 0, total: 0, stage: '' }, // Clear progress
+                  progress: { current: 0, total: 0, stage: '' },
+                })
+              }
+            } else if (type === 'master_prompt') {
+              if (session_id) {
+                set({
+                  masterPromptSessionId: session_id,
+                  awaitingMasterPromptConfirmation: true,
+                  masterPromptData: {
+                    mode: 'single',
+                    prompt: data.prompt,
+                    image: data.image,
+                    referenceImages: data.reference_images || [],
+                  },
+                  masterPromptLoadingByPane: { single: false, left: false, right: false },
+                  progress: { current: 0, total: 0, stage: '' },
                 })
               }
             } else if (type === 'complete') {
-              // Store final result
               finalResult = data
               set({
                 awaitingWeightsConfirmation: false,
@@ -729,17 +873,16 @@ export const useMoodboardStore = create((set, get) => ({
                 awaitingMasterPromptConfirmation: false,
                 masterPromptSessionId: null,
                 masterPromptData: null,
-                masterPromptIsLoading: false,
+                masterPromptLoadingByPane: { single: false, left: false, right: false },
                 progress: { current: 0, total: 0, stage: '' },
               })
-              
-              // Open model dialog
               if (data.file) {
-                  const url = data.file.startsWith('http') ? data.file : `${BACKEND_URL}${data.file}`
-                  get().openModelDialog(url)
+                const url = data.file.startsWith('http') ? data.file : `${BACKEND_URL}${data.file}`
+                get().openModelDialog(url)
               }
+            } else if (type === 'score') {
+              set({ score: data.score })
             } else if (type === 'cancelled') {
-              // Pipeline was cancelled
               set({
                 awaitingWeightsConfirmation: false,
                 weightsSessionId: null,
@@ -747,185 +890,543 @@ export const useMoodboardStore = create((set, get) => ({
                 awaitingMasterPromptConfirmation: false,
                 masterPromptSessionId: null,
                 masterPromptData: null,
-                masterPromptIsLoading: false,
+                masterPromptLoadingByPane: { single: false, left: false, right: false },
               })
               return { cancelled: true }
-            } else if (type === 'master_prompt') {
-              // Master prompt and image received
-              if (session_id) {
-                set({ 
-                  masterPromptSessionId: session_id, 
-                  awaitingMasterPromptConfirmation: true,
-                  masterPromptData: {
-                    prompt: data.prompt,
-                    image: data.image,
-                    referenceImages: data.reference_images || [],
-                  },
-                  masterPromptIsLoading: false,
-                  progress: { current: 0, total: 0, stage: '' }, // Clear progress
-                })
-              }
-            } else if (type === 'score') {
-              set({ score: data.score })
             } else if (type === 'error') {
-              console.error('Backend error:', data)
-              throw new Error(data)
+              set({
+                awaitingWeightsConfirmation: false,
+                weightsSessionId: null,
+                weightsIdMaps: null,
+                awaitingMasterPromptConfirmation: false,
+                masterPromptSessionId: null,
+                masterPromptData: null,
+                masterPromptLoadingByPane: { single: false, left: false, right: false },
+                progress: { current: 0, total: 0, stage: '' },
+              })
+              return { error: data }
             }
-          } catch (e) {
-            console.error('Error parsing SSE data:', e)
+          } catch (error) {
+            console.error('Error parsing SSE data:', error)
           }
         }
       }
 
       return finalResult || {}
-    } catch (error) {
-      console.error('Error generating moodboard:', error)
-      throw error
     } finally {
-      set({ 
-        isGenerating: false, 
-        awaitingWeightsConfirmation: false, 
+      set({
+        isGenerating: false,
+        generationMode: 'single',
+        awaitingWeightsConfirmation: false,
         weightsSessionId: null,
         weightsIdMaps: null,
         awaitingMasterPromptConfirmation: false,
         masterPromptSessionId: null,
         masterPromptData: null,
-        masterPromptIsLoading: false,
+        masterPromptLoadingByPane: { single: false, left: false, right: false },
         progress: { current: 0, total: 0, stage: '' },
       })
     }
   },
 
-  // Confirm weights to continue the pipeline
-  confirmWeights: async () => {
-    const { weightsSessionId, weightsIdMaps, nodes, clearWeights } = get()
-    if (!weightsSessionId) return
-    const editedWeightsPayload = buildEditedWeightsPayload(nodes, weightsIdMaps)
+  generateComparativeMoodboard: async (prompt = '') => {
+    const left = serializeDataForBackend(get().workspaces.left.nodes)
+    const right = serializeDataForBackend(get().workspaces.right.nodes)
+    const leftPayload = left.payload
+    const rightPayload = right.payload
 
-    // Hide confirmation bar immediately to make way for progress bar
+    if (
+      ((!leftPayload.elements || leftPayload.elements.length === 0) && (!leftPayload.clusters || leftPayload.clusters.length === 0)) ||
+      ((!rightPayload.elements || rightPayload.elements.length === 0) && (!rightPayload.clusters || rightPayload.clusters.length === 0))
+    ) {
+      return { cancelled: true }
+    }
+
+    set({
+      isGenerating: true,
+      generationMode: 'comparative',
+      awaitingWeightsConfirmation: false,
+      weightsSessionId: null,
+      weightsIdMaps: null,
+      awaitingMasterPromptConfirmation: false,
+      masterPromptSessionId: null,
+      masterPromptData: null,
+      masterPromptLoadingByPane: { single: false, left: false, right: false },
+      progress: { current: 0, total: 0, stage: 'Starting comparative generation...' },
+      score: null,
+      comparisonResults: {
+        left: { status: 'preparing', message: 'Preparing left workspace', modelUrl: null, score: null },
+        right: { status: 'preparing', message: 'Preparing right workspace', modelUrl: null, score: null },
+      },
+      modelDialog: { isOpen: false, modelUrl: null },
+    })
+
+    try {
+      const response = await fetch(`${BACKEND_URL}/extract/comparative`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          left: { ...leftPayload, prompt },
+          right: { ...rightPayload, prompt },
+          prompt,
+        }),
+      })
+
+      if (!response.ok) throw new Error('Comparative generation failed')
+
+      const reader = response.body.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ''
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        buffer += decoder.decode(value, { stream: true })
+        const events = buffer.split('\n\n')
+        buffer = events.pop() || ''
+
+        for (const event of events) {
+          if (!event.trim()) continue
+          const dataMatch = event.match(/^data:\s*(.+)$/m)
+          if (!dataMatch) continue
+
+          try {
+            const parsed = JSON.parse(dataMatch[1])
+            const { type, data, session_id } = parsed
+
+            if (type === 'progress') {
+              set({ progress: data })
+            } else if (type === 'pane_status') {
+              set((state) => ({
+                comparisonResults: updateComparisonResult(state.comparisonResults, data.pane, {
+                  status: data.status,
+                  message: data.message,
+                }),
+              }))
+            } else if (type === 'weights') {
+              get().applyWeightsToWorkspace(data.panes.left, left.idMaps, WORKSPACE_KEYS.LEFT)
+              get().applyWeightsToWorkspace(data.panes.right, right.idMaps, WORKSPACE_KEYS.RIGHT)
+              set((state) => ({
+                weightsSessionId: session_id,
+                weightsIdMaps: {
+                  left: left.idMaps,
+                  right: right.idMaps,
+                },
+                awaitingWeightsConfirmation: true,
+                progress: { current: 0, total: 0, stage: '' },
+                comparisonResults: updateComparisonResult(
+                  updateComparisonResult(state.comparisonResults, WORKSPACE_KEYS.LEFT, {
+                    status: 'review',
+                    message: 'Review weights',
+                  }),
+                  WORKSPACE_KEYS.RIGHT,
+                  {
+                    status: 'review',
+                    message: 'Review weights',
+                  }
+                ),
+              }))
+            } else if (type === 'master_prompt') {
+              set((state) => ({
+                masterPromptSessionId: session_id,
+                awaitingMasterPromptConfirmation: true,
+                masterPromptData: {
+                  mode: 'comparative',
+                  panes: data.panes,
+                },
+                masterPromptLoadingByPane: { single: false, left: false, right: false },
+                progress: { current: 0, total: 0, stage: '' },
+                comparisonResults: updateComparisonResult(
+                  updateComparisonResult(state.comparisonResults, WORKSPACE_KEYS.LEFT, {
+                    status: 'review',
+                    message: 'Review master prompt',
+                  }),
+                  WORKSPACE_KEYS.RIGHT,
+                  {
+                    status: 'review',
+                    message: 'Review master prompt',
+                  }
+                ),
+              }))
+            } else if (type === 'trellis_status') {
+              set((state) => ({
+                comparisonResults: updateComparisonResult(state.comparisonResults, data.pane, {
+                  status: data.status,
+                  message: data.message,
+                }),
+              }))
+            } else if (type === 'pane_complete') {
+              const url = data.file.startsWith('http') ? data.file : `${BACKEND_URL}${data.file}`
+              get().addModel(url, `${data.pane}-comparison.glb`, data.pane)
+              set((state) => ({
+                comparisonResults: updateComparisonResult(state.comparisonResults, data.pane, {
+                  status: 'completed',
+                  message: '3D model ready',
+                  modelUrl: url,
+                  score: data.score ?? null,
+                }),
+              }))
+            } else if (type === 'comparison_complete') {
+              set({ progress: { current: 0, total: 0, stage: '' } })
+            } else if (type === 'cancelled') {
+              set((state) => ({
+                comparisonResults: updateComparisonResult(
+                  updateComparisonResult(state.comparisonResults, WORKSPACE_KEYS.LEFT, {
+                    status: 'cancelled',
+                    message: 'Cancelled',
+                  }),
+                  WORKSPACE_KEYS.RIGHT,
+                  {
+                    status: 'cancelled',
+                    message: 'Cancelled',
+                  }
+                ),
+              }))
+              return { cancelled: true }
+            } else if (type === 'error') {
+              set((state) => ({
+                progress: { current: 0, total: 0, stage: '' },
+                comparisonResults: updateComparisonResult(
+                  updateComparisonResult(state.comparisonResults, WORKSPACE_KEYS.LEFT, {
+                    status:
+                      state.comparisonResults.left.status === 'completed'
+                        ? 'completed'
+                        : state.comparisonResults.left.status === 'failed'
+                          ? 'failed'
+                          : 'failed',
+                    message:
+                      state.comparisonResults.left.status === 'completed'
+                        ? state.comparisonResults.left.message
+                        : state.comparisonResults.left.status === 'failed'
+                          ? state.comparisonResults.left.message
+                          : 'Generation failed',
+                  }),
+                  WORKSPACE_KEYS.RIGHT,
+                  {
+                    status:
+                      state.comparisonResults.right.status === 'completed'
+                        ? 'completed'
+                        : state.comparisonResults.right.status === 'failed'
+                          ? 'failed'
+                          : 'failed',
+                    message:
+                      state.comparisonResults.right.status === 'completed'
+                        ? state.comparisonResults.right.message
+                        : state.comparisonResults.right.status === 'failed'
+                          ? state.comparisonResults.right.message
+                          : 'Generation failed',
+                  }
+                ),
+              }))
+              return { error: data }
+            }
+          } catch (error) {
+            console.error('Error parsing comparative SSE data:', error)
+          }
+        }
+      }
+
+      return { ok: true }
+    } finally {
+      set({
+        isGenerating: false,
+        awaitingWeightsConfirmation: false,
+        weightsSessionId: null,
+        weightsIdMaps: null,
+        awaitingMasterPromptConfirmation: false,
+        masterPromptSessionId: null,
+        masterPromptData: null,
+        masterPromptLoadingByPane: { single: false, left: false, right: false },
+        progress: { current: 0, total: 0, stage: '' },
+      })
+    }
+  },
+
+  confirmWeights: async () => {
+    const { weightsSessionId, weightsIdMaps, workspaces, mode } = get()
+    if (!weightsSessionId) return
+
     set({ awaitingWeightsConfirmation: false, weightsSessionId: null, weightsIdMaps: null })
 
     try {
+      if (mode === 'comparative' && weightsIdMaps?.left && weightsIdMaps?.right) {
+        await fetch(`${BACKEND_URL}/comparisons/${weightsSessionId}/confirm-weights`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            confirmed: true,
+            panes: {
+              left: buildEditedWeightsPayload(workspaces.left.nodes, weightsIdMaps.left),
+              right: buildEditedWeightsPayload(workspaces.right.nodes, weightsIdMaps.right),
+            },
+          }),
+        })
+        get().clearWeights([WORKSPACE_KEYS.LEFT, WORKSPACE_KEYS.RIGHT])
+        return
+      }
+
       await fetch(`${BACKEND_URL}/confirm-weights/${weightsSessionId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           confirmed: true,
-          ...editedWeightsPayload,
+          ...buildEditedWeightsPayload(workspaces.single.nodes, weightsIdMaps),
         }),
       })
-      // Clear weight visualization
-      clearWeights()
+      get().clearWeights([WORKSPACE_KEYS.SINGLE])
     } catch (error) {
       console.error('Error confirming weights:', error)
     }
   },
 
-  // Cancel weights to stop the pipeline
   cancelWeights: async () => {
-    const { weightsSessionId, clearWeights } = get()
+    const { weightsSessionId, mode } = get()
     if (!weightsSessionId) return
 
     try {
-      await fetch(`${BACKEND_URL}/confirm-weights/${weightsSessionId}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ confirmed: false }),
-      })
+      if (mode === 'comparative') {
+        await fetch(`${BACKEND_URL}/comparisons/${weightsSessionId}/confirm-weights`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ confirmed: false, panes: {} }),
+        })
+        get().clearWeights([WORKSPACE_KEYS.LEFT, WORKSPACE_KEYS.RIGHT])
+      } else {
+        await fetch(`${BACKEND_URL}/confirm-weights/${weightsSessionId}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ confirmed: false }),
+        })
+        get().clearWeights([WORKSPACE_KEYS.SINGLE])
+      }
       set({ weightsIdMaps: null })
-      // Clear weight visualization
-      clearWeights()
     } catch (error) {
       console.error('Error cancelling weights:', error)
     }
   },
 
-  // Confirm master prompt to continue the pipeline
   confirmMasterPrompt: async () => {
-    const { masterPromptSessionId } = get()
+    const { masterPromptSessionId, masterPromptData } = get()
     if (!masterPromptSessionId) return
 
     try {
-      await fetch(`${BACKEND_URL}/confirm-weights/${masterPromptSessionId}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ confirmed: true }),
-      })
+      if (masterPromptData?.mode === 'comparative') {
+        await fetch(`${BACKEND_URL}/comparisons/${masterPromptSessionId}/confirm-master-prompts`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ confirmed: true }),
+        })
+      } else {
+        await fetch(`${BACKEND_URL}/confirm-weights/${masterPromptSessionId}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ confirmed: true }),
+        })
+      }
+
       set({
         awaitingMasterPromptConfirmation: false,
         masterPromptSessionId: null,
         masterPromptData: null,
-        masterPromptIsLoading: false,
+        masterPromptLoadingByPane: { single: false, left: false, right: false },
       })
     } catch (error) {
       console.error('Error confirming master prompt:', error)
     }
   },
 
-  // Cancel master prompt to stop the pipeline
   cancelMasterPrompt: async () => {
-    const { masterPromptSessionId } = get()
+    const { masterPromptSessionId, masterPromptData } = get()
     if (!masterPromptSessionId) return
 
     try {
-      await fetch(`${BACKEND_URL}/confirm-weights/${masterPromptSessionId}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ confirmed: false }),
-      })
+      if (masterPromptData?.mode === 'comparative') {
+        await fetch(`${BACKEND_URL}/comparisons/${masterPromptSessionId}/confirm-master-prompts`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ confirmed: false }),
+        })
+      } else {
+        await fetch(`${BACKEND_URL}/confirm-weights/${masterPromptSessionId}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ confirmed: false }),
+        })
+      }
+
       set({
         awaitingMasterPromptConfirmation: false,
         masterPromptSessionId: null,
         masterPromptData: null,
-        masterPromptIsLoading: false,
+        masterPromptLoadingByPane: { single: false, left: false, right: false },
       })
     } catch (error) {
       console.error('Error cancelling master prompt:', error)
     }
   },
 
-  regenerateMasterPromptImage: async (prompt) => {
-    const { masterPromptSessionId } = get()
-    const nextPrompt = (prompt || '').trim()
-    if (!masterPromptSessionId || !nextPrompt) return
+  regenerateMasterPromptImage: async (...args) => {
+    const { masterPromptSessionId, masterPromptData } = get()
+    if (!masterPromptSessionId || !masterPromptData) return
 
-    set({ masterPromptIsLoading: true })
+    if (masterPromptData.mode === 'comparative') {
+      const [pane, prompt] = args
+      const nextPrompt = (prompt || '').trim()
+      if (!pane || !nextPrompt) return
+
+      set((state) => ({
+        masterPromptLoadingByPane: {
+          ...state.masterPromptLoadingByPane,
+          [pane]: true,
+        },
+      }))
+
+      try {
+        const response = await fetch(`${BACKEND_URL}/comparisons/${masterPromptSessionId}/panes/${pane}/master-prompt/regenerate`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ prompt: nextPrompt }),
+        })
+        if (!response.ok) throw new Error(`Failed to regenerate comparative master image (${response.status})`)
+
+        const data = await response.json()
+        set((state) => ({
+          masterPromptData: state.masterPromptData?.mode === 'comparative'
+            ? {
+                ...state.masterPromptData,
+                panes: {
+                  ...state.masterPromptData.panes,
+                  [pane]: {
+                    ...state.masterPromptData.panes[pane],
+                    prompt: nextPrompt,
+                    image: data.image || state.masterPromptData.panes[pane].image,
+                  },
+                },
+              }
+            : state.masterPromptData,
+        }))
+      } catch (error) {
+        console.error('Error regenerating comparative master prompt image:', error)
+      } finally {
+        set((state) => ({
+          masterPromptLoadingByPane: {
+            ...state.masterPromptLoadingByPane,
+            [pane]: false,
+          },
+        }))
+      }
+      return
+    }
+
+    const [prompt] = args
+    const nextPrompt = (prompt || '').trim()
+    if (!nextPrompt) return
+
+    set((state) => ({
+      masterPromptLoadingByPane: {
+        ...state.masterPromptLoadingByPane,
+        single: true,
+      },
+    }))
+
     try {
       const response = await fetch(`${BACKEND_URL}/master-prompt/${masterPromptSessionId}/regenerate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt: nextPrompt }),
       })
-      if (!response.ok) {
-        throw new Error(`Failed to regenerate master image (${response.status})`)
-      }
+      if (!response.ok) throw new Error(`Failed to regenerate master image (${response.status})`)
 
       const data = await response.json()
       set((state) => ({
-        masterPromptData: state.masterPromptData
+        masterPromptData: state.masterPromptData?.mode === 'single'
           ? {
               ...state.masterPromptData,
+              prompt: nextPrompt,
               image: data.image || state.masterPromptData.image,
             }
-          : {
-              prompt: nextPrompt,
-              image: data.image || '',
-              referenceImages: [],
-            },
+          : state.masterPromptData,
       }))
     } catch (error) {
       console.error('Error regenerating master prompt image:', error)
     } finally {
-      set({ masterPromptIsLoading: false })
+      set((state) => ({
+        masterPromptLoadingByPane: {
+          ...state.masterPromptLoadingByPane,
+          single: false,
+        },
+      }))
     }
   },
 
-  editMasterPromptImage: async (editPrompt) => {
+  editMasterPromptImage: async (...args) => {
     const { masterPromptSessionId, masterPromptData } = get()
-    const nextEditPrompt = (editPrompt || '').trim()
-    if (!masterPromptSessionId || !masterPromptData?.image || !nextEditPrompt) return
+    if (!masterPromptSessionId || !masterPromptData) return
 
-    set({ masterPromptIsLoading: true })
+    if (masterPromptData.mode === 'comparative') {
+      const [pane, editPrompt] = args
+      const nextEditPrompt = (editPrompt || '').trim()
+      const paneData = masterPromptData.panes?.[pane]
+      if (!pane || !paneData?.image || !nextEditPrompt) return
+
+      set((state) => ({
+        masterPromptLoadingByPane: {
+          ...state.masterPromptLoadingByPane,
+          [pane]: true,
+        },
+      }))
+
+      try {
+        const response = await fetch(`${BACKEND_URL}/comparisons/${masterPromptSessionId}/panes/${pane}/master-prompt/edit-image`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            prompt: nextEditPrompt,
+            image: paneData.image,
+          }),
+        })
+        if (!response.ok) throw new Error(`Failed to edit comparative master image (${response.status})`)
+
+        const data = await response.json()
+        set((state) => ({
+          masterPromptData: state.masterPromptData?.mode === 'comparative'
+            ? {
+                ...state.masterPromptData,
+                panes: {
+                  ...state.masterPromptData.panes,
+                  [pane]: {
+                    ...state.masterPromptData.panes[pane],
+                    image: data.image || state.masterPromptData.panes[pane].image,
+                  },
+                },
+              }
+            : state.masterPromptData,
+        }))
+      } catch (error) {
+        console.error('Error editing comparative master prompt image:', error)
+      } finally {
+        set((state) => ({
+          masterPromptLoadingByPane: {
+            ...state.masterPromptLoadingByPane,
+            [pane]: false,
+          },
+        }))
+      }
+      return
+    }
+
+    const [editPrompt] = args
+    const nextEditPrompt = (editPrompt || '').trim()
+    if (!masterPromptData?.image || !nextEditPrompt) return
+
+    set((state) => ({
+      masterPromptLoadingByPane: {
+        ...state.masterPromptLoadingByPane,
+        single: true,
+      },
+    }))
+
     try {
       const response = await fetch(`${BACKEND_URL}/master-prompt/${masterPromptSessionId}/edit-image`, {
         method: 'POST',
@@ -935,33 +1436,36 @@ export const useMoodboardStore = create((set, get) => ({
           image: masterPromptData.image,
         }),
       })
-      if (!response.ok) {
-        throw new Error(`Failed to edit master image (${response.status})`)
-      }
+      if (!response.ok) throw new Error(`Failed to edit master image (${response.status})`)
 
       const data = await response.json()
       set((state) => ({
-        masterPromptData: state.masterPromptData
+        masterPromptData: state.masterPromptData?.mode === 'single'
           ? { ...state.masterPromptData, image: data.image || state.masterPromptData.image }
           : state.masterPromptData,
       }))
     } catch (error) {
       console.error('Error editing master prompt image:', error)
     } finally {
-      set({ masterPromptIsLoading: false })
+      set((state) => ({
+        masterPromptLoadingByPane: {
+          ...state.masterPromptLoadingByPane,
+          single: false,
+        },
+      }))
     }
   },
 
   openModelDialog: (url) => set({ modelDialog: { isOpen: true, modelUrl: url } }),
   closeModelDialog: () => set({ modelDialog: { isOpen: false, modelUrl: null } }),
 
-  // Save moodboard to JSON file
   saveMoodboard: () => {
-    const { nodes } = get()
+    const key = resolveWorkspaceKey(get())
+    const workspace = get().workspaces[key]
     const moodboardData = {
       version: '1.0',
       timestamp: new Date().toISOString(),
-      nodes: nodes.map((node) => ({
+      nodes: workspace.nodes.map((node) => ({
         id: node.id,
         type: node.type,
         position: node.position,
@@ -970,34 +1474,41 @@ export const useMoodboardStore = create((set, get) => ({
       })),
     }
 
-    const dataStr = JSON.stringify(moodboardData, null, 2)
-    const dataBlob = new Blob([dataStr], { type: 'application/json' })
+    const dataBlob = new Blob([JSON.stringify(moodboardData, null, 2)], { type: 'application/json' })
     const url = URL.createObjectURL(dataBlob)
     const link = document.createElement('a')
     link.href = url
-    link.download = `moodboard-${Date.now()}.json`
+    link.download = `moodboard-${key}-${Date.now()}.json`
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
     URL.revokeObjectURL(url)
   },
 
-  // Load moodboard from JSON data
   loadMoodboard: (data) => {
+    const key = resolveWorkspaceKey(get())
     try {
-      if (data.nodes && Array.isArray(data.nodes)) {
-        set((state) => ({
-          nodes: applyLayerOrder(data.nodes, state.isGenerating),
-          edges: [],
-        }))
-        // Trigger fit view after loading
-        setTimeout(() => {
-          set((state) => ({ fitViewTrigger: state.fitViewTrigger + 1 }))
-        }, 100)
-      }
+      if (!data.nodes || !Array.isArray(data.nodes)) return
+
+      set((state) => updateWorkspaceState(state, key, {
+        nodes: applyLayerOrder(data.nodes, state.isGenerating),
+        edges: [],
+      }))
+
+      setTimeout(() => {
+        set((state) => {
+          const workspace = state.workspaces[key]
+          return updateWorkspaceState(state, key, { fitViewTrigger: workspace.fitViewTrigger + 1 })
+        })
+      }, 100)
     } catch (error) {
       console.error('Error loading moodboard:', error)
       alert('Error loading moodboard')
     }
   },
+
+  getWorkspaceData: (workspaceKey = null) => getWorkspace(get(), workspaceKey),
+  isMasterPromptLoading: () => anyMasterPromptLoading(get().masterPromptLoadingByPane),
 }))
+
+export { WORKSPACE_KEYS }

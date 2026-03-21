@@ -1,6 +1,9 @@
 #!/bin/bash
 set -e
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+
 # 1. Fix system dependencies
 sudo apt-get update
 sudo apt-get install -y libjpeg-dev
@@ -15,18 +18,32 @@ rm /workspaces/miniconda3/miniconda.sh
 source /workspaces/miniconda3/etc/profile.d/conda.sh
 conda init bash
 
-# 4. Run the TRELLIS.2 setup script
-cd /workspaces/imagin3d/trellis2 
-bash ./setup.sh --new-env --basic --nvdiffrast --nvdiffrec --cumesh --o-voxel --flexgemm
+# 4. Run the TRELLIS.2 setup script in the current shell so conda activation
+# inside TRELLIS's installer applies to the environment we keep using below.
+cd "${REPO_ROOT}/trellis2"
+source ./setup.sh --new-env --basic --nvdiffrast --nvdiffrec --cumesh --o-voxel --flexgemm
 
 # 5. Activate new environment
-source /workspaces/miniconda3/bin/activate trellis2
+conda activate trellis2
 
 # 6. Install Flash Attention
 pip install https://github.com/mjun0812/flash-attention-prebuild-wheels/releases/download/v0.0.8/flash_attn-2.7.4.post1%2Bcu124torch2.6-cp310-cp310-linux_x86_64.whl
 
-# 7. Install extra dependencies and force correct Pillow version
-pip install python-dotenv structlog pydantic-ai hydra-core huggingface_hub
+# 7. Install backend/runtime dependencies and force correct Pillow version
+pip install \
+  python-dotenv \
+  structlog \
+  pydantic-ai \
+  hydra-core \
+  huggingface_hub \
+  fastapi \
+  uvicorn \
+  boto3 \
+  jinja2 \
+  genai-prices \
+  numpy \
+  imageio \
+  opencv-python-headless
 pip install --upgrade transformers
 pip uninstall -y pillow
 pip install --no-cache-dir "pillow>=10.0.0" 
@@ -35,7 +52,7 @@ pip install --no-cache-dir "pillow>=10.0.0"
 python -c "from huggingface_hub import login; login()"
 
 # 9. Pre-download and dynamically patch models
-python patch_birefnet.py
+python "${SCRIPT_DIR}/patch.py"
 
 echo ""
 echo "Environment setup complete!"

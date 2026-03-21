@@ -13,7 +13,7 @@ import {
   MdFolderOpen,
   MdAutoAwesome,
 } from 'react-icons/md'
-import { useMoodboardStore } from '../store/moodboardStore'
+import { WORKSPACE_KEYS, useMoodboardStore } from '../store/moodboardStore'
 import PaletteDialog from './dialog/PaletteDialog'
 import GenerateDialog from './dialog/GenerateDialog'
 import './Topbar.css'
@@ -37,6 +37,8 @@ function Topbar() {
     loadMoodboard,
     generateMoodboard,
     isGenerating,
+    mode,
+    activeWorkspaceKey,
   } = useMoodboardStore((state) => ({
     addImage: state.addImage,
     addVideo: state.addVideo,
@@ -51,6 +53,8 @@ function Topbar() {
     loadMoodboard: state.loadMoodboard,
     generateMoodboard: state.generateMoodboard,
     isGenerating: state.isGenerating,
+    mode: state.mode,
+    activeWorkspaceKey: state.activeWorkspaceKey,
   }))
   const fileInputRef = useRef(null)
   const videoInputRef = useRef(null)
@@ -175,12 +179,21 @@ function Topbar() {
     }
   }
 
+  const workspaceLabel = mode === 'comparative'
+    ? activeWorkspaceKey === WORKSPACE_KEYS.RIGHT
+      ? 'Editing Right Pane'
+      : 'Editing Left Pane'
+    : 'Single Workspace'
+
   return (
     <div className="topbar">
       <div className="topbar-left">
         <div className="logo">
           <img src="logo.png" alt="imagin3d logo" className="logo-mark" />
           <span className="logo-text">imagin3d</span>
+        </div>
+        <div className="topbar-context">
+          <span className={`topbar-context__badge topbar-context__badge--${mode}`}>{workspaceLabel}</span>
         </div>
         <div className="topbar-add" role="group" aria-label="Add items">
           <button onClick={handleAddCluster} className="btn">
@@ -223,7 +236,7 @@ function Topbar() {
         </button>
         <button onClick={clearAll} className="btn btn-danger">
           <MdDeleteSweep className="btn-icon" size={18} aria-hidden="true" focusable="false" />
-          <span>Clear All</span>
+          <span>{mode === 'comparative' ? 'Clear Active' : 'Clear All'}</span>
         </button>
         <button onClick={saveMoodboard} className="btn btn-success">
           <MdSave className="btn-icon" size={18} aria-hidden="true" focusable="false" />
@@ -235,7 +248,7 @@ function Topbar() {
         </button>
         <button onClick={() => setGenerateDialogOpen(true)} className="btn btn-warning" disabled={isGenerating}>
           <MdAutoAwesome className="btn-icon" size={18} aria-hidden="true" focusable="false" />
-          <span>Generate</span>
+          <span>{mode === 'comparative' ? 'Generate Both' : 'Generate'}</span>
         </button>
       </div>
 
@@ -285,6 +298,7 @@ function Topbar() {
         onClose={() => setGenerateDialogOpen(false)}
         onGenerate={handleGenerateMoodboard}
         isGenerating={isGenerating}
+        isComparative={mode === 'comparative'}
       />
     </div>
   )

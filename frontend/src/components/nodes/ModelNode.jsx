@@ -234,7 +234,7 @@ function ModelNode({ id, data, selected }) {
                   }
                   gl.toneMapping = THREE.ACESFilmicToneMapping
                   gl.toneMappingExposure = 1.2
-                  gl.outputEncoding = THREE.sRGBEncoding
+                  gl.outputColorSpace = THREE.SRGBColorSpace
                 }}
               >
                 <Suspense fallback={null}>

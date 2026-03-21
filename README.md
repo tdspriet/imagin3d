@@ -23,12 +23,17 @@ The local frontend uses React and Vite.
 1. **Prerequisites** <br>
 Make sure you have [Node.js](https://nodejs.org/) and [npm](https://www.npmjs.com/get-npm) installed.
 
-2. **Install dependencies**<br>
+2. **Navigate to the frontend directory** <br>
+```bash
+cd frontend
+```
+
+3. **Install dependencies**<br>
 ``
 npm install
 ``
 
-3. **Run the Frontend**<br>
+4. **Run the Frontend**<br>
 ``
 npm run dev
 ``
@@ -37,13 +42,18 @@ npm run dev
 
 The Coder backend uses FastAPI and Uvicorn.
 
-1. **Run the setup script** <br>
+1. **Navigate to the backend directory** <br>
 ```bash
-  setup/setup2.sh # or "setup/setup1.sh" for TrellisV1
+cd backend
+```
+
+2. **Run the setup script** <br>
+```bash
+  bash setup/setup2.sh # or "bash setup/setup1.sh" for TrellisV1
 ```
 > **Note:** When running the TrellisV2 setup script, you will be asked to log into your Hugging Face account. You must have requested and received access to the required gated repositories on this account.
 
-2. **Set the environment variables** <br>
+3. **Set the environment variables** <br>
 Create a `.env` file in the `backend` directory with the following content:<br>
 ```sh
   BACKEND_ALLOWED_ORIGINS=http://localhost:5173,http://localhost:3000
@@ -52,7 +62,7 @@ Create a `.env` file in the `backend` directory with the following content:<br>
   BEDROCK_SECRET_ACCESS_KEY="..."
 ```
 
-3. **Run the Backend** <br>
+4. **Run the Backend** <br>
 ```sh
   source /workspaces/miniconda3/etc/profile.d/conda.sh
   conda activate trellis2 # or "conda activate trellis" for TrellisV1

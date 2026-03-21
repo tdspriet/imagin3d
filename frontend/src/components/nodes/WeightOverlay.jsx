@@ -1,9 +1,11 @@
 import React, { useRef, useState } from 'react'
 import { useMoodboardStore } from '../../store/moodboardStore'
+import { useWorkspaceKey } from '../workspaceContext'
 import { weightToColor } from '../../utils/colorUtils'
 import './WeightOverlay.css'
 
 function WeightOverlay({ nodeId, weight }) {
+  const workspaceKey = useWorkspaceKey()
   const editable = useMoodboardStore((s) => s.awaitingWeightsConfirmation)
   const updateWeight = useMoodboardStore((s) => s.updateNodeWeight)
   const [editing, setEditing] = useState(false)
@@ -17,7 +19,7 @@ function WeightOverlay({ nodeId, weight }) {
   const step = (delta) => (e) => {
     e.stopPropagation()
     e.preventDefault()
-    if (editable && nodeId) updateWeight(nodeId, Math.max(0, Math.min(100, w + delta)))
+    if (editable && nodeId) updateWeight(nodeId, Math.max(0, Math.min(100, w + delta)), workspaceKey)
   }
 
   const startEdit = (e) => {
@@ -34,7 +36,7 @@ function WeightOverlay({ nodeId, weight }) {
 
   const commitEdit = () => {
     const parsed = parseInt(draft, 10)
-    if (!isNaN(parsed) && nodeId) updateWeight(nodeId, parsed)
+    if (!isNaN(parsed) && nodeId) updateWeight(nodeId, parsed, workspaceKey)
     setEditing(false)
   }
 

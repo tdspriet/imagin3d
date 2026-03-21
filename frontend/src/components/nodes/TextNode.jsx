@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useLayoutEffect, useCallback } from
 import { NodeResizer } from 'reactflow'
 import { MdTextIncrease, MdTextDecrease } from 'react-icons/md'
 import { useMoodboardStore } from '../../store/moodboardStore'
+import { useWorkspaceKey } from '../workspaceContext'
 import NodeLayerControls from './NodeLayerControls'
 import WeightOverlay from './WeightOverlay'
 import './TextNode.css'
@@ -21,6 +22,7 @@ function TextNode({ id, data, selected }) {
   const containerRef = useRef(null)
   const contentRef = useRef(null)
   const lastHeightRef = useRef(null)
+  const workspaceKey = useWorkspaceKey()
   const { updateNodeData, setNodeDimensions } = useMoodboardStore()
   const isGenerating = useMoodboardStore((s) => s.isGenerating)
 
@@ -33,10 +35,10 @@ function TextNode({ id, data, selected }) {
 
       if (lastHeightRef.current === null || Math.abs(lastHeightRef.current - desiredHeight) > 0.5) {
         lastHeightRef.current = desiredHeight
-        setNodeDimensions(id, { height: desiredHeight })
+        setNodeDimensions(id, { height: desiredHeight }, workspaceKey)
       }
     },
-    [id, setNodeDimensions]
+    [id, setNodeDimensions, workspaceKey]
   )
 
   const adjustHeight = useCallback(() => {
@@ -83,7 +85,7 @@ function TextNode({ id, data, selected }) {
   // Handle blur - exit edit mode and save
   const handleBlur = () => {
     setIsEditing(false)
-    updateNodeData(id, { text, fontSize })
+    updateNodeData(id, { text, fontSize }, workspaceKey)
   }
 
   // Handle keyboard shortcuts
@@ -108,7 +110,7 @@ function TextNode({ id, data, selected }) {
     e.stopPropagation()
     const newSize = fontSize + 2
     setFontSize(newSize)
-    updateNodeData(id, { text, fontSize: newSize })
+    updateNodeData(id, { text, fontSize: newSize }, workspaceKey)
   }
 
   // Decrease font size
@@ -116,7 +118,7 @@ function TextNode({ id, data, selected }) {
     e.stopPropagation()
     const newSize = Math.max(8, fontSize - 2)
     setFontSize(newSize)
-    updateNodeData(id, { text, fontSize: newSize })
+    updateNodeData(id, { text, fontSize: newSize }, workspaceKey)
   }
 
   // Keep node height in sync with content size

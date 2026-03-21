@@ -2,13 +2,15 @@ import React from 'react'
 import { MdClose, MdCheck } from 'react-icons/md'
 import './ConfirmationBar.css'
 
-function ConfirmationBar({ onConfirm, onCancel, isVisible }) {
+function ConfirmationBar({ onConfirm, onCancel, isVisible, isComparative = false }) {
   if (!isVisible) return null
 
   return (
     <div className="confirmation-bar">
       <span className="confirmation-bar__message">
-        Review and adjust weights. Confirm to continue or cancel to stop.
+        {isComparative
+          ? 'Review and adjust weights on both panes. Confirm to continue the shared run or cancel to stop.'
+          : 'Review and adjust weights. Confirm to continue or cancel to stop.'}
       </span>
       <div className="confirmation-bar__actions">
         <button

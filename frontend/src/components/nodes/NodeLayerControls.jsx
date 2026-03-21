@@ -1,9 +1,11 @@
 import React, { useCallback } from 'react'
 import { MdFlipToFront, MdFlipToBack } from 'react-icons/md'
 import { useMoodboardStore } from '../../store/moodboardStore'
+import { useWorkspaceKey } from '../workspaceContext'
 import './NodeControls.css'
 
 function NodeLayerControls({ id, isVisible }) {
+  const workspaceKey = useWorkspaceKey()
   const bringNodeForward = useMoodboardStore((state) => state.bringNodeForward)
   const sendNodeBackward = useMoodboardStore((state) => state.sendNodeBackward)
   const isGenerating = useMoodboardStore((state) => state.isGenerating)
@@ -16,17 +18,17 @@ function NodeLayerControls({ id, isVisible }) {
   const handleForward = useCallback(
     (event) => {
       stopPropagation(event)
-      bringNodeForward(id)
+      bringNodeForward(id, workspaceKey)
     },
-    [bringNodeForward, id, stopPropagation]
+    [bringNodeForward, id, stopPropagation, workspaceKey]
   )
 
   const handleBackward = useCallback(
     (event) => {
       stopPropagation(event)
-      sendNodeBackward(id)
+      sendNodeBackward(id, workspaceKey)
     },
-    [sendNodeBackward, id, stopPropagation]
+    [sendNodeBackward, id, stopPropagation, workspaceKey]
   )
 
   if (!isVisible || isGenerating) {

@@ -18,6 +18,13 @@ class MoodboardPayload(BaseModel):
     prompt: str = Field(default="")
 
 
+class ComparativeMoodboardPayload(BaseModel):
+    left: MoodboardPayload
+    right: MoodboardPayload
+    prompt: str = Field(default="")
+    shared_seed: Optional[int] = Field(default=None)
+
+
 class WeightsRequest(BaseModel):
     weights: Dict[int, int] = Field(default_factory=dict)  # element_id -> weight info
     cluster_weights: Dict[int, int] = Field(
@@ -33,6 +40,11 @@ class WeightsResponse(BaseModel):
     )  # cluster_id -> weight info
 
 
+class ComparativeWeightsResponse(BaseModel):
+    confirmed: bool = True
+    panes: Dict[str, WeightsResponse] = Field(default_factory=dict)
+
+
 class MasterImageRegenerateRequest(BaseModel):
     prompt: str
 
@@ -40,6 +52,10 @@ class MasterImageRegenerateRequest(BaseModel):
 class MasterImageEditRequest(BaseModel):
     prompt: str
     image: str
+
+
+class ComparativeMasterPromptConfirmRequest(BaseModel):
+    confirmed: bool = True
 
 
 class GenerateResponse(BaseModel):

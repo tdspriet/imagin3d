@@ -23,7 +23,11 @@ pipeline.cuda()
 
 # Load Image & Run
 image = Image.open("{{ image_path }}")
+{% if seed is none -%}
 mesh = pipeline.run(image)[0]
+{% else -%}
+mesh = pipeline.run(image, seed={{ seed }})[0]
+{% endif -%}
 mesh.simplify(16777216)
 
 # Render Video
