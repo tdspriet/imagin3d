@@ -41,19 +41,27 @@ function App() {
   const closeModelDialog = useMoodboardStore((state) => state.closeModelDialog)
 
   // Show progress bar when generating and not awaiting any confirmation
-  const showProgressBar = isGenerating && !awaitingWeightsConfirmation && !awaitingMasterPromptConfirmation && progress.total > 0
   const isComparative = mode === 'comparative'
+  const showProgressBar = !isComparative && isGenerating && !awaitingWeightsConfirmation && !awaitingMasterPromptConfirmation && progress.total > 0
 
   const renderComparativePane = (workspaceKey, label, subtitle) => {
     const paneResult = comparisonResults[workspaceKey]
     const isActive = activeWorkspaceKey === workspaceKey
+    const isPaneLoading = isGenerating && (paneResult.status === 'preparing' || paneResult.status === 'running')
 
     return (
       <section className={`app__pane${isActive ? ' app__pane--active' : ''}`} key={workspaceKey}>
         <header className="app__pane-header">
-          <div>
+          <div className="app__pane-title">
             <h2>{label}</h2>
             <p>{subtitle}</p>
+            {isPaneLoading ? (
+              <div className="app__pane-progress" aria-hidden="true">
+                <div className="app__pane-progress-track">
+                  <div className="app__pane-progress-fill" />
+                </div>
+              </div>
+            ) : null}
           </div>
           <div className={`app__pane-status app__pane-status--${paneResult.status}`}>
             <span>{paneResult.message}</span>

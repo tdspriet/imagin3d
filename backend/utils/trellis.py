@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import asyncio
+import importlib
 import os
+import sys
 from pathlib import Path
 from typing import Any, Literal
 
@@ -40,6 +42,16 @@ class TrellisEngine:
         self._postprocessing_utils: Any = None
         self._imageio: Any = None
         self._o_voxel: Any = None
+
+    def _ensure_import_paths(self, *paths: Path) -> None:
+        inserted = False
+        for path in reversed(paths):
+            path_str = str(path)
+            if path.exists() and path_str not in sys.path:
+                sys.path.insert(0, path_str)
+                inserted = True
+        if inserted:
+            importlib.invalidate_caches()
 
     async def generate_3d_model(
         self,
@@ -99,6 +111,7 @@ class TrellisEngine:
 
     def _load_v1(self) -> None:
         os.environ.setdefault("SPCONV_ALGO", "native")
+        self._ensure_import_paths(self.trellis_path)
 
         import imageio
         import torch
@@ -115,6 +128,7 @@ class TrellisEngine:
     def _load_v2(self) -> None:
         os.environ.setdefault("OPENCV_IO_ENABLE_OPENEXR", "1")
         os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
+        self._ensure_import_paths(self.trellis_path)
 
         import cv2
         import imageio

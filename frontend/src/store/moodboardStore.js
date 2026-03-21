@@ -894,7 +894,17 @@ export const useMoodboardStore = create((set, get) => ({
               })
               return { cancelled: true }
             } else if (type === 'error') {
-              throw new Error(data)
+              set({
+                awaitingWeightsConfirmation: false,
+                weightsSessionId: null,
+                weightsIdMaps: null,
+                awaitingMasterPromptConfirmation: false,
+                masterPromptSessionId: null,
+                masterPromptData: null,
+                masterPromptLoadingByPane: { single: false, left: false, right: false },
+                progress: { current: 0, total: 0, stage: '' },
+              })
+              return { error: data }
             }
           } catch (error) {
             console.error('Error parsing SSE data:', error)
@@ -1075,7 +1085,41 @@ export const useMoodboardStore = create((set, get) => ({
               }))
               return { cancelled: true }
             } else if (type === 'error') {
-              throw new Error(data)
+              set((state) => ({
+                progress: { current: 0, total: 0, stage: '' },
+                comparisonResults: updateComparisonResult(
+                  updateComparisonResult(state.comparisonResults, WORKSPACE_KEYS.LEFT, {
+                    status:
+                      state.comparisonResults.left.status === 'completed'
+                        ? 'completed'
+                        : state.comparisonResults.left.status === 'failed'
+                          ? 'failed'
+                          : 'failed',
+                    message:
+                      state.comparisonResults.left.status === 'completed'
+                        ? state.comparisonResults.left.message
+                        : state.comparisonResults.left.status === 'failed'
+                          ? state.comparisonResults.left.message
+                          : 'Generation failed',
+                  }),
+                  WORKSPACE_KEYS.RIGHT,
+                  {
+                    status:
+                      state.comparisonResults.right.status === 'completed'
+                        ? 'completed'
+                        : state.comparisonResults.right.status === 'failed'
+                          ? 'failed'
+                          : 'failed',
+                    message:
+                      state.comparisonResults.right.status === 'completed'
+                        ? state.comparisonResults.right.message
+                        : state.comparisonResults.right.status === 'failed'
+                          ? state.comparisonResults.right.message
+                          : 'Generation failed',
+                  }
+                ),
+              }))
+              return { error: data }
             }
           } catch (error) {
             console.error('Error parsing comparative SSE data:', error)

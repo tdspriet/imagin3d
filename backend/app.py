@@ -129,7 +129,7 @@ async def _prepare_generation_payload(
     payload: MoodboardPayload,
     artifacts_path: Path,
 ) -> dict:
-    token = orchestrator.set_artifacts_dir(artifacts_path)
+    artifacts_token = orchestrator.set_artifacts_dir(artifacts_path)
     try:
         timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
         payload_data = payload.dict()
@@ -293,7 +293,7 @@ async def _prepare_generation_payload(
             "cluster_descriptor_lookup": cluster_descriptor_lookup,
         }
     finally:
-        orchestrator.reset_artifacts_dir(token)
+        orchestrator.reset_artifacts_dir(artifacts_token)
 
 
 def _apply_edited_weights(prepared: dict, edited_weights: dict) -> None:
@@ -571,12 +571,21 @@ async def extract_comparative(
 
         yield f"data: {json.dumps({'type': 'progress', 'data': {'current': 0, 'total': 6, 'stage': 'Starting comparative generation...'}})}\n\n"
 
-        for index, pane in enumerate(("left", "right"), start=1):
-            yield f"data: {json.dumps({'type': 'progress', 'data': {'current': index - 1, 'total': 6, 'stage': f'Preparing {pane} workspace...'}})}\n\n"
-            prepared[pane] = await _prepare_generation_payload(
+        async def prepare_pane(pane: str) -> tuple[str, dict]:
+            return pane, await _prepare_generation_payload(
                 pane_payloads[pane],
                 pane_artifacts[pane],
             )
+
+        for pane in ("left", "right"):
+            yield f"data: {json.dumps({'type': 'pane_status', 'data': {'pane': pane, 'status': 'preparing', 'message': 'Preparing workspace...'}})}\n\n"
+
+        prepare_tasks = [
+            asyncio.create_task(prepare_pane(pane)) for pane in ("left", "right")
+        ]
+        for completed_task in asyncio.as_completed(prepare_tasks):
+            pane, prepared_payload = await completed_task
+            prepared[pane] = prepared_payload
             yield f"data: {json.dumps({'type': 'pane_status', 'data': {'pane': pane, 'status': 'ready', 'message': 'Weights ready for review'}})}\n\n"
 
         weights_session_id = str(uuid.uuid4())
@@ -616,13 +625,25 @@ async def extract_comparative(
             _apply_edited_weights(prepared[pane], edited_weights.get(pane, {}))
 
         master_prompt_bundles: dict[str, dict] = {}
-        for index, pane in enumerate(("left", "right"), start=3):
-            yield f"data: {json.dumps({'type': 'progress', 'data': {'current': index - 1, 'total': 6, 'stage': f'Generating {pane} master prompt...'}})}\n\n"
-            master_prompt_bundles[pane] = await _generate_master_prompt_bundle(
+
+        async def generate_master_prompt_for_pane(pane: str) -> tuple[str, dict]:
+            return pane, await _generate_master_prompt_bundle(
                 pane_payloads[pane].prompt,
                 prepared[pane]["cluster_descriptors"],
                 pane_artifacts[pane],
             )
+
+        for pane in ("left", "right"):
+            yield f"data: {json.dumps({'type': 'pane_status', 'data': {'pane': pane, 'status': 'preparing', 'message': 'Generating master prompt...'}})}\n\n"
+
+        master_prompt_tasks = [
+            asyncio.create_task(generate_master_prompt_for_pane(pane))
+            for pane in ("left", "right")
+        ]
+        for completed_task in asyncio.as_completed(master_prompt_tasks):
+            pane, master_prompt_bundle = await completed_task
+            master_prompt_bundles[pane] = master_prompt_bundle
+            yield f"data: {json.dumps({'type': 'pane_status', 'data': {'pane': pane, 'status': 'ready', 'message': 'Master prompt ready'}})}\n\n"
 
         master_session_id = str(uuid.uuid4())
         pending_confirmations[master_session_id] = {
@@ -676,20 +697,31 @@ async def extract_comparative(
                 master_session["panes"][pane]["master_image_path"]
             )
             yield f"data: {json.dumps({'type': 'trellis_status', 'data': {'pane': pane, 'status': 'running', 'message': 'Generating 3D model...'}})}\n\n"
-            model_path = await _run_with_artifacts_dir(
-                pane_artifacts[pane],
-                lambda pane=pane, master_image_path=master_image_path: orchestrator.generate_3d_model(
-                    master_image_path,
-                    seed=payload.shared_seed,
-                ),
-            )
-            score = await _run_with_artifacts_dir(
-                pane_artifacts[pane],
-                lambda pane=pane, model_path=model_path: orchestrator.evaluate_model(
-                    model_path,
-                    prepared[pane]["cluster_descriptors"],
-                ),
-            )
+            try:
+                model_path = await _run_with_artifacts_dir(
+                    pane_artifacts[pane],
+                    lambda pane=pane, master_image_path=master_image_path: orchestrator.generate_3d_model(
+                        master_image_path,
+                        seed=payload.shared_seed,
+                    ),
+                )
+                score = await _run_with_artifacts_dir(
+                    pane_artifacts[pane],
+                    lambda pane=pane, model_path=model_path: orchestrator.evaluate_model(
+                        model_path,
+                        prepared[pane]["cluster_descriptors"],
+                    ),
+                )
+            except Exception as exc:
+                logger.exception(
+                    "Comparative TRELLIS generation failed",
+                    comparison_id=comparison_id,
+                    pane=pane,
+                )
+                yield f"data: {json.dumps({'type': 'trellis_status', 'data': {'pane': pane, 'status': 'failed', 'message': str(exc)}})}\n\n"
+                yield f"data: {json.dumps({'type': 'error', 'data': f'{pane.capitalize()} pane generation failed: {exc}'})}\n\n"
+                return
+
             comparison_results[pane] = {
                 "file": _artifact_url(model_path),
                 "score": score,
@@ -1190,7 +1222,20 @@ async def extract(payload: MoodboardPayload) -> StreamingResponse:
         yield f"data: {json.dumps(progress_event)}\n\n"
 
         # Generate 3D model from master image using TRELLIS
-        model_path = await orchestrator.generate_3d_model(master_image_path)
+        try:
+            model_path = await orchestrator.generate_3d_model(master_image_path)
+        except Exception as exc:
+            logger.exception(
+                "TRELLIS generation failed",
+                request_id=request_id,
+            )
+            error_event = {
+                "type": "error",
+                "data": f"3D model generation failed: {exc}",
+            }
+            yield f"data: {json.dumps(error_event)}\n\n"
+            orchestrator.reset_artifacts_dir(artifacts_token)
+            return
 
         progress_event = {
             "type": "progress",

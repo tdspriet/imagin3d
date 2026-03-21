@@ -49,6 +49,11 @@
   background: color-mix(in oklab, var(--color-surface) 94%, white);
 }
 
+.app__pane-title {
+  flex: 1;
+  min-width: 0;
+}
+
 .app__pane-header h2 {
   margin: 0 0 4px;
   font-size: 1rem;
@@ -59,6 +64,38 @@
   margin: 0;
   font-size: 0.85rem;
   color: var(--color-text-secondary);
+}
+
+.app__pane-progress {
+  margin-top: 10px;
+}
+
+.app__pane-progress-track {
+  position: relative;
+  height: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--color-border) 88%, white);
+}
+
+.app__pane-progress-fill {
+  position: absolute;
+  top: 0;
+  left: -38%;
+  width: 38%;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--accent-progress), var(--accent-progress-light));
+  animation: appPaneProgressSlide 1.15s ease-in-out infinite;
+}
+
+@keyframes appPaneProgressSlide {
+  0% {
+    left: -38%;
+  }
+  100% {
+    left: 100%;
+  }
 }
 
 .app__pane-status {
@@ -77,6 +114,7 @@
   color: var(--color-text-primary);
 }
 
+.app__pane-status--preparing,
 .app__pane-status--queued,
 .app__pane-status--running {
   color: var(--accent-progress);
