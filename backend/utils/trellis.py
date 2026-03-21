@@ -54,10 +54,17 @@ class TrellisEngine:
             importlib.invalidate_caches()
 
     def _patch_birefnet_cache(self) -> None:
+        hf_home = os.getenv("HF_HOME")
+        xdg_cache_home = os.getenv("XDG_CACHE_HOME")
+        if hf_home:
+            hf_root = Path(hf_home)
+        elif xdg_cache_home:
+            hf_root = Path(xdg_cache_home) / "huggingface"
+        else:
+            hf_root = Path.home() / ".cache" / "huggingface"
+
         cache_root = (
-            Path.home()
-            / ".cache"
-            / "huggingface"
+            hf_root
             / "modules"
             / "transformers_modules"
             / "briaai"
