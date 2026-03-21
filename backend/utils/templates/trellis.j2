@@ -7,7 +7,7 @@ from trellis.pipelines import TrellisImageTo3DPipeline
 from trellis.utils import render_utils, postprocessing_utils
 
 # Load the pipeline
-pipeline = TrellisImageTo3DPipeline.from_pretrained("microsoft/TRELLIS-image-large")
+pipeline = TrellisImageTo3DPipeline.from_pretrained("{{ ckpt_path }}")
 pipeline.cuda()
 
 # Load an image
@@ -16,7 +16,7 @@ image = Image.open("{{ image_path }}")
 # Run the pipeline
 outputs = pipeline.run(
     image,
-    seed=1,
+    seed={{ seed }},
     sparse_structure_sampler_params={
         "steps": 12,
         "cfg_strength": 7.5,

@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import asyncio
-import importlib
 import os
 import sys
+import tempfile
 from pathlib import Path
-from typing import Any, Literal
+from typing import Literal
 
+import jinja2
 import structlog
 
 logger = structlog.stdlib.get_logger(__name__)
@@ -14,10 +15,12 @@ logger = structlog.stdlib.get_logger(__name__)
 _VERSIONS = {
     1: {
         "trellis_path": Path("/workspaces/imagin3d/trellis"),
+        "template": "trellis.j2",
         "ckpt_path": "microsoft/TRELLIS-image-large",
     },
     2: {
         "trellis_path": Path("/workspaces/imagin3d/trellis2"),
+        "template": "trellis2.j2",
         "ckpt_path": "microsoft/TRELLIS.2-4B",
     },
 }
@@ -34,77 +37,13 @@ class TrellisEngine:
         self.version = version
         self.trellis_path = cfg["trellis_path"]
         self.ckpt_path = cfg["ckpt_path"]
+        self._template_name = cfg["template"]
         self._lock = asyncio.Lock()
-        self._pipeline: Any = None
-        self._envmap: Any = None
-        self._torch: Any = None
-        self._render_utils: Any = None
-        self._postprocessing_utils: Any = None
-        self._imageio: Any = None
-        self._o_voxel: Any = None
 
-    def _ensure_import_paths(self, *paths: Path) -> None:
-        inserted = False
-        for path in reversed(paths):
-            path_str = str(path)
-            if path.exists() and path_str not in sys.path:
-                sys.path.insert(0, path_str)
-                inserted = True
-        if inserted:
-            importlib.invalidate_caches()
-
-    def _patch_birefnet_cache(self) -> None:
-        hf_home = os.getenv("HF_HOME")
-        xdg_cache_home = os.getenv("XDG_CACHE_HOME")
-        if hf_home:
-            hf_root = Path(hf_home)
-        elif xdg_cache_home:
-            hf_root = Path(xdg_cache_home) / "huggingface"
-        else:
-            hf_root = Path.home() / ".cache" / "huggingface"
-
-        cache_root = (
-            hf_root
-            / "modules"
-            / "transformers_modules"
-            / "briaai"
-            / "RMBG_hyphen_2_dot_0"
+        template_dir = Path(__file__).parent / "templates"
+        self._jinja_env = jinja2.Environment(
+            loader=jinja2.FileSystemLoader(str(template_dir))
         )
-
-        try:
-            from transformers import AutoModelForImageSegmentation
-        except Exception:
-            logger.warning("Unable to import transformers for BiRefNet patching")
-            return
-
-        if not any(cache_root.rglob("birefnet.py")):
-            try:
-                AutoModelForImageSegmentation.from_pretrained(
-                    "briaai/RMBG-2.0",
-                    trust_remote_code=True,
-                )
-            except Exception:
-                # The first load may fail before patching, but it still populates the cache.
-                pass
-
-        patched_files = 0
-        for file_path in cache_root.rglob("birefnet.py"):
-            content = file_path.read_text(encoding="utf-8")
-            updated = content.replace(
-                "torch.linspace(0, drop_path_rate, sum(depths))",
-                "torch.linspace(0, drop_path_rate, sum(depths), device='cpu')",
-            )
-            if "all_tied_weights_keys = {}" not in updated:
-                updated = updated.replace(
-                    "def __init__(self, bb_pretrained=True",
-                    "all_tied_weights_keys = {}\n    def __init__(self, bb_pretrained=True",
-                )
-            if updated != content:
-                file_path.write_text(updated, encoding="utf-8")
-                patched_files += 1
-
-        if patched_files:
-            logger.info("Patched BiRefNet cache files", count=patched_files)
 
     async def generate_3d_model(
         self,
@@ -121,182 +60,66 @@ class TrellisEngine:
                 image_path=str(image_path),
                 output_dir=str(output_dir),
             )
-            return await asyncio.to_thread(
-                self._generate_3d_model_sync,
-                image_path,
-                output_dir,
-                seed,
+
+            output_glb = output_dir / "sample.glb"
+            template = self._jinja_env.get_template(self._template_name)
+            script_content = template.render(
+                **self._template_vars(image_path, output_dir, output_glb, seed)
             )
 
-    def _generate_3d_model_sync(
-        self,
-        image_path: Path,
-        output_dir: Path,
-        seed: int | None,
-    ) -> Path:
-        self._ensure_loaded()
+            with tempfile.TemporaryDirectory(prefix="trellis-run-") as temp_dir:
+                script_path = Path(temp_dir) / "run_trellis.py"
+                script_path.write_text(script_content, encoding="utf-8")
 
-        output_glb = output_dir / "sample.glb"
-        if self.version == 1:
-            self._generate_v1(image_path, output_dir, output_glb, seed)
-        else:
-            self._generate_v2(image_path, output_dir, output_glb, seed)
+                process = await asyncio.create_subprocess_exec(
+                    sys.executable,
+                    str(script_path),
+                    cwd=str(self.trellis_path),
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                )
+                stdout, stderr = await process.communicate()
 
-        if output_glb.exists():
-            logger.info(
-                "TRELLIS generation finished",
-                version=self.version,
-                output_glb=str(output_glb),
-            )
-            return output_glb
-        raise RuntimeError("GLB file not generated")
+            if process.returncode != 0:
+                raise RuntimeError(
+                    f"TRELLIS v{self.version} generation failed:\n"
+                    f"STDOUT:\n{stdout.decode(errors='replace')}\n"
+                    f"STDERR:\n{stderr.decode(errors='replace')}"
+                )
 
-    def _ensure_loaded(self) -> None:
-        if self._pipeline is not None:
-            return
+            if output_glb.exists():
+                logger.info(
+                    "TRELLIS generation finished",
+                    version=self.version,
+                    output_glb=str(output_glb),
+                )
+                return output_glb
 
-        logger.info("Loading TRELLIS pipeline", version=self.version)
-        if self.version == 1:
-            self._load_v1()
-        else:
-            self._load_v2()
-        logger.info("TRELLIS pipeline loaded", version=self.version)
+            raise RuntimeError("GLB file not generated")
 
-    def _load_v1(self) -> None:
-        os.environ.setdefault("SPCONV_ALGO", "native")
-        self._ensure_import_paths(self.trellis_path)
-
-        import imageio
-        import torch
-        from trellis.pipelines import TrellisImageTo3DPipeline
-        from trellis.utils import postprocessing_utils, render_utils
-
-        self._torch = torch
-        self._imageio = imageio
-        self._render_utils = render_utils
-        self._postprocessing_utils = postprocessing_utils
-        self._pipeline = TrellisImageTo3DPipeline.from_pretrained(self.ckpt_path)
-        self._pipeline.cuda()
-
-    def _load_v2(self) -> None:
-        os.environ.setdefault("OPENCV_IO_ENABLE_OPENEXR", "1")
-        os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
-        self._ensure_import_paths(self.trellis_path)
-        self._patch_birefnet_cache()
-
-        import cv2
-        import imageio
-        import o_voxel
-        import torch
-        from trellis2.pipelines import Trellis2ImageTo3DPipeline
-        from trellis2.renderers import EnvMap
-        from trellis2.utils import render_utils
-
-        self._torch = torch
-        self._imageio = imageio
-        self._render_utils = render_utils
-        self._o_voxel = o_voxel
-
-        hdri_path = self.trellis_path / "assets" / "hdri" / "forest.exr"
-        hdri = cv2.imread(str(hdri_path), cv2.IMREAD_UNCHANGED)
-        if hdri is None:
-            raise RuntimeError(f"Unable to load TRELLIS envmap: {hdri_path}")
-
-        self._envmap = EnvMap(
-            torch.tensor(
-                cv2.cvtColor(hdri, cv2.COLOR_BGR2RGB),
-                dtype=torch.float32,
-                device="cuda",
-            )
-        )
-        self._pipeline = Trellis2ImageTo3DPipeline.from_pretrained(self.ckpt_path)
-        self._pipeline.cuda()
-
-    def _generate_v1(
+    def _template_vars(
         self,
         image_path: Path,
         output_dir: Path,
         output_glb: Path,
         seed: int | None,
-    ) -> None:
-        from PIL import Image
+    ) -> dict:
+        if self.version == 1:
+            return {
+                "ckpt_path": self.ckpt_path,
+                "image_path": image_path,
+                "output_video_gs": output_dir / "sample_gs.mp4",
+                "output_video_rf": output_dir / "sample_rf.mp4",
+                "output_video_mesh": output_dir / "sample_mesh.mp4",
+                "output_glb": output_glb,
+                "output_ply": output_dir / "sample.ply",
+                "seed": 1 if seed is None else seed,
+            }
 
-        image = Image.open(image_path)
-        run_seed = seed if seed is not None else 1
-
-        with self._torch.inference_mode():
-            outputs = self._pipeline.run(
-                image,
-                seed=run_seed,
-                sparse_structure_sampler_params={
-                    "steps": 12,
-                    "cfg_strength": 7.5,
-                },
-                slat_sampler_params={
-                    "steps": 12,
-                    "cfg_strength": 3,
-                },
-            )
-
-        video = self._render_utils.render_video(outputs["gaussian"][0])["color"]
-        self._imageio.mimsave(output_dir / "sample_gs.mp4", video, fps=30)
-
-        video = self._render_utils.render_video(outputs["radiance_field"][0])["color"]
-        self._imageio.mimsave(output_dir / "sample_rf.mp4", video, fps=30)
-
-        video = self._render_utils.render_video(outputs["mesh"][0])["normal"]
-        self._imageio.mimsave(output_dir / "sample_mesh.mp4", video, fps=30)
-
-        glb = self._postprocessing_utils.to_glb(
-            outputs["gaussian"][0],
-            outputs["mesh"][0],
-            simplify=0.95,
-            texture_size=1024,
-        )
-        glb.export(output_glb)
-        outputs["gaussian"][0].save_ply(output_dir / "sample.ply")
-
-        if self._torch.cuda.is_available():
-            self._torch.cuda.empty_cache()
-
-    def _generate_v2(
-        self,
-        image_path: Path,
-        output_dir: Path,
-        output_glb: Path,
-        seed: int | None,
-    ) -> None:
-        from PIL import Image
-
-        if seed is not None:
-            self._torch.manual_seed(seed)
-
-        image = Image.open(image_path)
-        with self._torch.inference_mode():
-            mesh = self._pipeline.run(image)[0]
-        mesh.simplify(16777216)
-
-        video = self._render_utils.make_pbr_vis_frames(
-            self._render_utils.render_video(mesh, envmap=self._envmap)
-        )
-        self._imageio.mimsave(output_dir / "sample.mp4", video, fps=15)
-
-        glb = self._o_voxel.postprocess.to_glb(
-            vertices=mesh.vertices,
-            faces=mesh.faces,
-            attr_volume=mesh.attrs,
-            coords=mesh.coords,
-            attr_layout=mesh.layout,
-            voxel_size=mesh.voxel_size,
-            aabb=[[-0.5, -0.5, -0.5], [0.5, 0.5, 0.5]],
-            decimation_target=1000000,
-            texture_size=4096,
-            remesh=True,
-            remesh_band=1,
-            remesh_project=0,
-            verbose=True,
-        )
-        glb.export(output_glb, extension_webp=True)
-
-        if self._torch.cuda.is_available():
-            self._torch.cuda.empty_cache()
+        return {
+            "ckpt_path": self.ckpt_path,
+            "image_path": image_path,
+            "output_video": output_dir / "sample.mp4",
+            "output_glb": output_glb,
+            "seed": seed,
+        }
