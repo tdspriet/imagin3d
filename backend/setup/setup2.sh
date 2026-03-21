@@ -35,7 +35,7 @@ pip install --no-cache-dir "pillow>=10.0.0"
 python -c "from huggingface_hub import login; login()"
 
 # 9. Pre-download and dynamically patch models
-python patch_birefnet.py
+python patch.py
 
 echo ""
 echo "Environment setup complete!"

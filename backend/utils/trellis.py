@@ -53,6 +53,52 @@ class TrellisEngine:
         if inserted:
             importlib.invalidate_caches()
 
+    def _patch_birefnet_cache(self) -> None:
+        cache_root = (
+            Path.home()
+            / ".cache"
+            / "huggingface"
+            / "modules"
+            / "transformers_modules"
+            / "briaai"
+            / "RMBG_hyphen_2_dot_0"
+        )
+
+        try:
+            from transformers import AutoModelForImageSegmentation
+        except Exception:
+            logger.warning("Unable to import transformers for BiRefNet patching")
+            return
+
+        if not any(cache_root.rglob("birefnet.py")):
+            try:
+                AutoModelForImageSegmentation.from_pretrained(
+                    "briaai/RMBG-2.0",
+                    trust_remote_code=True,
+                )
+            except Exception:
+                # The first load may fail before patching, but it still populates the cache.
+                pass
+
+        patched_files = 0
+        for file_path in cache_root.rglob("birefnet.py"):
+            content = file_path.read_text(encoding="utf-8")
+            updated = content.replace(
+                "torch.linspace(0, drop_path_rate, sum(depths))",
+                "torch.linspace(0, drop_path_rate, sum(depths), device='cpu')",
+            )
+            if "all_tied_weights_keys = {}" not in updated:
+                updated = updated.replace(
+                    "def __init__(self, bb_pretrained=True",
+                    "all_tied_weights_keys = {}\n    def __init__(self, bb_pretrained=True",
+                )
+            if updated != content:
+                file_path.write_text(updated, encoding="utf-8")
+                patched_files += 1
+
+        if patched_files:
+            logger.info("Patched BiRefNet cache files", count=patched_files)
+
     async def generate_3d_model(
         self,
         image_path: Path,
@@ -129,6 +175,7 @@ class TrellisEngine:
         os.environ.setdefault("OPENCV_IO_ENABLE_OPENEXR", "1")
         os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
         self._ensure_import_paths(self.trellis_path)
+        self._patch_birefnet_cache()
 
         import cv2
         import imageio
