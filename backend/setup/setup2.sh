@@ -18,18 +18,32 @@ rm /workspaces/miniconda3/miniconda.sh
 source /workspaces/miniconda3/etc/profile.d/conda.sh
 conda init bash
 
-# 4. Run the TRELLIS.2 setup script
+# 4. Run the TRELLIS.2 setup script in the current shell so conda activation
+# inside TRELLIS's installer applies to the environment we keep using below.
 cd "${REPO_ROOT}/trellis2"
-bash ./setup.sh --new-env --basic --nvdiffrast --nvdiffrec --cumesh --o-voxel --flexgemm
+source ./setup.sh --new-env --basic --nvdiffrast --nvdiffrec --cumesh --o-voxel --flexgemm
 
 # 5. Activate new environment
-source /workspaces/miniconda3/bin/activate trellis2
+conda activate trellis2
 
 # 6. Install Flash Attention
 pip install https://github.com/mjun0812/flash-attention-prebuild-wheels/releases/download/v0.0.8/flash_attn-2.7.4.post1%2Bcu124torch2.6-cp310-cp310-linux_x86_64.whl
 
-# 7. Install extra dependencies and force correct Pillow version
-pip install python-dotenv structlog pydantic-ai hydra-core huggingface_hub
+# 7. Install backend/runtime dependencies and force correct Pillow version
+pip install \
+  python-dotenv \
+  structlog \
+  pydantic-ai \
+  hydra-core \
+  huggingface_hub \
+  fastapi \
+  uvicorn \
+  boto3 \
+  jinja2 \
+  genai-prices \
+  numpy \
+  imageio \
+  opencv-python-headless
 pip install --upgrade transformers
 pip uninstall -y pillow
 pip install --no-cache-dir "pillow>=10.0.0" 
