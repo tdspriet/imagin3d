@@ -4,6 +4,7 @@ node_modules
 # Backend Environment
 .venv
 .pants.d
+hf_cache
 
 # Python
 __pycache__

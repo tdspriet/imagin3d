@@ -11,6 +11,11 @@ from trellis2.utils import render_utils
 from trellis2.renderers import EnvMap
 import o_voxel
 
+RESOLUTION = "512->1024"
+SEED = 0
+DECIMATION_TARGET = 300000
+TEXTURE_SIZE = 2048
+
 # Setup Environment Map
 envmap = EnvMap(torch.tensor(
     cv2.cvtColor(cv2.imread('assets/hdri/forest.exr', cv2.IMREAD_UNCHANGED), cv2.COLOR_BGR2RGB),
@@ -23,7 +28,12 @@ pipeline.cuda()
 
 # Load Image & Run
 image = Image.open("{{ image_path }}")
-mesh = pipeline.run(image)[0]
+mesh = pipeline.run(
+    image, 
+    seed=SEED, 
+    pipeline_type=RESOLUTION
+)[0]
+
 mesh.simplify(16777216)
 
 # Render Video
@@ -39,8 +49,8 @@ glb = o_voxel.postprocess.to_glb(
     attr_layout=mesh.layout,
     voxel_size=mesh.voxel_size,
     aabb=[[-0.5, -0.5, -0.5], [0.5, 0.5, 0.5]],
-    decimation_target=1000000,
-    texture_size=4096,
+    decimation_target=DECIMATION_TARGET,
+    texture_size=TEXTURE_SIZE,
     remesh=True,
     remesh_band=1,
     remesh_project=0,
