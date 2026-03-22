@@ -71,6 +71,8 @@ if ALLOWED_ORIGINS:
 else:
     CORS_ORIGINS = ["*"]
 
+LOCAL_DEV_ORIGIN_REGEX = r"https?://(localhost|127\.0\.0\.1)(:\d+)?$"
+
 # Session management
 # Maps session_id -> {"event": asyncio.Event, "confirmed": bool}
 pending_confirmations: dict[str, dict] = {}
@@ -80,6 +82,7 @@ app = FastAPI(title="Imagin3D Backend", version="1.0.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=CORS_ORIGINS,
+    allow_origin_regex=LOCAL_DEV_ORIGIN_REGEX,
     allow_methods=["*"],
     allow_headers=["*"],
 )
