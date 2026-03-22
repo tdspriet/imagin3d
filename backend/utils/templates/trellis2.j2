@@ -1,6 +1,8 @@
 import os
 os.environ['OPENCV_IO_ENABLE_OPENEXR'] = '1'
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
+os.environ["HF_HUB_OFFLINE"] = "1"
+os.environ["TRANSFORMERS_OFFLINE"] = "1"
 
 import cv2
 import imageio
@@ -11,7 +13,7 @@ from trellis2.utils import render_utils
 from trellis2.renderers import EnvMap
 import o_voxel
 
-RESOLUTION = "1024_cascade"
+RESOLUTION = "1024_cascade" # "512" or "1024_cascade"
 SEED = 0
 DECIMATION_TARGET = 300000
 TEXTURE_SIZE = 2048

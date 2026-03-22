@@ -1,6 +1,13 @@
 from transformers import AutoModelForImageSegmentation
+from huggingface_hub import snapshot_download
 import os
 import glob
+
+# Pre-download TRELLIS weights so offline mode works later
+try:
+    snapshot_download("microsoft/TRELLIS.2-4B")
+except Exception:
+    pass
 
 try:
     # This forces the download of the remote code and weights
