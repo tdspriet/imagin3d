@@ -21,3 +21,6 @@ trellis:
 
 logging:
   filename: ${now:%Y-%m-%d}-${now:%H-%M-%S}.log
+
+image_generation:
+  seed: 42
