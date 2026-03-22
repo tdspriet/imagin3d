@@ -1,7 +1,8 @@
-# Frontend Dependencies
+# Frontend
 node_modules
+dist
 
-# Backend Environment
+# Backend
 .venv
 .pants.d
 hf_cache
