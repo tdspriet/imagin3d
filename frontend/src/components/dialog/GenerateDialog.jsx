@@ -56,7 +56,7 @@ function GenerateDialog({ isOpen, onClose, onGenerate, isGenerating, isComparati
         </button>
 
         <header className="generate-dialog__header">
-          <h2>{isComparative ? 'Generate Comparative Pair' : 'Generate 3D Model'}</h2>
+          <h2>Generate 3D Model</h2>
           <p>
             {isComparative
               ? 'Use one shared prompt to generate both panes for comparison.'
@@ -90,7 +90,7 @@ function GenerateDialog({ isOpen, onClose, onGenerate, isGenerating, isComparati
               className="generate-dialog__btn generate-dialog__btn--primary"
               disabled={!prompt.trim() || isGenerating}
             >
-              {isGenerating ? 'Generating...' : isComparative ? 'Generate Both' : 'Generate'}
+              {isGenerating ? 'Generating...' : 'Generate'}
             </button>
           </div>
         </form>

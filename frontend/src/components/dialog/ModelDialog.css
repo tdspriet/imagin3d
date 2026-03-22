@@ -26,6 +26,10 @@
   border: 1px solid rgba(0, 0, 0, 0.08);
 }
 
+.model-dialog__content--comparative {
+  width: min(1180px, 96vw);
+}
+
 .model-dialog__close {
   position: absolute;
   top: 18px;
@@ -77,6 +81,32 @@
   margin-bottom: 24px;
 }
 
+.model-dialog__comparative-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  margin-bottom: 24px;
+}
+
+.model-dialog__pane {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.model-dialog__pane-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.model-dialog__pane-header h3 {
+  margin: 0;
+  font-size: 1rem;
+  color: var(--color-text);
+}
+
 .model-dialog__canvas-container {
   width: 100%;
   height: 400px;
@@ -87,11 +117,20 @@
   background: var(--color-surface);
 }
 
+.model-dialog__pane-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
 .model-dialog__actions {
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 12px;
+}
+
+.model-dialog__actions--comparative {
+  justify-content: flex-end;
 }
 
 .model-dialog__buttons {
@@ -139,4 +178,14 @@
 
 .model-dialog__btn--primary:hover:not(:disabled) {
   background: var(--accent-success-hover);
+}
+
+@media (max-width: 980px) {
+  .model-dialog__comparative-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .model-dialog__canvas-container {
+    height: 320px;
+  }
 }

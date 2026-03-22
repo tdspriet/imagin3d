@@ -1,0 +1,21 @@
+name: imagin3d-backend
+channels:
+  - conda-forge
+dependencies:
+  - python=3.10
+  - pip
+  - numpy
+  - pillow
+  - imageio
+  - pip:
+      - boto3
+      - fastapi
+      - genai-prices
+      - google-genai
+      - hydra-core
+      - jinja2
+      - opencv-python-headless
+      - pydantic-ai-slim[google,bedrock]
+      - python-dotenv
+      - structlog
+      - uvicorn

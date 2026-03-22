@@ -1,0 +1,59 @@
+.trellis-version-select {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  box-sizing: border-box;
+  padding: 0 12px;
+  border: 1px solid var(--color-button-border);
+  background: var(--color-button-bg);
+  border-radius: 6px;
+  color: var(--color-text-primary);
+}
+
+.trellis-version-select--compact {
+  min-height: 34px;
+  padding: 0 10px;
+  background: color-mix(in oklab, var(--color-surface-alt) 88%, white);
+}
+
+.trellis-version-select__label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+
+.trellis-version-select__control {
+  appearance: auto;
+  border: 0;
+  background: transparent;
+  color: var(--color-text-primary);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1;
+  min-height: 20px;
+  padding: 0;
+  width: auto;
+  cursor: pointer;
+  color-scheme: light;
+}
+
+.trellis-version-select__control:focus {
+  outline: none;
+}
+
+.trellis-version-select__control:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+.trellis-version-select__control option {
+  background: var(--color-surface-raised);
+  color: var(--color-text-primary);
+}
+
+[data-theme="dark"] .trellis-version-select__control {
+  color-scheme: dark;
+}

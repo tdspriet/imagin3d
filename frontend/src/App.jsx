@@ -5,6 +5,7 @@ import ProgressBar from './components/ProgressBar'
 import ConfirmationBar from './components/ConfirmationBar'
 import MasterPromptDialog from './components/dialog/MasterPromptDialog'
 import ModelDialog from './components/dialog/ModelDialog'
+import TrellisVersionSelect from './components/TrellisVersionSelect'
 import { WORKSPACE_KEYS, useMoodboardStore } from './store/moodboardStore'
 import './App.css'
 
@@ -16,11 +17,12 @@ function App() {
   const mode = useMoodboardStore((state) => state.mode)
   const activeWorkspaceKey = useMoodboardStore((state) => state.activeWorkspaceKey)
   const setActiveWorkspace = useMoodboardStore((state) => state.setActiveWorkspace)
-  const enterComparativeMode = useMoodboardStore((state) => state.enterComparativeMode)
-  const exitComparativeMode = useMoodboardStore((state) => state.exitComparativeMode)
   const isGenerating = useMoodboardStore((state) => state.isGenerating)
   const progress = useMoodboardStore((state) => state.progress)
+  const comparisonProgress = useMoodboardStore((state) => state.comparisonProgress)
   const comparisonResults = useMoodboardStore((state) => state.comparisonResults)
+  const workspaces = useMoodboardStore((state) => state.workspaces)
+  const setTrellisVersion = useMoodboardStore((state) => state.setTrellisVersion)
 
   // Weights state
   const awaitingWeightsConfirmation = useMoodboardStore((state) => state.awaitingWeightsConfirmation)
@@ -42,30 +44,51 @@ function App() {
 
   // Show progress bar when generating and not awaiting any confirmation
   const isComparative = mode === 'comparative'
-  const showProgressBar = !isComparative && isGenerating && !awaitingWeightsConfirmation && !awaitingMasterPromptConfirmation && progress.total > 0
+  const showProgressBar = !isComparative
+    && !awaitingWeightsConfirmation
+    && !awaitingMasterPromptConfirmation
+    && (progress.total > 0 || Boolean(progress.finishedAt))
 
-  const renderComparativePane = (workspaceKey, label, subtitle) => {
+  const renderComparativePane = (workspaceKey, label) => {
     const paneResult = comparisonResults[workspaceKey]
     const isActive = activeWorkspaceKey === workspaceKey
-    const isPaneLoading = isGenerating && (paneResult.status === 'preparing' || paneResult.status === 'running')
+    const paneProgress = comparisonProgress[workspaceKey]
+    const showPaneProgress = paneProgress.total > 0 || Boolean(paneProgress.finishedAt)
+    const showStatus = paneResult.status !== 'idle' && Boolean(paneResult.message)
+    const workspace = workspaces[workspaceKey]
 
     return (
       <section className={`app__pane${isActive ? ' app__pane--active' : ''}`} key={workspaceKey}>
         <header className="app__pane-header">
-          <div className="app__pane-title">
-            <h2>{label}</h2>
-            <p>{subtitle}</p>
-            {isPaneLoading ? (
-              <div className="app__pane-progress" aria-hidden="true">
-                <div className="app__pane-progress-track">
-                  <div className="app__pane-progress-fill" />
-                </div>
+          <div className="app__pane-header-main">
+            <div className="app__pane-header-top">
+              <div className="app__pane-title">
+                <h2>{label}</h2>
+                <TrellisVersionSelect
+                  compact
+                  value={workspace.trellisVersion}
+                  onChange={(version) => setTrellisVersion(version, workspaceKey)}
+                  disabled={isGenerating}
+                  workspaceLabel={`${label.toLowerCase()}`}
+                />
               </div>
-            ) : null}
-          </div>
-          <div className={`app__pane-status app__pane-status--${paneResult.status}`}>
-            <span>{paneResult.message}</span>
-            {typeof paneResult.score === 'number' ? <strong>{paneResult.score}%</strong> : null}
+              {showStatus ? (
+                <div className={`app__pane-status app__pane-status--${paneResult.status}`}>
+                  <span>{paneResult.message}</span>
+                  {typeof paneResult.score === 'number' ? <strong>{paneResult.score}%</strong> : null}
+                </div>
+              ) : null}
+            </div>
+            <ProgressBar
+              current={paneProgress.current}
+              total={paneProgress.total}
+              stage={paneProgress.stage}
+              startedAt={paneProgress.startedAt}
+              finishedAt={paneProgress.finishedAt}
+              lastElapsedMs={paneProgress.lastElapsedMs}
+              isVisible={showPaneProgress}
+              compact
+            />
           </div>
         </header>
         <Canvas
@@ -85,6 +108,9 @@ function App() {
           current={progress.current}
           total={progress.total}
           stage={progress.stage}
+          startedAt={progress.startedAt}
+          finishedAt={progress.finishedAt}
+          lastElapsedMs={progress.lastElapsedMs}
           isVisible={showProgressBar}
         />
         <ConfirmationBar
@@ -96,23 +122,12 @@ function App() {
       </header>
       {isComparative ? (
         <main className="app__split-view">
-          {renderComparativePane(WORKSPACE_KEYS.LEFT, 'Left Pane', 'Baseline workspace')}
-          {renderComparativePane(WORKSPACE_KEYS.RIGHT, 'Right Pane', 'Modified workspace')}
+          {renderComparativePane(WORKSPACE_KEYS.LEFT, 'Left Pane')}
+          {renderComparativePane(WORKSPACE_KEYS.RIGHT, 'Right Pane')}
         </main>
       ) : (
         <Canvas workspaceKey={WORKSPACE_KEYS.SINGLE} isActive />
       )}
-      <button
-        type="button"
-        className={`app__compare-toggle${isComparative ? ' app__compare-toggle--active' : ''}`}
-        onClick={isComparative ? exitComparativeMode : enterComparativeMode}
-        disabled={isGenerating}
-      >
-        <span className="app__compare-toggle-label">Comparative View</span>
-        <span className="app__compare-toggle-caption">
-          {isComparative ? 'Return to one workspace' : 'Duplicate the current workspace side by side'}
-        </span>
-      </button>
       <MasterPromptDialog
         isOpen={awaitingMasterPromptConfirmation}
         onClose={cancelMasterPrompt}
@@ -123,9 +138,11 @@ function App() {
         loadingByPane={masterPromptLoadingByPane}
       />
       <ModelDialog
-        isOpen={!isComparative && modelDialog.isOpen}
+        isOpen={modelDialog.isOpen}
         onClose={closeModelDialog}
+        mode={modelDialog.mode}
         modelUrl={modelDialog.modelUrl}
+        models={modelDialog.models}
       />
     </div>
   )

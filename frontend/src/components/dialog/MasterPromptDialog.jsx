@@ -188,9 +188,6 @@ function MasterPromptDialog({
       <section key={pane} className="master-prompt-dialog__pane">
         <header className="master-prompt-dialog__pane-header">
           <h3>{pane === 'left' ? 'Left Pane' : 'Right Pane'}</h3>
-          <span className={`master-prompt-dialog__pane-status${isPaneLoading ? ' master-prompt-dialog__pane-status--loading' : ''}`}>
-            {isPaneLoading ? 'Updating' : 'Ready'}
-          </span>
         </header>
 
         <div className="master-prompt-dialog__prompt-row master-prompt-dialog__prompt-row--pane">

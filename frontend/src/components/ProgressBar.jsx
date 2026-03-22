@@ -3,13 +3,30 @@ import './ProgressBar.css'
 
 const TRELLIS_ESTIMATE_MS = 1 * 60 * 1000
 
-function ProgressBar({ current, total, stage, isVisible }) {
+const formatElapsed = (elapsedMs = 0) => {
+  const totalSeconds = Math.max(0, Math.round(elapsedMs / 1000))
+  const minutes = Math.floor(totalSeconds / 60)
+  const seconds = totalSeconds % 60
+  return `${minutes}:${String(seconds).padStart(2, '0')}`
+}
+
+function ProgressBar({
+  current,
+  total,
+  stage,
+  startedAt,
+  finishedAt,
+  lastElapsedMs,
+  isVisible,
+  compact = false,
+}) {
   const trellisStage = useMemo(
     () => (stage || '').toLowerCase().includes('generating 3d model'),
     [stage]
   )
   const startTimeRef = useRef(null)
   const [estimatedPercentage, setEstimatedPercentage] = useState(0)
+  const [elapsedMs, setElapsedMs] = useState(lastElapsedMs || 0)
 
   useEffect(() => {
     if (!isVisible || !trellisStage) {
@@ -33,22 +50,49 @@ function ProgressBar({ current, total, stage, isVisible }) {
     return () => window.clearInterval(interval)
   }, [isVisible, trellisStage])
 
+  useEffect(() => {
+    if (!isVisible) {
+      setElapsedMs(lastElapsedMs || 0)
+      return
+    }
+
+    if (finishedAt) {
+      setElapsedMs(lastElapsedMs || (startedAt ? finishedAt - startedAt : 0))
+      return
+    }
+
+    if (!startedAt) {
+      setElapsedMs(lastElapsedMs || 0)
+      return
+    }
+
+    const tick = () => {
+      setElapsedMs(Date.now() - startedAt)
+    }
+
+    tick()
+    const interval = window.setInterval(tick, 250)
+    return () => window.clearInterval(interval)
+  }, [finishedAt, isVisible, lastElapsedMs, startedAt])
+
   if (!isVisible) return null
 
   const serverPercentage = total > 0 ? Math.round((current / total) * 100) : 0
   const percentage = trellisStage ? Math.max(serverPercentage, estimatedPercentage) : serverPercentage
+  const showTimer = trellisStage
 
   return (
-    <div className="progress-bar">
-      <div className="progress-bar__info">
-        <span className="progress-bar__stage">{stage}</span>
-      </div>
+    <div className={`progress-bar${compact ? ' progress-bar--compact' : ''}`}>
+      <span className="progress-bar__stage">{stage}</span>
       <div className="progress-bar__track">
         <div
           className="progress-bar__fill"
           style={{ width: `${percentage}%` }}
         />
       </div>
+      {showTimer ? (
+        <span className="progress-bar__timer">{formatElapsed(finishedAt ? lastElapsedMs : elapsedMs)}</span>
+      ) : null}
     </div>
   )
 }

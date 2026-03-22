@@ -6,6 +6,7 @@ const WORKSPACE_KEYS = {
   LEFT: 'left',
   RIGHT: 'right',
 }
+const DEFAULT_TRELLIS_VERSION = 2
 const SELECTED_Z_OFFSET = 2000
 const CLUSTER_Z_OFFSET = -1000
 const DEFAULT_FONT_SIZE = 16
@@ -22,16 +23,95 @@ const DEFAULT_SIZES = {
   CLUSTER: { width: 640, height: 420 },
 }
 
+const createProgressState = (overrides = {}) => ({
+  current: 0,
+  total: 0,
+  stage: '',
+  startedAt: null,
+  finishedAt: null,
+  lastElapsedMs: 0,
+  ...overrides,
+})
+
+const createComparisonProgress = () => ({
+  left: createProgressState(),
+  right: createProgressState(),
+})
+
+const isProgressActive = (progress) => Boolean(progress?.stage) && Number(progress?.total) > 0
+
+const mergeProgressState = (current, patch) => {
+  const base = current || createProgressState()
+  const next = {
+    current: patch?.current ?? base.current,
+    total: patch?.total ?? base.total,
+    stage: patch?.stage ?? base.stage,
+  }
+
+  if (!isProgressActive(next)) {
+    return createProgressState()
+  }
+
+  const now = Date.now()
+  const startedAt = isProgressActive(base) && base.startedAt ? base.startedAt : now
+
+  return createProgressState({
+    ...next,
+    startedAt,
+    lastElapsedMs: Math.max(base.lastElapsedMs || 0, now - startedAt),
+  })
+}
+
+const completeProgressState = (current, patch = {}) => {
+  const base = current || createProgressState()
+  const next = {
+    current: patch.current ?? base.current,
+    total: patch.total ?? base.total,
+    stage: patch.stage ?? base.stage,
+  }
+
+  if (!isProgressActive(next)) {
+    return createProgressState()
+  }
+
+  const finishedAt = Date.now()
+  const startedAt = base.startedAt || finishedAt
+
+  return createProgressState({
+    ...next,
+    startedAt,
+    finishedAt,
+    lastElapsedMs: Math.max(base.lastElapsedMs || 0, finishedAt - startedAt),
+  })
+}
+
+const resetIncompleteComparisonProgress = (comparisonProgress = createComparisonProgress()) => (
+  Object.fromEntries(
+    Object.entries(comparisonProgress).map(([pane, progress]) => [
+      pane,
+      progress?.finishedAt ? progress : createProgressState(),
+    ])
+  )
+)
+
 const createWorkspaceState = () => ({
   nodes: [],
   edges: [],
   reactFlowInstance: null,
   fitViewTrigger: 0,
+  trellisVersion: DEFAULT_TRELLIS_VERSION,
 })
 
 const createComparisonResults = () => ({
-  left: { status: 'idle', message: 'Ready', modelUrl: null, score: null },
-  right: { status: 'idle', message: 'Ready', modelUrl: null, score: null },
+  left: { status: 'idle', message: '', modelUrl: null, score: null },
+  right: { status: 'idle', message: '', modelUrl: null, score: null },
+})
+
+const createModelDialogState = () => ({
+  isOpen: false,
+  mode: 'single',
+  modelUrl: null,
+  models: null,
 })
 
 const addInitialSize = (data, width, height) => ({
@@ -51,6 +131,7 @@ const cloneWorkspaceState = (workspace) => ({
   edges: cloneSerializable(workspace.edges || []),
   reactFlowInstance: null,
   fitViewTrigger: 0,
+  trellisVersion: workspace?.trellisVersion === 1 ? 1 : DEFAULT_TRELLIS_VERSION,
 })
 
 const resolveWorkspaceKey = (state, workspaceKey = null) => {
@@ -293,15 +374,9 @@ export const useMoodboardStore = create((set, get) => ({
     left: false,
     right: false,
   },
-  progress: {
-    current: 0,
-    total: 0,
-    stage: '',
-  },
-  modelDialog: {
-    isOpen: false,
-    modelUrl: null,
-  },
+  progress: createProgressState(),
+  comparisonProgress: createComparisonProgress(),
+  modelDialog: createModelDialogState(),
   score: null,
   comparisonResults: createComparisonResults(),
 
@@ -326,8 +401,10 @@ export const useMoodboardStore = create((set, get) => ({
         left: cloneWorkspaceState(sourceWorkspace),
         right: cloneWorkspaceState(sourceWorkspace),
       },
+      progress: createProgressState(),
       comparisonResults: createComparisonResults(),
-      modelDialog: { isOpen: false, modelUrl: null },
+      comparisonProgress: createComparisonProgress(),
+      modelDialog: createModelDialogState(),
     }
   }),
 
@@ -342,6 +419,7 @@ export const useMoodboardStore = create((set, get) => ({
         right: createWorkspaceState(),
       },
       comparisonResults: createComparisonResults(),
+      comparisonProgress: createComparisonProgress(),
       weightsSessionId: null,
       weightsIdMaps: null,
       awaitingWeightsConfirmation: false,
@@ -353,9 +431,15 @@ export const useMoodboardStore = create((set, get) => ({
         left: false,
         right: false,
       },
-      progress: { current: 0, total: 0, stage: '' },
+      progress: createProgressState(),
     }
   }),
+
+  setTrellisVersion: (version, workspaceKey = null) => set((state) => (
+    updateWorkspaceState(state, workspaceKey, {
+      trellisVersion: version === 1 ? 1 : 2,
+    })
+  )),
 
   setReactFlowInstance: (instance, workspaceKey = null) => set((state) => (
     updateWorkspaceState(state, workspaceKey, { reactFlowInstance: instance })
@@ -790,6 +874,7 @@ export const useMoodboardStore = create((set, get) => ({
     }
 
     payload.prompt = prompt
+    payload.trellis_version = workspace.trellisVersion
 
     set({
       isGenerating: true,
@@ -801,9 +886,9 @@ export const useMoodboardStore = create((set, get) => ({
       masterPromptSessionId: null,
       masterPromptData: null,
       masterPromptLoadingByPane: { single: false, left: false, right: false },
-      progress: { current: 0, total: 0, stage: 'Starting...' },
+      progress: createProgressState(),
       score: null,
-      modelDialog: { isOpen: false, modelUrl: null },
+      modelDialog: createModelDialogState(),
     })
 
     try {
@@ -838,7 +923,9 @@ export const useMoodboardStore = create((set, get) => ({
             const { type, data, session_id } = parsed
 
             if (type === 'progress') {
-              set({ progress: data })
+              set((state) => ({
+                progress: mergeProgressState(state.progress, data),
+              }))
             } else if (type === 'weights') {
               get().applyWeightsToWorkspace(data, idMaps, WORKSPACE_KEYS.SINGLE)
               if (session_id) {
@@ -846,7 +933,7 @@ export const useMoodboardStore = create((set, get) => ({
                   weightsSessionId: session_id,
                   weightsIdMaps: idMaps,
                   awaitingWeightsConfirmation: true,
-                  progress: { current: 0, total: 0, stage: '' },
+                  progress: createProgressState(),
                 })
               }
             } else if (type === 'master_prompt') {
@@ -861,12 +948,12 @@ export const useMoodboardStore = create((set, get) => ({
                     referenceImages: data.reference_images || [],
                   },
                   masterPromptLoadingByPane: { single: false, left: false, right: false },
-                  progress: { current: 0, total: 0, stage: '' },
+                  progress: createProgressState(),
                 })
               }
             } else if (type === 'complete') {
               finalResult = data
-              set({
+              set((state) => ({
                 awaitingWeightsConfirmation: false,
                 weightsSessionId: null,
                 weightsIdMaps: null,
@@ -874,8 +961,8 @@ export const useMoodboardStore = create((set, get) => ({
                 masterPromptSessionId: null,
                 masterPromptData: null,
                 masterPromptLoadingByPane: { single: false, left: false, right: false },
-                progress: { current: 0, total: 0, stage: '' },
-              })
+                progress: completeProgressState(state.progress),
+              }))
               if (data.file) {
                 const url = data.file.startsWith('http') ? data.file : `${BACKEND_URL}${data.file}`
                 get().openModelDialog(url)
@@ -891,6 +978,7 @@ export const useMoodboardStore = create((set, get) => ({
                 masterPromptSessionId: null,
                 masterPromptData: null,
                 masterPromptLoadingByPane: { single: false, left: false, right: false },
+                progress: createProgressState(),
               })
               return { cancelled: true }
             } else if (type === 'error') {
@@ -902,7 +990,7 @@ export const useMoodboardStore = create((set, get) => ({
                 masterPromptSessionId: null,
                 masterPromptData: null,
                 masterPromptLoadingByPane: { single: false, left: false, right: false },
-                progress: { current: 0, total: 0, stage: '' },
+                progress: createProgressState(),
               })
               return { error: data }
             }
@@ -924,14 +1012,15 @@ export const useMoodboardStore = create((set, get) => ({
         masterPromptSessionId: null,
         masterPromptData: null,
         masterPromptLoadingByPane: { single: false, left: false, right: false },
-        progress: { current: 0, total: 0, stage: '' },
       })
     }
   },
 
   generateComparativeMoodboard: async (prompt = '') => {
-    const left = serializeDataForBackend(get().workspaces.left.nodes)
-    const right = serializeDataForBackend(get().workspaces.right.nodes)
+    const leftWorkspace = get().workspaces.left
+    const rightWorkspace = get().workspaces.right
+    const left = serializeDataForBackend(leftWorkspace.nodes)
+    const right = serializeDataForBackend(rightWorkspace.nodes)
     const leftPayload = left.payload
     const rightPayload = right.payload
 
@@ -952,13 +1041,14 @@ export const useMoodboardStore = create((set, get) => ({
       masterPromptSessionId: null,
       masterPromptData: null,
       masterPromptLoadingByPane: { single: false, left: false, right: false },
-      progress: { current: 0, total: 0, stage: 'Starting comparative generation...' },
+      progress: createProgressState(),
+      comparisonProgress: createComparisonProgress(),
       score: null,
       comparisonResults: {
         left: { status: 'preparing', message: 'Preparing left workspace', modelUrl: null, score: null },
         right: { status: 'preparing', message: 'Preparing right workspace', modelUrl: null, score: null },
       },
-      modelDialog: { isOpen: false, modelUrl: null },
+      modelDialog: createModelDialogState(),
     })
 
     try {
@@ -966,8 +1056,8 @@ export const useMoodboardStore = create((set, get) => ({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          left: { ...leftPayload, prompt },
-          right: { ...rightPayload, prompt },
+          left: { ...leftPayload, prompt, trellis_version: leftWorkspace.trellisVersion },
+          right: { ...rightPayload, prompt, trellis_version: rightWorkspace.trellisVersion },
           prompt,
         }),
       })
@@ -996,7 +1086,16 @@ export const useMoodboardStore = create((set, get) => ({
             const { type, data, session_id } = parsed
 
             if (type === 'progress') {
-              set({ progress: data })
+              set((state) => ({
+                progress: mergeProgressState(state.progress, data),
+              }))
+            } else if (type === 'pane_progress') {
+              set((state) => ({
+                comparisonProgress: {
+                  ...state.comparisonProgress,
+                  [data.pane]: mergeProgressState(state.comparisonProgress[data.pane], data),
+                },
+              }))
             } else if (type === 'pane_status') {
               set((state) => ({
                 comparisonResults: updateComparisonResult(state.comparisonResults, data.pane, {
@@ -1014,7 +1113,7 @@ export const useMoodboardStore = create((set, get) => ({
                   right: right.idMaps,
                 },
                 awaitingWeightsConfirmation: true,
-                progress: { current: 0, total: 0, stage: '' },
+                progress: createProgressState(),
                 comparisonResults: updateComparisonResult(
                   updateComparisonResult(state.comparisonResults, WORKSPACE_KEYS.LEFT, {
                     status: 'review',
@@ -1036,7 +1135,7 @@ export const useMoodboardStore = create((set, get) => ({
                   panes: data.panes,
                 },
                 masterPromptLoadingByPane: { single: false, left: false, right: false },
-                progress: { current: 0, total: 0, stage: '' },
+                progress: createProgressState(),
                 comparisonResults: updateComparisonResult(
                   updateComparisonResult(state.comparisonResults, WORKSPACE_KEYS.LEFT, {
                     status: 'review',
@@ -1060,6 +1159,10 @@ export const useMoodboardStore = create((set, get) => ({
               const url = data.file.startsWith('http') ? data.file : `${BACKEND_URL}${data.file}`
               get().addModel(url, `${data.pane}-comparison.glb`, data.pane)
               set((state) => ({
+                comparisonProgress: {
+                  ...state.comparisonProgress,
+                  [data.pane]: completeProgressState(state.comparisonProgress[data.pane]),
+                },
                 comparisonResults: updateComparisonResult(state.comparisonResults, data.pane, {
                   status: 'completed',
                   message: '3D model ready',
@@ -1068,9 +1171,25 @@ export const useMoodboardStore = create((set, get) => ({
                 }),
               }))
             } else if (type === 'comparison_complete') {
-              set({ progress: { current: 0, total: 0, stage: '' } })
+              const models = Object.fromEntries(
+                Object.entries(data.results || {}).map(([pane, result]) => [
+                  pane,
+                  {
+                    modelUrl: result.file.startsWith('http') ? result.file : `${BACKEND_URL}${result.file}`,
+                    score: result.score ?? null,
+                  },
+                ])
+              )
+              set((state) => ({
+                progress: completeProgressState(state.progress),
+              }))
+              if (models.left?.modelUrl && models.right?.modelUrl) {
+                get().openComparisonModelDialog(models)
+              }
             } else if (type === 'cancelled') {
               set((state) => ({
+                progress: createProgressState(),
+                comparisonProgress: createComparisonProgress(),
                 comparisonResults: updateComparisonResult(
                   updateComparisonResult(state.comparisonResults, WORKSPACE_KEYS.LEFT, {
                     status: 'cancelled',
@@ -1086,7 +1205,8 @@ export const useMoodboardStore = create((set, get) => ({
               return { cancelled: true }
             } else if (type === 'error') {
               set((state) => ({
-                progress: { current: 0, total: 0, stage: '' },
+                progress: createProgressState(),
+                comparisonProgress: resetIncompleteComparisonProgress(state.comparisonProgress),
                 comparisonResults: updateComparisonResult(
                   updateComparisonResult(state.comparisonResults, WORKSPACE_KEYS.LEFT, {
                     status:
@@ -1138,7 +1258,6 @@ export const useMoodboardStore = create((set, get) => ({
         masterPromptSessionId: null,
         masterPromptData: null,
         masterPromptLoadingByPane: { single: false, left: false, right: false },
-        progress: { current: 0, total: 0, stage: '' },
       })
     }
   },
@@ -1456,8 +1575,23 @@ export const useMoodboardStore = create((set, get) => ({
     }
   },
 
-  openModelDialog: (url) => set({ modelDialog: { isOpen: true, modelUrl: url } }),
-  closeModelDialog: () => set({ modelDialog: { isOpen: false, modelUrl: null } }),
+  openModelDialog: (url) => set({
+    modelDialog: {
+      isOpen: true,
+      mode: 'single',
+      modelUrl: url,
+      models: null,
+    },
+  }),
+  openComparisonModelDialog: (models) => set({
+    modelDialog: {
+      isOpen: true,
+      mode: 'comparative',
+      modelUrl: null,
+      models,
+    },
+  }),
+  closeModelDialog: () => set({ modelDialog: createModelDialogState() }),
 
   saveMoodboard: () => {
     const key = resolveWorkspaceKey(get())
@@ -1465,6 +1599,7 @@ export const useMoodboardStore = create((set, get) => ({
     const moodboardData = {
       version: '1.0',
       timestamp: new Date().toISOString(),
+      trellisVersion: workspace.trellisVersion,
       nodes: workspace.nodes.map((node) => ({
         id: node.id,
         type: node.type,
@@ -1493,6 +1628,7 @@ export const useMoodboardStore = create((set, get) => ({
       set((state) => updateWorkspaceState(state, key, {
         nodes: applyLayerOrder(data.nodes, state.isGenerating),
         edges: [],
+        trellisVersion: data.trellisVersion === 1 ? 1 : 2,
       }))
 
       setTimeout(() => {

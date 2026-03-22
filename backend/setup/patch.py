@@ -15,7 +15,7 @@ except Exception:
     pass
 
 print("Patching local submodule BiRefNet.py...")
-submodule_file = "/workspaces/imagin3d/trellis2/pipelines/rembg/BiRefNet.py"
+submodule_file = "/workspaces/imagin3d/trellis2/trellis2/pipelines/rembg/BiRefNet.py"
 
 if os.path.exists(submodule_file):
     with open(submodule_file, "r") as f:

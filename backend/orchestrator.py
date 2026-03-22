@@ -302,9 +302,12 @@ def get_reference_images_preview(
 async def generate_3d_model(
     master_image_path: Path,
     seed: int | None = None,
+    trellis_version: int | None = None,
 ) -> Path:
     logger.info(
-        "Generating 3D model from master image", image_path=str(master_image_path)
+        "Generating 3D model from master image",
+        image_path=str(master_image_path),
+        trellis_version=trellis_version,
     )
 
     # Create output directory for TRELLIS
@@ -316,6 +319,7 @@ async def generate_3d_model(
         master_image_path,
         output_dir,
         seed=seed,
+        version=trellis_version,
     )
 
     logger.info("3D model generation completed", model_path=str(model_path))

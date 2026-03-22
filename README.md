@@ -47,13 +47,27 @@ The Coder backend uses FastAPI and Uvicorn.
 cd backend
 ```
 
-2. **Run the setup script** <br>
+2. **Create the dedicated backend environment** <br>
 ```bash
-  bash setup/setup2.sh # or "bash setup/setup1.sh" for TrellisV1
+  bash setup/setup_backend.sh
 ```
-> **Note:** When running the TrellisV2 setup script, you will be asked to log into your Hugging Face account. You must have requested and received access to the required gated repositories on this account.
+This creates the `imagin3d-backend` conda environment with the dependencies needed to run the FastAPI backend only.
 
-3. **Set the environment variables** <br>
+3. **Install the TRELLIS runtime(s) you want to generate with** <br>
+```bash
+  bash setup/setup2.sh
+```
+This creates the `trellis2` environment used for Trellis V2 generation.
+
+If you also want Trellis V1 available in the UI, install that runtime too:
+```bash
+  bash setup/setup1.sh
+```
+This creates the `trellis` environment used for Trellis V1 generation.
+
+> **Note:** When running the Trellis V2 setup script, you will be asked to log into your Hugging Face account. You must have requested and received access to the required gated repositories on this account.
+
+4. **Set the environment variables** <br>
 Create a `.env` file in the `backend` directory with the following content:<br>
 ```sh
   BACKEND_ALLOWED_ORIGINS=http://localhost:5173,http://localhost:3000
@@ -62,12 +76,18 @@ Create a `.env` file in the `backend` directory with the following content:<br>
   BEDROCK_SECRET_ACCESS_KEY="..."
 ```
 
-4. **Run the Backend** <br>
+5. **Run the Backend** <br>
 ```sh
   source /workspaces/miniconda3/etc/profile.d/conda.sh
-  conda activate trellis2 # or "conda activate trellis" for TrellisV1
+  conda activate imagin3d-backend
   python run.py
 ```
+
+The backend now runs from its own environment and launches generation jobs in the appropriate TRELLIS runtime automatically:
+
+- `Trellis V2` requests use the `trellis2` environment.
+- `Trellis V1` requests prefer the `trellis` environment.
+- Comparative mode can mix versions, for example `left = Trellis V1` and `right = Trellis V2`, without restarting the backend.
 
 ## Architecture
 

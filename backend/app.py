@@ -125,14 +125,41 @@ def _clamp_weight(value: int) -> int:
     return max(0, min(100, int(value)))
 
 
+def _count_or_one(items: list) -> int:
+    return max(len(items), 1)
+
+
+def _prepare_progress_total(payload_data: dict) -> int:
+    return (
+        _count_or_one(payload_data["elements"])
+        + _count_or_one(payload_data["clusters"])
+        + _count_or_one(payload_data["clusters"])
+        + _count_or_one(payload_data["elements"])
+    )
+
+
 async def _prepare_generation_payload(
     payload: MoodboardPayload,
     artifacts_path: Path,
+    progress_callback=None,
 ) -> dict:
     artifacts_token = orchestrator.set_artifacts_dir(artifacts_path)
     try:
         timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
         payload_data = payload.dict()
+        progress_current = 0
+
+        async def advance_progress(stage: str) -> None:
+            nonlocal progress_current
+            if progress_callback is None:
+                return
+            progress_current += 1
+            await progress_callback(progress_current, stage)
+
+        async def emit_placeholder_progress(stage: str, items: list) -> None:
+            if items:
+                return
+            await advance_progress(stage)
 
         raw_path = artifacts_path / "raw" / f"moodboard-{timestamp}.json"
         raw_path.parent.mkdir(parents=True, exist_ok=True)
@@ -157,6 +184,7 @@ async def _prepare_generation_payload(
                     raise ValueError(f"Unsupported element type: {element_type}")
 
             embedding = orchestrator.generate_embedding(title)
+            await advance_progress("Analyzing workspace...")
             return DesignToken(
                 id=element["id"],
                 type=element_type,
@@ -178,6 +206,7 @@ async def _prepare_generation_payload(
                 ]
             )
         )
+        await emit_placeholder_progress("Analyzing workspace...", payload_data["elements"])
 
         design_tokens_path = (
             artifacts_path / "design_tokens" / f"design-tokens-{timestamp}.json"
@@ -204,6 +233,7 @@ async def _prepare_generation_payload(
             title, description = await orchestrator.handle_cluster(
                 cluster["title"], elements
             )
+            await advance_progress("Preparing weights...")
             return ClusterDescriptor(
                 id=cluster["id"],
                 title=title,
@@ -219,6 +249,7 @@ async def _prepare_generation_payload(
                 ]
             )
         )
+        await emit_placeholder_progress("Preparing weights...", payload_data["clusters"])
 
         for cluster_descriptor in cluster_descriptors:
             cluster_descriptors_dir = (
@@ -232,16 +263,20 @@ async def _prepare_generation_payload(
             with cluster_descriptor_path.open("w", encoding="utf-8") as f:
                 json.dump(cluster_descriptor.dict(), f, ensure_ascii=False, indent=2)
 
+        async def route_cluster_weight(cluster_descriptor: ClusterDescriptor) -> int:
+            weight = await orchestrator.route_cluster(payload.prompt, cluster_descriptor)
+            await advance_progress("Preparing weights...")
+            return weight
+
         cluster_routing_results = list(
             await asyncio.gather(
                 *[
-                    asyncio.create_task(
-                        orchestrator.route_cluster(payload.prompt, cluster_descriptor)
-                    )
+                    asyncio.create_task(route_cluster_weight(cluster_descriptor))
                     for cluster_descriptor in cluster_descriptors
                 ]
             )
         )
+        await emit_placeholder_progress("Preparing weights...", cluster_descriptors)
 
         cluster_descriptor_lookup = {cd.id: cd for cd in cluster_descriptors}
         cluster_weights: dict[int, int] = {}
@@ -256,20 +291,24 @@ async def _prepare_generation_payload(
                     f"{cluster_descriptor.title},{cluster_descriptor.description}"
                 )
 
+        async def route_token_weight(token: DesignToken) -> int:
+            weight = await orchestrator.route_token(
+                payload.prompt,
+                token,
+                token_cluster_context.get(token.id),
+            )
+            await advance_progress("Preparing weights...")
+            return weight
+
         token_routing_results = list(
             await asyncio.gather(
                 *[
-                    asyncio.create_task(
-                        orchestrator.route_token(
-                            payload.prompt,
-                            token,
-                            token_cluster_context.get(token.id),
-                        )
-                    )
+                    asyncio.create_task(route_token_weight(token))
                     for token in design_tokens
                 ]
             )
         )
+        await emit_placeholder_progress("Preparing weights...", design_tokens)
 
         token_lookup_for_routing = {token.id: token for token in design_tokens}
         element_weights: dict[int, int] = {}
@@ -324,6 +363,7 @@ async def _generate_master_prompt_bundle(
     user_prompt: str,
     cluster_descriptors: list[ClusterDescriptor],
     artifacts_path: Path,
+    progress_callback=None,
 ) -> dict:
     token = orchestrator.set_artifacts_dir(artifacts_path)
     try:
@@ -331,6 +371,8 @@ async def _generate_master_prompt_bundle(
             user_prompt,
             cluster_descriptors,
         )
+        if progress_callback is not None:
+            await progress_callback("Generating master image...")
         master_image_path = await orchestrator.generate_master_image(
             master_prompt,
             cluster_descriptors,
@@ -562,6 +604,12 @@ async def extract_comparative(
         }
         prepared: dict[str, dict] = {}
         comparison_results: dict[str, dict] = {}
+        pane_progress_totals = {
+            pane: _prepare_progress_total(pane_payload.dict()) + 3
+            for pane, pane_payload in pane_payloads.items()
+        }
+        pane_progress_current = {pane: 0 for pane in pane_payloads}
+        progress_queue: asyncio.Queue[str] = asyncio.Queue()
 
         logger.info(
             "Starting comparative extraction",
@@ -571,22 +619,68 @@ async def extract_comparative(
 
         yield f"data: {json.dumps({'type': 'progress', 'data': {'current': 0, 'total': 6, 'stage': 'Starting comparative generation...'}})}\n\n"
 
+        def pane_progress_event(pane: str, current: int, stage: str) -> str:
+            return (
+                f"data: {json.dumps({'type': 'pane_progress', 'data': {'pane': pane, 'current': current, 'total': pane_progress_totals[pane], 'stage': stage}})}\n\n"
+            )
+
+        async def update_pane_progress(pane: str, current: int, stage: str) -> None:
+            pane_progress_current[pane] = current
+            await progress_queue.put(pane_progress_event(pane, current, stage))
+
+        async def advance_pane_progress(
+            pane: str,
+            stage: str,
+            increment: int = 1,
+        ) -> None:
+            await update_pane_progress(
+                pane,
+                min(
+                    pane_progress_totals[pane],
+                    pane_progress_current[pane] + increment,
+                ),
+                stage,
+            )
+
+        async def yield_task_progress(tasks: set[asyncio.Task]):
+            pending = set(tasks)
+            while pending:
+                queue_task = asyncio.create_task(progress_queue.get())
+                done, still_pending = await asyncio.wait(
+                    pending | {queue_task},
+                    return_when=asyncio.FIRST_COMPLETED,
+                )
+                if queue_task in done:
+                    yield queue_task.result()
+                else:
+                    queue_task.cancel()
+                pending = still_pending.intersection(pending)
+
+            while not progress_queue.empty():
+                yield await progress_queue.get()
+
         async def prepare_pane(pane: str) -> tuple[str, dict]:
             return pane, await _prepare_generation_payload(
                 pane_payloads[pane],
                 pane_artifacts[pane],
+                progress_callback=lambda current, stage, pane=pane: update_pane_progress(
+                    pane,
+                    current,
+                    stage,
+                ),
             )
 
         for pane in ("left", "right"):
-            yield f"data: {json.dumps({'type': 'pane_status', 'data': {'pane': pane, 'status': 'preparing', 'message': 'Preparing workspace...'}})}\n\n"
+            yield f"data: {json.dumps({'type': 'pane_status', 'data': {'pane': pane, 'status': 'preparing', 'message': 'Analyzing workspace...'}})}\n\n"
+            yield pane_progress_event(pane, 0, "Analyzing workspace...")
 
-        prepare_tasks = [
+        prepare_tasks = {
             asyncio.create_task(prepare_pane(pane)) for pane in ("left", "right")
-        ]
-        for completed_task in asyncio.as_completed(prepare_tasks):
-            pane, prepared_payload = await completed_task
+        }
+        async for queue_event in yield_task_progress(prepare_tasks):
+            yield queue_event
+        for pane, prepared_payload in [task.result() for task in prepare_tasks]:
             prepared[pane] = prepared_payload
-            yield f"data: {json.dumps({'type': 'pane_status', 'data': {'pane': pane, 'status': 'ready', 'message': 'Weights ready for review'}})}\n\n"
 
         weights_session_id = str(uuid.uuid4())
         pending_confirmations[weights_session_id] = {
@@ -609,6 +703,12 @@ async def extract_comparative(
             "session_id": weights_session_id,
         }
         yield f"data: {json.dumps(weights_event)}\n\n"
+        for pane in ("left", "right"):
+            yield pane_progress_event(
+                pane,
+                pane_progress_current[pane],
+                "Review weights...",
+            )
 
         await pending_confirmations[weights_session_id]["event"].wait()
         weights_session = pending_confirmations.pop(weights_session_id)
@@ -627,23 +727,41 @@ async def extract_comparative(
         master_prompt_bundles: dict[str, dict] = {}
 
         async def generate_master_prompt_for_pane(pane: str) -> tuple[str, dict]:
+            await update_pane_progress(
+                pane,
+                pane_progress_current[pane],
+                "Generating master prompt...",
+            )
             return pane, await _generate_master_prompt_bundle(
                 pane_payloads[pane].prompt,
                 prepared[pane]["cluster_descriptors"],
                 pane_artifacts[pane],
+                progress_callback=lambda stage, pane=pane: advance_pane_progress(
+                    pane,
+                    stage,
+                ),
             )
 
         for pane in ("left", "right"):
             yield f"data: {json.dumps({'type': 'pane_status', 'data': {'pane': pane, 'status': 'preparing', 'message': 'Generating master prompt...'}})}\n\n"
 
-        master_prompt_tasks = [
+        master_prompt_tasks = {
             asyncio.create_task(generate_master_prompt_for_pane(pane))
             for pane in ("left", "right")
-        ]
-        for completed_task in asyncio.as_completed(master_prompt_tasks):
-            pane, master_prompt_bundle = await completed_task
+        }
+        async for queue_event in yield_task_progress(master_prompt_tasks):
+            yield queue_event
+        for pane, master_prompt_bundle in [task.result() for task in master_prompt_tasks]:
             master_prompt_bundles[pane] = master_prompt_bundle
-            yield f"data: {json.dumps({'type': 'pane_status', 'data': {'pane': pane, 'status': 'ready', 'message': 'Master prompt ready'}})}\n\n"
+            pane_progress_current[pane] = min(
+                pane_progress_totals[pane],
+                pane_progress_current[pane] + 1,
+            )
+            yield pane_progress_event(
+                pane,
+                pane_progress_current[pane],
+                "Review master prompt...",
+            )
 
         master_session_id = str(uuid.uuid4())
         pending_confirmations[master_session_id] = {
@@ -696,6 +814,11 @@ async def extract_comparative(
             master_image_path = Path(
                 master_session["panes"][pane]["master_image_path"]
             )
+            yield pane_progress_event(
+                pane,
+                pane_progress_current[pane],
+                "Generating 3D model...",
+            )
             yield f"data: {json.dumps({'type': 'trellis_status', 'data': {'pane': pane, 'status': 'running', 'message': 'Generating 3D model...'}})}\n\n"
             try:
                 model_path = await _run_with_artifacts_dir(
@@ -703,6 +826,7 @@ async def extract_comparative(
                     lambda pane=pane, master_image_path=master_image_path: orchestrator.generate_3d_model(
                         master_image_path,
                         seed=payload.shared_seed,
+                        trellis_version=pane_payloads[pane].trellis_version,
                     ),
                 )
                 score = await _run_with_artifacts_dir(
@@ -726,6 +850,12 @@ async def extract_comparative(
                 "file": _artifact_url(model_path),
                 "score": score,
             }
+            pane_progress_current[pane] = pane_progress_totals[pane]
+            yield pane_progress_event(
+                pane,
+                pane_progress_current[pane],
+                "Generating 3D model...",
+            )
             yield f"data: {json.dumps({'type': 'pane_complete', 'data': {'pane': pane, 'file': comparison_results[pane]['file'], 'score': score}})}\n\n"
             if pane == "left":
                 yield f"data: {json.dumps({'type': 'trellis_status', 'data': {'pane': 'right', 'status': 'queued', 'message': 'GPU worker available next'}})}\n\n"
@@ -1223,7 +1353,10 @@ async def extract(payload: MoodboardPayload) -> StreamingResponse:
 
         # Generate 3D model from master image using TRELLIS
         try:
-            model_path = await orchestrator.generate_3d_model(master_image_path)
+            model_path = await orchestrator.generate_3d_model(
+                master_image_path,
+                trellis_version=payload.trellis_version,
+            )
         except Exception as exc:
             logger.exception(
                 "TRELLIS generation failed",

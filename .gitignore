@@ -1,5 +1,6 @@
-# Frontend Dependencies
+# Frontend Environment
 node_modules
+dist
 
 # Backend Environment
 .venv

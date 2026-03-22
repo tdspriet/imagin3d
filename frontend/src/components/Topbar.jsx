@@ -12,10 +12,12 @@ import {
   MdSave,
   MdFolderOpen,
   MdAutoAwesome,
+  MdCompareArrows,
 } from 'react-icons/md'
-import { WORKSPACE_KEYS, useMoodboardStore } from '../store/moodboardStore'
+import { useMoodboardStore } from '../store/moodboardStore'
 import PaletteDialog from './dialog/PaletteDialog'
 import GenerateDialog from './dialog/GenerateDialog'
+import TrellisVersionSelect from './TrellisVersionSelect'
 import './Topbar.css'
 
 /**
@@ -31,6 +33,7 @@ function Topbar() {
     addModel,
     addCluster,
     addPalette,
+    setTrellisVersion,
     fitView,
     clearAll,
     saveMoodboard,
@@ -38,7 +41,9 @@ function Topbar() {
     generateMoodboard,
     isGenerating,
     mode,
-    activeWorkspaceKey,
+    singleTrellisVersion,
+    enterComparativeMode,
+    exitComparativeMode,
   } = useMoodboardStore((state) => ({
     addImage: state.addImage,
     addVideo: state.addVideo,
@@ -47,6 +52,7 @@ function Topbar() {
     addModel: state.addModel,
     addCluster: state.addCluster,
     addPalette: state.addPalette,
+    setTrellisVersion: state.setTrellisVersion,
     fitView: state.fitView,
     clearAll: state.clearAll,
     saveMoodboard: state.saveMoodboard,
@@ -54,7 +60,9 @@ function Topbar() {
     generateMoodboard: state.generateMoodboard,
     isGenerating: state.isGenerating,
     mode: state.mode,
-    activeWorkspaceKey: state.activeWorkspaceKey,
+    singleTrellisVersion: state.workspaces.single.trellisVersion,
+    enterComparativeMode: state.enterComparativeMode,
+    exitComparativeMode: state.exitComparativeMode,
   }))
   const fileInputRef = useRef(null)
   const videoInputRef = useRef(null)
@@ -179,11 +187,7 @@ function Topbar() {
     }
   }
 
-  const workspaceLabel = mode === 'comparative'
-    ? activeWorkspaceKey === WORKSPACE_KEYS.RIGHT
-      ? 'Editing Right Pane'
-      : 'Editing Left Pane'
-    : 'Single Workspace'
+  const isComparative = mode === 'comparative'
 
   return (
     <div className="topbar">
@@ -191,9 +195,6 @@ function Topbar() {
         <div className="logo">
           <img src="logo.png" alt="imagin3d logo" className="logo-mark" />
           <span className="logo-text">imagin3d</span>
-        </div>
-        <div className="topbar-context">
-          <span className={`topbar-context__badge topbar-context__badge--${mode}`}>{workspaceLabel}</span>
         </div>
         <div className="topbar-add" role="group" aria-label="Add items">
           <button onClick={handleAddCluster} className="btn">
@@ -226,17 +227,33 @@ function Topbar() {
             <MdPalette className="btn-icon" size={18} aria-hidden="true" focusable="false" />
             <span>Add Palette</span>
           </button>
+          {!isComparative ? (
+            <TrellisVersionSelect
+              value={singleTrellisVersion}
+              onChange={(version) => setTrellisVersion(version)}
+              disabled={isGenerating}
+              workspaceLabel="single workspace"
+            />
+          ) : null}
         </div>
       </div>
 
       <div className="topbar-right">
+        <button
+          onClick={isComparative ? exitComparativeMode : enterComparativeMode}
+          className={`btn btn-secondary${isComparative ? ' btn-secondary--active' : ''}`}
+          disabled={isGenerating}
+        >
+          <MdCompareArrows className="btn-icon" size={18} aria-hidden="true" focusable="false" />
+          <span>Split View</span>
+        </button>
         <button onClick={fitView} className="btn btn-secondary">
           <MdZoomOutMap className="btn-icon" size={18} aria-hidden="true" focusable="false" />
           <span>Fit View</span>
         </button>
         <button onClick={clearAll} className="btn btn-danger">
           <MdDeleteSweep className="btn-icon" size={18} aria-hidden="true" focusable="false" />
-          <span>{mode === 'comparative' ? 'Clear Active' : 'Clear All'}</span>
+          <span>Clear</span>
         </button>
         <button onClick={saveMoodboard} className="btn btn-success">
           <MdSave className="btn-icon" size={18} aria-hidden="true" focusable="false" />
@@ -248,7 +265,7 @@ function Topbar() {
         </button>
         <button onClick={() => setGenerateDialogOpen(true)} className="btn btn-warning" disabled={isGenerating}>
           <MdAutoAwesome className="btn-icon" size={18} aria-hidden="true" focusable="false" />
-          <span>{mode === 'comparative' ? 'Generate Both' : 'Generate'}</span>
+          <span>Generate</span>
         </button>
       </div>
 
@@ -298,7 +315,7 @@ function Topbar() {
         onClose={() => setGenerateDialogOpen(false)}
         onGenerate={handleGenerateMoodboard}
         isGenerating={isGenerating}
-        isComparative={mode === 'comparative'}
+        isComparative={isComparative}
       />
     </div>
   )

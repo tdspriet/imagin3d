@@ -3,7 +3,7 @@ from __future__ import annotations
 import base64
 import binascii
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Literal, Optional
 
 import pydantic_ai
 from pydantic import BaseModel, Field
@@ -16,6 +16,7 @@ class MoodboardPayload(BaseModel):
     elements: List[Element] = Field(default_factory=list)
     clusters: List[Cluster] = Field(default_factory=list)
     prompt: str = Field(default="")
+    trellis_version: Literal[1, 2] = Field(default=2)
 
 
 class ComparativeMoodboardPayload(BaseModel):

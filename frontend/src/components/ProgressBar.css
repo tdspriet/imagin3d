@@ -13,6 +13,16 @@
   animation: slideDown 0.2s ease-out;
 }
 
+.progress-bar--compact {
+  position: static;
+  padding: 0;
+  gap: 10px;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  animation: none;
+}
+
 @keyframes slideDown {
   from {
     opacity: 0;
@@ -22,17 +32,18 @@
   }
 }
 
-.progress-bar__info {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-shrink: 0;
-}
-
 .progress-bar__stage {
   font-size: 13px;
   font-weight: 500;
   color: var(--color-text-primary);
+  flex-shrink: 0;
+}
+
+.progress-bar__timer {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-text-secondary);
+  flex-shrink: 0;
 }
 
 .progress-bar__track {
@@ -48,4 +59,12 @@
   background: linear-gradient(90deg, var(--accent-progress), var(--accent-progress-light));
   border-radius: 3px;
   transition: width 0.3s ease;
+}
+
+.progress-bar--compact .progress-bar__stage {
+  font-size: 12px;
+}
+
+.progress-bar--compact .progress-bar__track {
+  min-width: 120px;
 }
