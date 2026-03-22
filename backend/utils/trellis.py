@@ -42,6 +42,10 @@ class TrellisEngine:
             loader=jinja2.FileSystemLoader(str(template_dir))
         )
 
+    @property
+    def display_name(self) -> str:
+        return f"TrellisV{self.version}"
+
     async def generate_3d_model(self, image_path: Path, output_dir: Path) -> Path:
         output_dir.mkdir(parents=True, exist_ok=True)
 

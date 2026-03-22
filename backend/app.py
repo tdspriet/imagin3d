@@ -95,6 +95,15 @@ artifacts_dir.mkdir(parents=True, exist_ok=True)
 app.mount("/artifacts", StaticFiles(directory=ROOT_DIR / "artifacts"), name="artifacts")
 
 
+@app.get("/status")
+async def status():
+    engine = orchestrator.trellis_engine
+    if engine is None:
+        engine = orchestrator.TrellisEngine()
+        orchestrator.trellis_engine = engine
+    return {"model": engine.display_name}
+
+
 @app.post("/confirm-weights/{session_id}")
 async def confirm_weights(
     session_id: str,
