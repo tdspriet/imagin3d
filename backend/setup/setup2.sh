@@ -49,6 +49,12 @@ pip uninstall -y pillow
 pip install --no-cache-dir "pillow>=10.0.0" 
 
 # 8. Login using Hugging Face
+ENV_PATH="${SCRIPT_DIR}/../.env"
+if [ -f "$ENV_PATH" ]; then
+    set -a
+    source "$ENV_PATH"
+    set +a
+fi
 python -c "from huggingface_hub import login; login()"
 
 # 9. Pre-download and dynamically patch models
@@ -56,5 +62,4 @@ python "${SCRIPT_DIR}/patch.py"
 
 echo ""
 echo "Environment setup complete!"
-echo "Please restart your terminal."
 echo ""

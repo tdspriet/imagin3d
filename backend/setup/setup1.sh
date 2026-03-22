@@ -47,5 +47,4 @@ rm -rf TRELLIS-image-large
 
 echo ""
 echo "Environment setup complete!"
-echo "Please restart your terminal."
 echo ""
