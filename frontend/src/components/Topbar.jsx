@@ -37,6 +37,7 @@ function Topbar() {
     loadMoodboard,
     generateMoodboard,
     isGenerating,
+    backendModelLabel,
   } = useMoodboardStore((state) => ({
     addImage: state.addImage,
     addVideo: state.addVideo,
@@ -51,6 +52,7 @@ function Topbar() {
     loadMoodboard: state.loadMoodboard,
     generateMoodboard: state.generateMoodboard,
     isGenerating: state.isGenerating,
+    backendModelLabel: state.backendModelLabel,
   }))
   const fileInputRef = useRef(null)
   const videoInputRef = useRef(null)
@@ -233,10 +235,13 @@ function Topbar() {
           <MdFolderOpen className="btn-icon" size={18} aria-hidden="true" focusable="false" />
           <span>Load</span>
         </button>
-        <button onClick={() => setGenerateDialogOpen(true)} className="btn btn-warning" disabled={isGenerating}>
-          <MdAutoAwesome className="btn-icon" size={18} aria-hidden="true" focusable="false" />
-          <span>Generate</span>
-        </button>
+        <div className="topbar-generate">
+          <button onClick={() => setGenerateDialogOpen(true)} className="btn btn-warning" disabled={isGenerating}>
+            <MdAutoAwesome className="btn-icon" size={18} aria-hidden="true" focusable="false" />
+            <span>Generate</span>
+          </button>
+          {backendModelLabel && <span className="topbar-model-label">{backendModelLabel}</span>}
+        </div>
       </div>
 
       {/* Hidden file inputs */}

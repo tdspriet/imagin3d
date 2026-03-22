@@ -257,6 +257,7 @@ export const useMoodboardStore = create((set, get) => ({
     isOpen: false,
     modelUrl: null,
   },
+  backendModelLabel: null,
   score: null,
 
   // Set ReactFlow instance
@@ -948,6 +949,41 @@ export const useMoodboardStore = create((set, get) => ({
       console.error('Error editing master prompt image:', error)
     } finally {
       set({ masterPromptIsLoading: false })
+    }
+  },
+
+  startBackendModelLabelPolling: () => {
+    let isStopped = false
+    let retryTimeoutId = null
+
+    const poll = async () => {
+      if (isStopped || get().backendModelLabel) return
+
+      try {
+        const response = await fetch(`${BACKEND_URL}/status`)
+        if (response.ok) {
+          const data = await response.json()
+          if (data?.model) {
+            set({ backendModelLabel: data.model })
+            return
+          }
+        }
+      } catch {
+        // Backend may not be up yet. Keep retrying quietly.
+      }
+
+      if (!isStopped && !get().backendModelLabel) {
+        retryTimeoutId = setTimeout(poll, 3000)
+      }
+    }
+
+    poll()
+
+    return () => {
+      isStopped = true
+      if (retryTimeoutId) {
+        clearTimeout(retryTimeoutId)
+      }
     }
   },
 
