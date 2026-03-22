@@ -66,7 +66,7 @@ Don't forgot the fill in ``...`` with the actual values.
 
 3. **Run the setup script** <br>
 ```bash
-  bash setup/setup2.sh # or "setup/setup1.sh" for TrellisV1
+  bash setup/setup2.sh # or "bash setup/setup1.sh" for TrellisV1
 ```
 > **Note:** When running the TrellisV2 setup script, you will be asked to log into your Hugging Face account. You must have requested and received access to the required gated repositories on this account.
 
