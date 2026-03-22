@@ -25,12 +25,19 @@ The local frontend uses React and Vite.
   cd frontend
 ```
 
-2. **Install dependencies**<br>
+2. **Set the environment variables** <br>
+Create a `.env` file in the `frontend` directory with the following content:<br>
+```sh
+  VITE_BACKEND_URL=http://localhost:8001 # must match BACKEND_PORT in backend/.env
+  VITE_PORT=3001
+```
+
+3. **Install dependencies**<br>
 ```bash
   npm install
 ```
 
-3. **Run the Frontend**<br>
+4. **Run the Frontend**<br>
 ```bash
   npm run dev
 ```
@@ -48,12 +55,14 @@ The Coder backend uses FastAPI and Uvicorn.
 Create a `.env` file in the `backend` directory with the following content:<br>
 ```sh
   BACKEND_ALLOWED_ORIGINS=http://localhost:5173,http://localhost:3000
+  BACKEND_PORT=8001 # must match VITE_BACKEND_URL in frontend/.env
   HF_HOME="/workspace/imagin3d/hf_cache"
   HF_TOKEN="hf_..."
   GOOGLE_API_KEY="..."
   BEDROCK_ACCESS_KEY_ID="..."
   BEDROCK_SECRET_ACCESS_KEY="..."
 ```
+Don't forgot the fill in ``...`` with the actual values.
 
 3. **Run the setup script** <br>
 ```bash
