@@ -7,14 +7,16 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 cd "${REPO_ROOT}/backend"
 
 # 1. Install Miniconda
-mkdir -p /workspaces/miniconda3
-wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O /workspaces/miniconda3/miniconda.sh
-bash /workspaces/miniconda3/miniconda.sh -b -u -p /workspaces/miniconda3
-rm /workspaces/miniconda3/miniconda.sh
-source /workspaces/miniconda3/bin/activate
-conda init --all
+if [ ! -x /workspaces/miniconda3/bin/conda ]; then
+    mkdir -p /workspaces/miniconda3
+    wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O /workspaces/miniconda3/miniconda.sh
+    bash /workspaces/miniconda3/miniconda.sh -b -u -p /workspaces/miniconda3
+    rm /workspaces/miniconda3/miniconda.sh
+fi
 
 # 2. Create the environment
+source /workspaces/miniconda3/bin/activate
+conda init --all
 conda env create -f setup/environment.yml
 source /workspaces/miniconda3/etc/profile.d/conda.sh
 conda activate trellis
@@ -44,6 +46,9 @@ pip install git+https://github.com/camenduru/simple-knn.git --no-build-isolation
 git clone https://huggingface.co/microsoft/TRELLIS-image-large
 mv TRELLIS-image-large/ckpts .
 rm -rf TRELLIS-image-large
+
+# 11. Pre-download offline inference
+python setup/patch1.py
 
 echo ""
 echo "Environment setup complete!"
