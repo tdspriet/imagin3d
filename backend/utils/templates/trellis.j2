@@ -1,4 +1,6 @@
 import os
+from urllib.parse import urlparse
+
 import torch
 import imageio
 from PIL import Image
@@ -7,19 +9,23 @@ from PIL import Image
 # (like spconv) pick up the configurations during initialization.
 os.environ['SPCONV_ALGO'] = 'native'
 os.environ['U2NET_HOME'] = '{{ offline_path }}/vendor/u2net'
+os.environ['TORCH_HOME'] = '{{ offline_path }}/vendor/torch_hub'
 
 from trellis.pipelines import TrellisImageTo3DPipeline
 from trellis.utils import render_utils, postprocessing_utils
 
 
 def patch_torch_hub_for_offline_dinov2(offline_path: str):
-    """Patches torch.hub.load to use a local DINOv2 repository if available."""
+    """Routes DINOv2 repo and checkpoints to the backend-local offline bundle."""
     dinov2_repo = os.path.join(offline_path, 'vendor', 'torch_hub', 'facebookresearch_dinov2_main')
-    
-    if not os.path.isdir(dinov2_repo):
+    checkpoints_dir = os.path.join(offline_path, 'vendor', 'torch_hub', 'checkpoints')
+
+    if not os.path.isdir(dinov2_repo) or not os.path.isdir(checkpoints_dir):
         return
 
+    torch.hub.set_dir(os.environ['TORCH_HOME'])
     original_torch_hub_load = torch.hub.load
+    original_load_state_dict_from_url = torch.hub.load_state_dict_from_url
 
     def _offline_torch_hub_load(repo_or_dir, model, *args, **kwargs):
         if repo_or_dir == 'facebookresearch/dinov2':
@@ -33,7 +39,18 @@ def patch_torch_hub_for_offline_dinov2(offline_path: str):
             )
         return original_torch_hub_load(repo_or_dir, model, *args, **kwargs)
 
+    def _offline_load_state_dict_from_url(url, *args, **kwargs):
+        checkpoint_name = kwargs.get('file_name') or os.path.basename(urlparse(url).path)
+        checkpoint_path = os.path.join(checkpoints_dir, checkpoint_name)
+        if not os.path.isfile(checkpoint_path):
+            raise FileNotFoundError(
+                f"Missing offline checkpoint for {url}: {checkpoint_path}"
+            )
+        map_location = kwargs.get('map_location', 'cpu')
+        return torch.load(checkpoint_path, map_location=map_location)
+
     torch.hub.load = _offline_torch_hub_load
+    torch.hub.load_state_dict_from_url = _offline_load_state_dict_from_url
 
 
 def main():
