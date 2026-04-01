@@ -44,7 +44,9 @@ pip install git+https://github.com/camenduru/simple-knn.git --no-build-isolation
 
 # 10. Download models
 git clone https://huggingface.co/microsoft/TRELLIS-image-large
-mv TRELLIS-image-large/ckpts .
+mkdir -p trellisv1
+mv TRELLIS-image-large/ckpts trellisv1/
+mv TRELLIS-image-large/pipeline.json trellisv1/
 rm -rf TRELLIS-image-large
 
 # 11. Pre-download offline inference

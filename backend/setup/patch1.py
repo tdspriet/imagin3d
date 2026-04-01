@@ -2,6 +2,7 @@ import os
 import shutil
 import logging
 import torch
+import rembg
 from pathlib import Path
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
@@ -36,6 +37,13 @@ def vendor_dinov2_assets(trellisv1_dir: Path):
     if cached_checkpoint.is_file():
         shutil.copy2(cached_checkpoint, vendored_checkpoints / cached_checkpoint.name)
 
+def cache_u2net_assets():
+    """Ensures rembg downloads the u2net model into the local cache."""
+    logging.info("Pre-downloading U2Net weights...")
+    try:
+        rembg.new_session("u2net")
+    except Exception as e:
+        logging.warning(f"U2Net download encountered an issue: {e}")
 
 def vendor_u2net_assets(trellisv1_dir: Path):
     """Finds u2net.onnx in common locations and copies it to the vendor directory."""
@@ -63,6 +71,7 @@ def main():
     logging.info("Preparing Trellis v1 offline assets...")
 
     cache_dinov2_assets()
+    cache_u2net_assets()
     vendor_dinov2_assets(trellisv1_dir)
     vendor_u2net_assets(trellisv1_dir)
 
