@@ -3,37 +3,17 @@ import shutil
 import logging
 import torch
 from pathlib import Path
-from transformers import AutoModelForImageSegmentation
-from huggingface_hub import snapshot_download
 
-# Setup basic logging to replace silent 'pass' statements
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
 
-def pre_download_models():
-    """Pre-downloads TRELLIS, DINOv2, and RMBG-2.0 weights to local caches."""
-    logging.info("Pre-downloading TRELLIS weights...")
-    try:
-        snapshot_download("microsoft/TRELLIS.2-4B")
-    except Exception as e:
-        logging.warning(f"TRELLIS download encountered an issue: {e}")
-
+def cache_dinov2_assets():
+    """Pre-downloads the DINOv2 repo and checkpoint into the torch hub cache."""
     logging.info("Pre-downloading DINOv2 weights...")
     try:
         torch.hub.load("facebookresearch/dinov2", "dinov2_vitl14_reg", pretrained=True)
     except Exception as e:
         logging.warning(f"DINOv2 download encountered an issue: {e}")
-
-    logging.info("Pre-downloading RMBG-2.0 remote code and weights...")
-    try:
-        # Forces the download of the remote code and weights
-        AutoModelForImageSegmentation.from_pretrained(
-            "briaai/RMBG-2.0", trust_remote_code=True
-        )
-    except Exception:
-        # We expect it to crash here because it isn't patched yet,
-        # but the files are successfully downloaded to the cache.
-        pass
 
 
 def vendor_dinov2_assets(trellisv1_dir: Path):
@@ -76,59 +56,17 @@ def vendor_u2net_assets(trellisv1_dir: Path):
             break
 
 
-def patch_birefnet_code():
-    """Finds dynamically downloaded birefnet.py and applies necessary hotfixes."""
-    hf_cache_base = Path(
-        os.environ.get("HF_HOME", Path.home() / ".cache" / "huggingface")
-    )
-    cache_dir = (
-        hf_cache_base
-        / "modules"
-        / "transformers_modules"
-        / "briaai"
-        / "RMBG_hyphen_2_dot_0"
-    )
-
-    # Search for birefnet.py dynamically to avoid hardcoded hashes
-    birefnet_files = list(cache_dir.rglob("birefnet.py"))
-
-    for file_path in birefnet_files:
-        content = file_path.read_text()
-        original_content = content
-
-        # Patch 1: CPU math for meta tensors
-        content = content.replace(
-            "torch.linspace(0, drop_path_rate, sum(depths))",
-            "torch.linspace(0, drop_path_rate, sum(depths), device='cpu')",
-        )
-
-        # Patch 2: Missing tied weights variable
-        if "all_tied_weights_keys = {}" not in content:
-            content = content.replace(
-                "def __init__(self, bb_pretrained=True",
-                "all_tied_weights_keys = {}\n    def __init__(self, bb_pretrained=True",
-            )
-
-        # Only write back if changes were actually made
-        if content != original_content:
-            file_path.write_text(content)
-            logging.info(f"Patched {file_path}")
-
-
 def main():
-    # Define the base trellisv1 directory relative to this script
     current_script_dir = Path(__file__).resolve().parent
     trellisv1_dir = (current_script_dir / ".." / "trellisv1").resolve()
 
-    # Execute the preparation steps sequentially
-    logging.info("Starting setup process...")
+    logging.info("Preparing Trellis v1 offline assets...")
 
-    pre_download_models()
+    cache_dinov2_assets()
     vendor_dinov2_assets(trellisv1_dir)
     vendor_u2net_assets(trellisv1_dir)
-    patch_birefnet_code()
 
-    logging.info("Setup and patching complete.")
+    logging.info("Trellis v1 offline assets are ready.")
 
 
 if __name__ == "__main__":

@@ -1,4 +1,5 @@
 import logging
+import os
 import shutil
 import json
 from pathlib import Path
@@ -111,7 +112,10 @@ def patch_file(path: Path) -> None:
 
 def patch_rmbg_code(bundle_dir: Path) -> None:
     patch_file(bundle_dir / "vendor" / "hf_models" / RMBG_DIR_NAME / "birefnet.py")
-    modules_root = Path.home() / ".cache" / "huggingface" / "modules" / "transformers_modules"
+    hf_cache_base = Path(
+        os.environ.get("HF_HOME", Path.home() / ".cache" / "huggingface")
+    )
+    modules_root = hf_cache_base / "modules" / "transformers_modules"
     for path in modules_root.rglob("birefnet.py"):
         if "RMBG_hyphen_2_dot_0" in str(path):
             patch_file(path)
