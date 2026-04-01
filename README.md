@@ -56,7 +56,7 @@ Create a `.env` file in the `backend` directory with the following content:<br>
 ```sh
   BACKEND_ALLOWED_ORIGINS=http://localhost:5173,http://localhost:3000
   BACKEND_PORT=8001 # must match VITE_BACKEND_URL in frontend/.env
-  HF_HOME="/workspace/imagin3d/hf_cache"
+  HF_HOME="/workspaces/imagin3d/hf_cache"
   HF_TOKEN="hf_..."
   GOOGLE_API_KEY="..."
   BEDROCK_ACCESS_KEY_ID="..."
