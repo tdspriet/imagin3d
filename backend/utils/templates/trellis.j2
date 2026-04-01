@@ -1,50 +1,100 @@
 import os
-os.environ['SPCONV_ALGO'] = 'native'
-
+import torch
 import imageio
 from PIL import Image
+
+# Set environment variables before importing Trellis to ensure dependencies 
+# (like spconv) pick up the configurations during initialization.
+os.environ['SPCONV_ALGO'] = 'native'
+os.environ['U2NET_HOME'] = '{{ offline_path }}/vendor/u2net'
+
 from trellis.pipelines import TrellisImageTo3DPipeline
 from trellis.utils import render_utils, postprocessing_utils
 
-# Load the pipeline
-pipeline = TrellisImageTo3DPipeline.from_pretrained("microsoft/TRELLIS-image-large")
-pipeline.cuda()
 
-# Load an image
-image = Image.open("{{ image_path }}")
+def patch_torch_hub_for_offline_dinov2(offline_path: str):
+    """Patches torch.hub.load to use a local DINOv2 repository if available."""
+    dinov2_repo = os.path.join(offline_path, 'vendor', 'torch_hub', 'facebookresearch_dinov2_main')
+    
+    if not os.path.isdir(dinov2_repo):
+        return
 
-# Run the pipeline
-outputs = pipeline.run(
-    image,
-    seed=1,
-    sparse_structure_sampler_params={
-        "steps": 12,
-        "cfg_strength": 7.5,
-    },
-    slat_sampler_params={
-        "steps": 12,
-        "cfg_strength": 3,
-    },
-)
+    original_torch_hub_load = torch.hub.load
 
-# Render the outputs
-video = render_utils.render_video(outputs['gaussian'][0])['color']
-imageio.mimsave("{{ output_video_gs }}", video, fps=30)
+    def _offline_torch_hub_load(repo_or_dir, model, *args, **kwargs):
+        if repo_or_dir == 'facebookresearch/dinov2':
+            kwargs.pop('source', None)
+            return original_torch_hub_load(
+                dinov2_repo,
+                model,
+                *args,
+                source='local',
+                **kwargs,
+            )
+        return original_torch_hub_load(repo_or_dir, model, *args, **kwargs)
 
-video = render_utils.render_video(outputs['radiance_field'][0])['color']
-imageio.mimsave("{{ output_video_rf }}", video, fps=30)
+    torch.hub.load = _offline_torch_hub_load
 
-video = render_utils.render_video(outputs['mesh'][0])['normal']
-imageio.mimsave("{{ output_video_mesh }}", video, fps=30)
 
-# GLB files can be extracted from the outputs
-glb = postprocessing_utils.to_glb(
-    outputs['gaussian'][0],
-    outputs['mesh'][0],
-    simplify=0.95,
-    texture_size=1024,
-)
-glb.export("{{ output_glb }}")
+def main():
+    # 1. Define configuration and template paths
+    offline_path = "{{ offline_path }}"
+    image_path = "{{ image_path }}"
+    output_video_gs = "{{ output_video_gs }}"
+    output_video_rf = "{{ output_video_rf }}"
+    output_video_mesh = "{{ output_video_mesh }}"
+    output_glb = "{{ output_glb }}"
+    output_ply = "{{ output_ply }}"
 
-# Save Gaussians as PLY files
-outputs['gaussian'][0].save_ply("{{ output_ply }}")
+    # 2. Setup offline routing
+    patch_torch_hub_for_offline_dinov2(offline_path)
+
+    # 3. Load the pipeline and image
+    pipeline = TrellisImageTo3DPipeline.from_pretrained(offline_path)
+    pipeline.cuda()
+    image = Image.open(image_path)
+
+    # 4. Run the pipeline
+    outputs = pipeline.run(
+        image,
+        seed=1,
+        sparse_structure_sampler_params={
+            "steps": 12,
+            "cfg_strength": 7.5,
+        },
+        slat_sampler_params={
+            "steps": 12,
+            "cfg_strength": 3.0, 
+        },
+    )
+
+    # 5. Extract outputs to avoid repetitive dictionary lookups
+    gaussian_output = outputs['gaussian'][0]
+    radiance_field_output = outputs['radiance_field'][0]
+    mesh_output = outputs['mesh'][0]
+
+    # 6. Render and save videos
+    gs_video = render_utils.render_video(gaussian_output)['color']
+    imageio.mimsave(output_video_gs, gs_video, fps=30)
+
+    rf_video = render_utils.render_video(radiance_field_output)['color']
+    imageio.mimsave(output_video_rf, rf_video, fps=30)
+
+    mesh_video = render_utils.render_video(mesh_output)['normal']
+    imageio.mimsave(output_video_mesh, mesh_video, fps=30)
+
+    # 7. Extract and save GLB file
+    glb = postprocessing_utils.to_glb(
+        gaussian_output,
+        mesh_output,
+        simplify=0.95,
+        texture_size=1024,
+    )
+    glb.export(output_glb)
+
+    # 8. Save Gaussians as PLY files
+    gaussian_output.save_ply(output_ply)
+
+
+if __name__ == "__main__":
+    main()
