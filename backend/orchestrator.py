@@ -240,7 +240,13 @@ async def generate_master_image(
     # Generate master image
     result = await visualizer.run(master_prompt, style_images)
 
-    return _save_master_image(result.output)
+    # Save master image to artifacts
+    master_image_path = ROOT_DIR / "artifacts" / "master_image.jpg"
+
+    with open(master_image_path, "wb") as f:
+        f.write(result.output.data)
+
+    return master_image_path
 
 
 async def edit_master_image(
@@ -254,7 +260,13 @@ async def edit_master_image(
     )
 
     result = await visualizer.run(prompt, [source_image])
-    return _save_master_image(result.output)
+    # Save master image to artifacts
+    master_image_path = ROOT_DIR / "artifacts" / "master_image.jpg"
+
+    with open(master_image_path, "wb") as f:
+        f.write(result.output.data)
+
+    return master_image_path
 
 
 def get_reference_images_preview(
