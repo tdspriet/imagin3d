@@ -4,19 +4,16 @@ set -e
 # 0. Define script and repository paths
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
-ENV_PATH="${SCRIPT_DIR}/../.env"
 
 # 1. Fix system dependencies
 sudo apt-get update
 sudo apt-get install -y libjpeg-dev
 
 # 2. Install Miniconda
-if [ ! -x /workspaces/miniconda3/bin/conda ]; then
-  mkdir -p /workspaces/miniconda3
-  wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O /workspaces/miniconda3/miniconda.sh
-  bash /workspaces/miniconda3/miniconda.sh -b -u -p /workspaces/miniconda3
-  rm /workspaces/miniconda3/miniconda.sh
-fi
+mkdir -p /workspaces/miniconda3
+wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O /workspaces/miniconda3/miniconda.sh
+bash /workspaces/miniconda3/miniconda.sh -b -u -p /workspaces/miniconda3
+rm /workspaces/miniconda3/miniconda.sh
 
 # 3. Setup Conda for the script and initialize it
 source /workspaces/miniconda3/etc/profile.d/conda.sh
@@ -24,11 +21,7 @@ conda init bash
 
 # 4. Run the TRELLIS.2 setup script
 cd "${REPO_ROOT}/trellis2"
-SETUP_ARGS=(--basic --nvdiffrast --nvdiffrec --cumesh --o-voxel --flexgemm)
-if ! conda env list | awk '{print $1}' | grep -qx trellis2; then
-  SETUP_ARGS=(--new-env "${SETUP_ARGS[@]}")
-fi
-source ./setup.sh "${SETUP_ARGS[@]}"
+source ./setup.sh --new-env --basic --nvdiffrast --nvdiffrec --cumesh --o-voxel --flexgemm
 
 # 5. Activate new environment
 conda activate trellis2
@@ -55,14 +48,16 @@ pip install --upgrade transformers
 pip uninstall -y pillow
 pip install --no-cache-dir "pillow>=10.0.0" 
 
-# 8. Load backend environment variables if available
+# 8. Login using Hugging Face
+ENV_PATH="${SCRIPT_DIR}/../.env"
 if [ -f "$ENV_PATH" ]; then
     set -a
     source "$ENV_PATH"
     set +a
 fi
+python -c "from huggingface_hub import login; login()"
 
-# 9. Materialize the offline TrellisV2 bundle
+# 9. Pre-download and dynamically patch models
 python "${SCRIPT_DIR}/patch2.py"
 
 echo ""

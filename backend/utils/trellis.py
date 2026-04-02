@@ -20,7 +20,7 @@ _VERSIONS = {
     2: {
         "trellis_path": Path("/workspaces/imagin3d/trellis2"),
         "template": "trellis2.j2",
-        "ckpt_path": "/workspaces/imagin3d/backend/trellisv2",
+        "ckpt_path": "microsoft/TRELLIS.2-4B",
     },
 }
 
@@ -97,7 +97,7 @@ class TrellisEngine:
 
     def _v2_vars(self, image_path: Path, output_dir: Path, output_glb: Path) -> dict:
         return {
-            "offline_path": self.ckpt_path,
+            "ckpt_path": self.ckpt_path,
             "image_path": image_path,
             "output_video": output_dir / "sample.mp4",
             "output_glb": output_glb,
