@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react'
 import './ProgressBar.css'
 
 const TRELLIS_V1_ESTIMATE_MS = 1 * 60 * 1000
-const TRELLIS_V2_ESTIMATE_MS = 2 * 60 * 1000 + 30 * 1000
+const TRELLIS_V2_ESTIMATE_MS = 1 * 60 * 1000 + 30 * 1000
 
 function ProgressBar({ current, total, stage, isVisible, modelLabel }) {
   const trellisStage = useMemo(
