@@ -97,7 +97,6 @@ app.mount("/artifacts", StaticFiles(directory=ROOT_DIR / "artifacts"), name="art
 
 @app.on_event("startup")
 async def initialize_orchestrator() -> None:
-    logger.info("Initializing orchestrator")
     await asyncio.to_thread(orchestrator._initialize)
 
 
