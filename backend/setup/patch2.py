@@ -2,7 +2,7 @@ import json
 import logging
 from pathlib import Path
 
-from huggingface_hub import snapshot_download
+from huggingface_hub import snapshot_download, hf_hub_download
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
@@ -74,6 +74,16 @@ def download_repo(repo_id: str, target_dir: Path) -> None:
     )
 
 
+def download_v1_checkpoints(bundle_dir: Path) -> None:
+    logging.info("Downloading V1 sparse structure decoder...")
+    for ext in ["json", "safetensors"]:
+        hf_hub_download(
+            repo_id="microsoft/TRELLIS-image-large",
+            filename=f"ckpts/ss_dec_conv3d_16l8_fp16.{ext}",
+            local_dir=str(bundle_dir),
+        )
+
+
 def patch_local_rmbg_bundle(bundle_dir: Path) -> None:
     logging.info("Patching local RMBG bundle...")
     birefnet_path = bundle_dir / "birefnet.py"
@@ -102,34 +112,61 @@ def patch_local_rmbg_bundle(bundle_dir: Path) -> None:
 
 
 def patch_local_pipeline_config(bundle_dir: Path) -> None:
-    logging.info("Patching local pipeline config...")
+    logging.info("Patching local pipeline configs...")
+
+    # Patch main pipeline.json
     pipeline_path = bundle_dir / "pipeline.json"
+    if pipeline_path.exists():
+        try:
+            pipeline = json.loads(pipeline_path.read_text())
+            args = pipeline.get("args", {})
+            models = args.setdefault("models", {})
+            models.pop("tex_slat_flow_model_512", None)
 
-    if not pipeline_path.exists():
+            # Repoint sparse_structure_decoder to the locally downloaded V1 weights
+            if "sparse_structure_decoder" in models:
+                models["sparse_structure_decoder"] = "ckpts/ss_dec_conv3d_16l8_fp16"
+
+            image_cond = args.get("image_cond_model", {})
+            rembg = args.get("rembg_model", {})
+
+            image_cond.setdefault("args", {})["model_name"] = str(
+                bundle_dir / "vendor" / "hf_models" / "dinov3-vitl16-pretrain-lvd1689m"
+            )
+            rembg.setdefault("args", {})["model_name"] = str(
+                bundle_dir / "vendor" / "hf_models" / "RMBG-2.0"
+            )
+
+            pipeline_path.write_text(json.dumps(pipeline, indent=2) + "\n")
+            logging.info("Successfully patched pipeline.json")
+        except json.JSONDecodeError:
+            logging.error("Failed to parse pipeline.json.")
+    else:
         logging.error(f"pipeline.json not found at {pipeline_path}")
-        return
 
-    try:
-        pipeline = json.loads(pipeline_path.read_text())
-    except json.JSONDecodeError:
-        logging.error("Failed to parse pipeline.json.")
-        return
+    # Patch texturing_pipeline.json
+    texturing_path = bundle_dir / "texturing_pipeline.json"
+    if texturing_path.exists():
+        try:
+            pipeline = json.loads(texturing_path.read_text())
+            args = pipeline.get("args", {})
 
-    args = pipeline.get("args", {})
-    models = args.setdefault("models", {})
-    models.pop("tex_slat_flow_model_512", None)
-    image_cond = args.get("image_cond_model", {})
-    rembg = args.get("rembg_model", {})
+            image_cond = args.get("image_cond_model", {})
+            rembg = args.get("rembg_model", {})
 
-    image_cond.setdefault("args", {})["model_name"] = str(
-        bundle_dir / "vendor" / "hf_models" / "dinov3-vitl16-pretrain-lvd1689m"
-    )
-    rembg.setdefault("args", {})["model_name"] = str(
-        bundle_dir / "vendor" / "hf_models" / "RMBG-2.0"
-    )
+            image_cond.setdefault("args", {})["model_name"] = str(
+                bundle_dir / "vendor" / "hf_models" / "dinov3-vitl16-pretrain-lvd1689m"
+            )
+            rembg.setdefault("args", {})["model_name"] = str(
+                bundle_dir / "vendor" / "hf_models" / "RMBG-2.0"
+            )
 
-    pipeline_path.write_text(json.dumps(pipeline, indent=2) + "\n")
-    logging.info("Successfully patched pipeline.json")
+            texturing_path.write_text(json.dumps(pipeline, indent=2) + "\n")
+            logging.info("Successfully patched texturing_pipeline.json")
+        except json.JSONDecodeError:
+            logging.error("Failed to parse texturing_pipeline.json.")
+    else:
+        logging.warning(f"texturing_pipeline.json not found at {texturing_path}")
 
 
 def main() -> None:
@@ -140,6 +177,7 @@ def main() -> None:
     logging.info(f"Starting setup. Repository root: {repo_root}")
 
     download_repo("microsoft/TRELLIS.2-4B", bundle_dir)
+    download_v1_checkpoints(bundle_dir)
     download_repo(
         "facebook/dinov3-vitl16-pretrain-lvd1689m",
         vendor_dir / "dinov3-vitl16-pretrain-lvd1689m",
