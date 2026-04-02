@@ -49,7 +49,17 @@ class TrellisEngine:
     @staticmethod
     def _resolve_version(version: Literal[1, 2] | None) -> Literal[1, 2]:
         if version is None:
-            version = int(os.getenv("TRELLIS_VERSION", "2"))
+            conda_env = os.getenv("CONDA_DEFAULT_ENV", "").strip().lower()
+            if conda_env == "trellis":
+                version = 1
+            elif conda_env == "trellis2":
+                version = 2
+            else:
+                raise ValueError(
+                    "Unable to resolve TRELLIS version from CONDA_DEFAULT_ENV. "
+                    "Expected 'trellis' for TrellisV1 or 'trellis2' for TrellisV2, "
+                    f"got {conda_env!r}."
+                )
         if version not in _VERSIONS:
             raise ValueError(f"Unsupported TRELLIS version: {version}. Use 1 or 2.")
         return version  # type: ignore
