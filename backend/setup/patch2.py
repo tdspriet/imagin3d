@@ -116,6 +116,8 @@ def patch_local_pipeline_config(bundle_dir: Path) -> None:
         return
 
     args = pipeline.get("args", {})
+    models = args.setdefault("models", {})
+    models.pop("tex_slat_flow_model_512", None)
     image_cond = args.get("image_cond_model", {})
     rembg = args.get("rembg_model", {})
 

@@ -31,6 +31,7 @@ logger = structlog.stdlib.get_logger(__name__)
 # Global state
 RELEVANCE_THRESHOLD = 40
 ROOT_DIR = Path(__file__).parent.resolve()
+_initialized = False
 blender_engine: Union[Blender, None] = None
 trellis_engine: Union[TrellisEngine, None] = None
 descriptor: Union[Descriptor, None] = None
@@ -55,6 +56,9 @@ def _initialize():
         bedrock_client, \
         embedding_function
 
+    if _initialized:
+        return
+
     # Initialize via Hydra configuration
     config_dir = str(ROOT_DIR / "config")
     with initialize_config_dir(config_dir=config_dir, version_base=None):
@@ -69,6 +73,7 @@ def _initialize():
     visualizer = hydra.utils.instantiate(cfg.visualizer)
     bedrock_client = boto3.client("bedrock-runtime")
     embedding_function = BedrockEmbeddingFunction(bedrock_client)
+    _initialized = True
 
 
 async def handle_model(element: dict) -> tuple[str, str]:
@@ -235,13 +240,7 @@ async def generate_master_image(
     # Generate master image
     result = await visualizer.run(master_prompt, style_images)
 
-    # Save master image to artifacts
-    master_image_path = ROOT_DIR / "artifacts" / "master_image.jpg"
-
-    with open(master_image_path, "wb") as f:
-        f.write(result.output.data)
-
-    return master_image_path
+    return _save_master_image(result.output)
 
 
 async def edit_master_image(
@@ -251,16 +250,11 @@ async def edit_master_image(
     source_image = common.decode_data_url_to_binary_image(image_data_url)
     prompt = (
         "Edit the attached image according to this instruction: "
-        f"{edit_prompt}. The subject must be fully in-frame isolated against a seamless pure white background."
+        f"{edit_prompt}. The subject must be fully in-frame isolated against a transparent background."
     )
 
     result = await visualizer.run(prompt, [source_image])
-
-    master_image_path = ROOT_DIR / "artifacts" / "master_image.jpg"
-    with open(master_image_path, "wb") as f:
-        f.write(result.output.data)
-
-    return master_image_path
+    return _save_master_image(result.output)
 
 
 def get_reference_images_preview(
@@ -354,6 +348,20 @@ async def evaluate_model(
 
 
 # --- Helper functions ---
+
+
+def _save_master_image(output: pydantic_ai.BinaryImage) -> Path:
+    image = Image.open(io.BytesIO(output.data))
+    image.load()
+
+    master_image_path = ROOT_DIR / "artifacts" / "master_image.png"
+    if "A" in image.getbands():
+        image = image.convert("RGBA")
+    else:
+        image = image.convert("RGB")
+    image.save(master_image_path, format="PNG")
+
+    return master_image_path
 
 
 async def _save_model_file(element: dict) -> Path:

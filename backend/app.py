@@ -95,13 +95,22 @@ artifacts_dir.mkdir(parents=True, exist_ok=True)
 app.mount("/artifacts", StaticFiles(directory=ROOT_DIR / "artifacts"), name="artifacts")
 
 
+@app.on_event("startup")
+async def initialize_orchestrator() -> None:
+    logger.info("Initializing orchestrator")
+    await asyncio.to_thread(orchestrator._initialize)
+
+
 @app.get("/status")
 async def status():
     engine = orchestrator.trellis_engine
-    if engine is None:
-        engine = orchestrator.TrellisEngine()
-        orchestrator.trellis_engine = engine
-    return {"model": engine.display_name}
+    version = engine.version if engine is not None else None
+    response = {
+        "initialized": orchestrator._initialized,
+    }
+    if version is not None:
+        response["model"] = f"TrellisV{version}"
+    return response
 
 
 @app.post("/confirm-weights/{session_id}")
@@ -341,7 +350,6 @@ async def extract(payload: MoodboardPayload) -> StreamingResponse:
 
         # Turn clusters into cluster descriptors
         async def process_cluster(cluster: dict) -> ClusterDescriptor:
-
             # 1) Gather elements for this cluster
             elements: list[DesignToken] = [
                 token_lookup[element_id]
