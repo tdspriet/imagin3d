@@ -15,6 +15,7 @@ import './App.css'
 function App() {
   const isGenerating = useMoodboardStore((state) => state.isGenerating)
   const progress = useMoodboardStore((state) => state.progress)
+  const backendModelLabel = useMoodboardStore((state) => state.backendModelLabel)
   const startBackendModelLabelPolling = useMoodboardStore((state) => state.startBackendModelLabelPolling)
 
   // Weights state
@@ -54,6 +55,7 @@ function App() {
           total={progress.total}
           stage={progress.stage}
           isVisible={showProgressBar}
+          modelLabel={backendModelLabel}
         />
         <ConfirmationBar
           isVisible={awaitingWeightsConfirmation}

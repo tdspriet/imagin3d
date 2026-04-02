@@ -1,13 +1,24 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import './ProgressBar.css'
 
-const TRELLIS_ESTIMATE_MS = 1 * 60 * 1000
+const TRELLIS_V1_ESTIMATE_MS = 1 * 60 * 1000
+const TRELLIS_V2_ESTIMATE_MS = 2 * 60 * 1000 + 30 * 1000
 
-function ProgressBar({ current, total, stage, isVisible }) {
+function ProgressBar({ current, total, stage, isVisible, modelLabel }) {
   const trellisStage = useMemo(
     () => (stage || '').toLowerCase().includes('generating 3d model'),
     [stage]
   )
+  const estimateDurationMs = useMemo(() => {
+    const normalizedLabel = (modelLabel || '').toLowerCase()
+    if (normalizedLabel.includes('trellisv2')) {
+      return TRELLIS_V2_ESTIMATE_MS
+    }
+    if (normalizedLabel.includes('trellisv1')) {
+      return TRELLIS_V1_ESTIMATE_MS
+    }
+    return TRELLIS_V2_ESTIMATE_MS
+  }, [modelLabel])
   const startTimeRef = useRef(null)
   const [estimatedPercentage, setEstimatedPercentage] = useState(0)
 
@@ -24,14 +35,14 @@ function ProgressBar({ current, total, stage, isVisible }) {
     const tick = () => {
       if (!startTimeRef.current) return
       const elapsed = Date.now() - startTimeRef.current
-      const nextPercentage = Math.min(95, Math.round((elapsed / TRELLIS_ESTIMATE_MS) * 100))
+      const nextPercentage = Math.min(95, Math.round((elapsed / estimateDurationMs) * 100))
       setEstimatedPercentage(nextPercentage)
     }
 
     tick()
     const interval = window.setInterval(tick, 200)
     return () => window.clearInterval(interval)
-  }, [isVisible, trellisStage])
+  }, [isVisible, trellisStage, estimateDurationMs])
 
   if (!isVisible) return null
 
