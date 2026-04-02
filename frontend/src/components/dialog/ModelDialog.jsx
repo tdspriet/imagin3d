@@ -147,18 +147,18 @@ function ModelDialog({
           <div className="model-dialog__canvas-container">
              <Canvas camera={{ position: [0, 0, 5], fov: 50 }}>
                 {/* Top & Bottom */}
-                <directionalLight position={[0, 10, 0]} intensity={5} />
-                <directionalLight position={[0, -10, 0]} intensity={5} />
+                <directionalLight position={[0, 10, 0]} intensity={3} />
+                <directionalLight position={[0, -10, 0]} intensity={3} />
                 {/* Front, Back, Left, Right */}
-                <directionalLight position={[10, 0, 0]} intensity={5} />
-                <directionalLight position={[-10, 0, 0]} intensity={5} />
-                <directionalLight position={[0, 0, 10]} intensity={5} />
-                <directionalLight position={[0, 0, -10]} intensity={5} />
+                <directionalLight position={[10, 0, 0]} intensity={3} />
+                <directionalLight position={[-10, 0, 0]} intensity={3} />
+                <directionalLight position={[0, 0, 10]} intensity={3} />
+                <directionalLight position={[0, 0, -10]} intensity={3} />
                 {/* 4 Diagonals */}
-                <directionalLight position={[7, 0, 7]} intensity={5} />
-                <directionalLight position={[-7, 0, 7]} intensity={5} />
-                <directionalLight position={[7, 0, -7]} intensity={5} />
-                <directionalLight position={[-7, 0, -7]} intensity={5} />
+                <directionalLight position={[7, 0, 7]} intensity={3} />
+                <directionalLight position={[-7, 0, 7]} intensity={3} />
+                <directionalLight position={[7, 0, -7]} intensity={3} />
+                <directionalLight position={[-7, 0, -7]} intensity={3} />
                 <Suspense fallback={null}>
                     {modelUrl && <Model3D url={modelUrl} />}
                 </Suspense>
