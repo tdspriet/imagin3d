@@ -6,8 +6,8 @@ import tempfile
 from pathlib import Path
 from typing import Literal
 
-import structlog
 import jinja2
+import structlog
 
 logger = structlog.stdlib.get_logger(__name__)
 
@@ -20,7 +20,7 @@ _VERSIONS = {
     2: {
         "trellis_path": Path("/workspaces/imagin3d/trellis2"),
         "template": "trellis2.j2",
-        "ckpt_path": "microsoft/TRELLIS.2-4B",
+        "ckpt_path": "/workspaces/imagin3d/backend/trellisv2",
     },
 }
 
@@ -28,7 +28,7 @@ _VERSIONS = {
 class TrellisEngine:
     def __init__(self, version: Literal[1, 2] | None = None):
         if version is None:
-            version = 2 if os.getenv("CONDA_DEFAULT_ENV") == "trellis2" else 1
+            version = int(os.getenv("TRELLIS_VERSION", "2"))
         if version not in _VERSIONS:
             raise ValueError(f"Unsupported TRELLIS version: {version}. Use 1 or 2.")
         self.version = version
@@ -97,6 +97,7 @@ class TrellisEngine:
 
     def _v2_vars(self, image_path: Path, output_dir: Path, output_glb: Path) -> dict:
         return {
+            "offline_path": Path(self.ckpt_path),
             "ckpt_path": self.ckpt_path,
             "image_path": image_path,
             "output_video": output_dir / "sample.mp4",
