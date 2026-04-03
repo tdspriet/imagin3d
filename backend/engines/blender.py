@@ -16,6 +16,8 @@ logger = structlog.stdlib.get_logger(__name__)
 class Blender(engine.Engine):
     """Blender 3D engine implementation."""
 
+    _semaphore: asyncio.Semaphore | None = None
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # check that the executable exists
@@ -31,51 +33,62 @@ class Blender(engine.Engine):
             loader=jinja2.FileSystemLoader(str(template_dir))
         )
 
+    @classmethod
+    def get_semaphore(cls) -> asyncio.Semaphore:
+        if cls._semaphore is None:
+            cls._semaphore = asyncio.Semaphore(1)
+        return cls._semaphore
+
     async def render_views(
         self, model_path: pathlib.Path, output_dir: pathlib.Path
     ) -> list[engine.Render]:
-        # create renders directory if it doesn't exist
-        output_dir.mkdir(exist_ok=True, parents=True)
+        async with self.get_semaphore():
+            # create renders directory if it doesn't exist
+            output_dir.mkdir(exist_ok=True, parents=True)
 
-        # create the full script
-        full_script = self._create_render_script(model_path, output_dir)
+            # create the full script
+            full_script = self._create_render_script(model_path, output_dir)
 
-        # run blender and execute the rendering script
-        try:
-            stdout, stderr, returncode = await asyncio.wait_for(
-                self._run_script(full_script), self.timeout_s
-            )
-        except TimeoutError:
-            msg = f"Blender timed out (>{self.timeout_s} s) during rendering."
-            logger.warning(msg)
-            raise engine.EngineException(msg)
+            # run blender and execute the rendering script
+            try:
+                stdout, stderr, returncode = await asyncio.wait_for(
+                    self._run_script(full_script), self.timeout_s
+                )
+            except TimeoutError:
+                msg = f"Blender timed out (>{self.timeout_s} s) during rendering."
+                logger.warning(msg)
+                raise engine.EngineException(msg)
 
-        # log errors if any
-        if stderr and ("Traceback" in stderr or "Error:" in stderr) and returncode != 0:
-            logger.warning("Blender error during rendering.", exc_info=stderr)
-            raise engine.EngineException(stderr)
+            # log errors if any
+            if (
+                stderr
+                and ("Traceback" in stderr or "Error:" in stderr)
+                and returncode != 0
+            ):
+                logger.warning("Blender error during rendering.", exc_info=stderr)
+                raise engine.EngineException(stderr)
 
-        # collect rendered images
-        renders = []
-        for i in range(self.num_views):
-            render_filename = f"view_{i:01d}.jpg"
-            render_path = output_dir / render_filename
+            # collect rendered images
+            renders = []
+            for i in range(self.num_views):
+                render_filename = f"view_{i:01d}.jpg"
+                render_path = output_dir / render_filename
 
-            # check if the file exists before trying to read it
-            if not render_path.exists():
-                raise FileNotFoundError(f"Render file not created: {render_path}")
+                # check if the file exists before trying to read it
+                if not render_path.exists():
+                    raise FileNotFoundError(f"Render file not created: {render_path}")
 
-            with open(render_path, "rb") as f:
-                image_bytes = f.read()
-                renders.append(
-                    engine.Render(
-                        image=pydantic_ai.BinaryImage(
-                            data=image_bytes, media_type="image/jpeg"
+                with open(render_path, "rb") as f:
+                    image_bytes = f.read()
+                    renders.append(
+                        engine.Render(
+                            image=pydantic_ai.BinaryImage(
+                                data=image_bytes, media_type="image/jpeg"
+                            )
                         )
                     )
-                )
 
-        return renders
+            return renders
 
     def _create_render_script(
         self,
