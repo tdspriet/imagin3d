@@ -122,10 +122,9 @@ async def confirm_weights(
 
     session = pending_confirmations[session_id]
     session["confirmed"] = payload.confirmed
-    if payload.weights or payload.cluster_weights:
+    if payload.weights:
         session["edited_weights"] = {
             "weights": payload.weights,
-            "cluster_weights": payload.cluster_weights,
         }
     session["event"].set()
 
@@ -210,7 +209,7 @@ async def extract(payload: MoodboardPayload) -> StreamingResponse:
         # Calculate total steps for progress tracking
         total_elements = len(payload.elements)
         total_clusters = len(payload.clusters)
-        total_steps = total_elements + total_clusters + total_elements + total_clusters
+        total_steps = total_elements + total_clusters + total_elements
 
         # Shared progress state
         progress_state = {"current": 0, "lock": asyncio.Lock()}
@@ -419,49 +418,8 @@ async def extract(payload: MoodboardPayload) -> StreamingResponse:
 
         # Initialize weight tracking
         element_weights: dict[int, int] = {}
-        cluster_weights: dict[int, int] = {}
 
-        # 1) Route clusters and assign weights
-        async def route_single_cluster(
-            cluster_descriptor: ClusterDescriptor,
-        ) -> tuple[int, int]:
-            weight = await orchestrator.route_cluster(
-                payload.prompt, cluster_descriptor
-            )
-            # Signal progress
-            current = await increment_progress()
-            await progress_queue.put(
-                {
-                    "current": current,
-                    "total": total_steps,
-                    "stage": "Weighing clusters...",
-                }
-            )
-            return cluster_descriptor.id, weight
-
-        # Start routing all clusters in parallel
-        cluster_routing_tasks = [
-            asyncio.create_task(route_single_cluster(cd)) for cd in cluster_descriptors
-        ]
-
-        # Yield progress updates as they come in
-        completed = 0
-        while completed < len(cluster_routing_tasks):
-            progress_data = await progress_queue.get()
-            completed += 1
-            progress_event = {"type": "progress", "data": progress_data}
-            yield f"data: {json.dumps(progress_event)}\n\n"
-
-        # Collect all results
-        cluster_routing_results = list(await asyncio.gather(*cluster_routing_tasks))
-
-        # Apply the routing results to cluster descriptors
-        cluster_descriptor_lookup = {cd.id: cd for cd in cluster_descriptors}
-        for cluster_id, weight in cluster_routing_results:
-            cluster_descriptor_lookup[cluster_id].weight = weight
-            cluster_weights[cluster_id] = weight
-
-        # 2) Provide cluster context for design tokens
+        # 1) Provide cluster context for design tokens
         token_cluster_context: dict[int, str] = {}
         for cluster_descriptor in cluster_descriptors:
             for element in cluster_descriptor.elements:
@@ -469,7 +427,7 @@ async def extract(payload: MoodboardPayload) -> StreamingResponse:
                     f"{cluster_descriptor.title},{cluster_descriptor.description}"
                 )
 
-        # 3) Route design tokens and assign weights
+        # 2) Route design tokens and assign weights
         async def route_single_token(token: DesignToken) -> tuple[int, int]:
             cluster_context = token_cluster_context.get(token.id)
             weight = await orchestrator.route_token(
@@ -524,7 +482,7 @@ async def extract(payload: MoodboardPayload) -> StreamingResponse:
         }
         weights_response = WeightsRequest(
             weights=element_weights,
-            cluster_weights=cluster_weights,
+            cluster_weights={},
         )
         weights_event = {
             "type": "weights",
@@ -551,7 +509,6 @@ async def extract(payload: MoodboardPayload) -> StreamingResponse:
             return
         if edited_weights:
             edited_element_weights = edited_weights.get("weights", {})
-            edited_cluster_weights = edited_weights.get("cluster_weights", {})
 
             for token_id, user_weight in edited_element_weights.items():
                 if token_id in token_lookup_for_routing:
@@ -559,13 +516,6 @@ async def extract(payload: MoodboardPayload) -> StreamingResponse:
                     token_lookup_for_routing[token_id].weight = clamped_weight
                     if token_id in element_weights:
                         element_weights[token_id] = clamped_weight
-
-            for cluster_id, user_weight in edited_cluster_weights.items():
-                if cluster_id in cluster_descriptor_lookup:
-                    clamped_weight = max(0, min(100, int(user_weight)))
-                    cluster_descriptor_lookup[cluster_id].weight = clamped_weight
-                    if cluster_id in cluster_weights:
-                        cluster_weights[cluster_id] = clamped_weight
 
         logger.info("User confirmed weights, continuing pipeline...")
 

@@ -29,7 +29,7 @@ from backend.utils.video import extract_key_frames
 logger = structlog.stdlib.get_logger(__name__)
 
 # Global state
-RELEVANCE_THRESHOLD = 40
+RELEVANCE_THRESHOLD = 50
 ROOT_DIR = Path(__file__).parent.resolve()
 _initialized = False
 blender_engine: Union[Blender, None] = None
@@ -202,10 +202,10 @@ async def synthesize_master_prompt(
                 "type": elem.type,
                 "title": elem.title,
                 "description": elem.description,
-                "weight": (elem.weight * cluster.weight) / 100,
+                "weight": elem.weight,
             }
             for elem in cluster.elements
-            if (elem.weight * cluster.weight) / 100 > RELEVANCE_THRESHOLD
+            if elem.weight > RELEVANCE_THRESHOLD
         ]
         if filtered_elements:
             filtered_clusters.append(
@@ -313,12 +313,12 @@ async def evaluate_model(
 
     for cluster in clusters:
         for token in cluster.elements:
-            if (token.weight * cluster.weight) / 100 <= RELEVANCE_THRESHOLD:
+            if token.weight <= RELEVANCE_THRESHOLD:
                 continue
 
             if token.embedding and len(token.embedding) > 0:
                 embeddings.append(token.embedding)
-                weights.append((token.weight * cluster.weight) / 100)
+                weights.append(token.weight)
 
     embeddings_np = np.array(embeddings)
     weights_np = np.array(weights)
@@ -416,7 +416,7 @@ def _collect_style_image_paths(
     image_paths: list[Path] = []
     for cluster in clusters:
         for elem in cluster.elements:
-            if (elem.weight * cluster.weight) / 100 <= RELEVANCE_THRESHOLD:
+            if elem.weight <= RELEVANCE_THRESHOLD:
                 continue
 
             if elem.type == "image":
