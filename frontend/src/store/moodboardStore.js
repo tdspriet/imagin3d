@@ -204,7 +204,6 @@ const buildEditedWeightsPayload = (nodes = [], idMaps = null) => {
 
   const nodeLookup = new Map(nodes.map((node) => [node.id, node]))
   const weights = {}
-  const cluster_weights = {}
 
   if (idMaps.elements instanceof Map) {
     for (const [backendId, frontendId] of idMaps.elements.entries()) {
@@ -215,16 +214,7 @@ const buildEditedWeightsPayload = (nodes = [], idMaps = null) => {
     }
   }
 
-  if (idMaps.clusters instanceof Map) {
-    for (const [backendId, frontendId] of idMaps.clusters.entries()) {
-      const node = nodeLookup.get(frontendId)
-      if (typeof node?.data?.weight === 'number') {
-        cluster_weights[backendId] = Math.max(0, Math.min(100, Math.round(node.data.weight)))
-      }
-    }
-  }
-
-  return { weights, cluster_weights }
+  return { weights, cluster_weights: {} }
 }
 
 /**
@@ -629,11 +619,11 @@ export const useMoodboardStore = create((set, get) => ({
   applyWeights: (weightsData, idMaps) => {
     set((state) => ({
       nodes: state.nodes.map((node) => {
-        const map = node.type === 'clusterNode' ? idMaps.clusters : idMaps.elements
-        const source = node.type === 'clusterNode' ? weightsData.cluster_weights : weightsData.weights
-        for (const [backendId, frontendId] of map.entries()) {
-          if (frontendId === node.id && source?.[backendId] != null) {
-            return { ...node, data: { ...node.data, weight: source[backendId] } }
+        if (node.type !== 'clusterNode') {
+          for (const [backendId, frontendId] of idMaps.elements.entries()) {
+            if (frontendId === node.id && weightsData.weights?.[backendId] != null) {
+              return { ...node, data: { ...node.data, weight: weightsData.weights[backendId] } }
+            }
           }
         }
         return node

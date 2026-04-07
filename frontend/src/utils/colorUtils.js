@@ -25,12 +25,12 @@ export const weightToColor = (weight, opacity = 0.3) => {
   
   let r, g
   if (clampedWeight <= 50) {
-    // Red to yellow
+    // Excluded: Red to Orange
     r = 255
-    g = Math.round((clampedWeight / 50) * 255)
+    g = Math.round((clampedWeight / 50) * 150) // 0 to 150
   } else {
-    // Yellow to green
-    r = Math.round(255 - ((clampedWeight - 50) / 50) * 255)
+    // Included: Yellow to Green
+    r = Math.round(255 - ((clampedWeight - 50) / 50) * 255) // 255 to 0
     g = 255
   }
   

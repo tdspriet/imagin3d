@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { NodeResizer } from 'reactflow'
 import { useMoodboardStore } from '../../store/moodboardStore'
-import WeightOverlay from './WeightOverlay'
 import './ClusterNode.css'
 
 function ClusterNode({ id, data, selected }) {
@@ -100,7 +99,6 @@ function ClusterNode({ id, data, selected }) {
           )}
         </div>
         <div className="cluster-node-body" aria-hidden="true">
-          <WeightOverlay nodeId={id} weight={data?.weight} />
         </div>
       </div>
     </>
