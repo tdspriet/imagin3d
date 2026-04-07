@@ -120,6 +120,8 @@ def patch_local_pipeline_config(bundle_dir: Path) -> None:
         try:
             pipeline = json.loads(pipeline_path.read_text())
             args = pipeline.get("args", {})
+
+            # NOTE: This is dangerous as running 512 will not work anymore
             models = args.setdefault("models", {})
             models.pop("tex_slat_flow_model_512", None)
 
