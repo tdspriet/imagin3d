@@ -27,6 +27,58 @@ TRELLIS_NEW_LAYER_CODE = """        encoder = getattr(self.model, "model", self.
             )
 """
 
+TRELLIS_OLD_CUMESH_CODE = """    def fill_holes(self, max_hole_perimeter=3e-2):
+        vertices = self.vertices.cuda()
+        faces = self.faces.cuda()
+        
+        mesh = cumesh.CuMesh()
+        mesh.init(vertices, faces)
+        mesh.get_edges()
+        mesh.get_boundary_info()
+        if mesh.num_boundaries == 0:
+            return
+        mesh.get_vertex_edge_adjacency()
+        mesh.get_vertex_boundary_adjacency()
+        mesh.get_manifold_boundary_adjacency()
+        mesh.read_manifold_boundary_adjacency()
+        mesh.get_boundary_connected_components()
+        mesh.get_boundary_loops()
+        if mesh.num_boundary_loops == 0:
+            return
+        mesh.fill_holes(max_hole_perimeter=max_hole_perimeter)
+        new_vertices, new_faces = mesh.read()"""
+
+TRELLIS_NEW_CUMESH_CODE = """    def fill_holes(self, max_hole_perimeter=3e-2):
+        vertices = self.vertices.cuda()
+        faces = self.faces.cuda()
+        
+        mesh = cumesh.CuMesh()
+        mesh.init(vertices, faces)
+        
+        try:
+            # Try to free up caching allocator memory first before native CuMesh allocation
+            torch.cuda.empty_cache()
+            mesh.get_edges()
+            mesh.get_boundary_info()
+            if mesh.num_boundaries == 0:
+                return
+            mesh.get_vertex_edge_adjacency()
+            mesh.get_vertex_boundary_adjacency()
+            mesh.get_manifold_boundary_adjacency()
+            mesh.read_manifold_boundary_adjacency()
+            mesh.get_boundary_connected_components()
+            mesh.get_boundary_loops()
+            if mesh.num_boundary_loops == 0:
+                return
+            mesh.fill_holes(max_hole_perimeter=max_hole_perimeter)
+        except RuntimeError as e:
+            if "out of memory" in str(e).lower():
+                print("[Warning] CuMesh out of memory during fill_holes(). Skipping hole filling to prevent crash.")
+                return
+            raise e
+            
+        new_vertices, new_faces = mesh.read()"""
+
 
 def patch_file(file_path: Path, old: str, new: str) -> bool:
     """Replaces 'old' with 'new' in the target file. Returns True if patched, False otherwise."""
@@ -62,6 +114,14 @@ def patch_trellis_dinov3_api(repo_root: Path) -> None:
 
     for target_path in targets:
         patch_file(target_path, TRELLIS_OLD_LAYER_CODE, TRELLIS_NEW_LAYER_CODE)
+
+
+def patch_trellis_cumesh_oom(repo_root: Path) -> None:
+    logging.info("Patching TRELLIS CuMesh OOM handling...")
+
+    target_path = repo_root / "trellis2/trellis2/representations/mesh/base.py"
+
+    patch_file(target_path, TRELLIS_OLD_CUMESH_CODE, TRELLIS_NEW_CUMESH_CODE)
 
 
 def download_repo(repo_id: str, target_dir: Path) -> None:
@@ -189,6 +249,7 @@ def main() -> None:
     patch_local_rmbg_bundle(vendor_dir / "RMBG-2.0")
     patch_local_pipeline_config(bundle_dir)
     patch_trellis_dinov3_api(repo_root)
+    patch_trellis_cumesh_oom(repo_root)
 
     logging.info("Setup complete.")
 
