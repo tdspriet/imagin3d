@@ -64,6 +64,7 @@ function Topbar() {
 
   // Handle image file selection
   const handleImageUpload = (e) => {
+    if (isGenerating) return
     const file = e.target.files[0]
     if (file && file.type.startsWith('image/')) {
       const reader = new FileReader()
@@ -77,6 +78,7 @@ function Topbar() {
 
   // Handle video file selection
   const handleVideoUpload = (e) => {
+    if (isGenerating) return
     const file = e.target.files[0]
     if (file && file.type.startsWith('video/')) {
       const reader = new FileReader()
@@ -90,6 +92,7 @@ function Topbar() {
 
   // Handle font file selection
   const handleFontUpload = (e) => {
+    if (isGenerating) return
     const file = e.target.files[0]
     if (file) {
       const validExtensions = ['.otf', '.ttf', '.woff', '.woff2']
@@ -112,6 +115,7 @@ function Topbar() {
 
   // Handle 3D model file selection
   const handleModelUpload = (e) => {
+    if (isGenerating) return
     const file = e.target.files[0]
     if (file) {
       const validExtensions = ['.glb', '.gltf']
@@ -134,6 +138,7 @@ function Topbar() {
 
   // Handle moodboard file loading
   const handleLoadFile = (e) => {
+    if (isGenerating) return
     const file = e.target.files[0]
     if (file && file.type === 'application/json') {
       const reader = new FileReader()
@@ -151,6 +156,7 @@ function Topbar() {
   }
 
   const handleAddCluster = () => {
+    if (isGenerating) return
     const title = window.prompt('Choose a name for your cluster', 'New Cluster')
     if (title === null) {
       return
@@ -159,6 +165,7 @@ function Topbar() {
   }
 
   const handleCreateManualPalette = (colors) => {
+    if (isGenerating) return false
     if (!Array.isArray(colors) || colors.length === 0) {
       return false
     }
@@ -185,33 +192,33 @@ function Topbar() {
           <span className="logo-text">imagin3d</span>
         </div>
         <div className="topbar-add" role="group" aria-label="Add items">
-          <button onClick={handleAddCluster} className="btn">
+          <button onClick={handleAddCluster} className="btn" disabled={isGenerating}>
             <MdGridOn className="btn-icon" size={18} aria-hidden="true" focusable="false" />
             <span>Add Cluster</span>
           </button>
-          <button onClick={() => modelInputRef.current?.click()} className="btn">
+          <button onClick={() => modelInputRef.current?.click()} className="btn" disabled={isGenerating}>
             <MdViewInAr className="btn-icon" size={18} aria-hidden="true" focusable="false" />
             <span>Add 3D</span>
           </button>
-          <button onClick={() => videoInputRef.current?.click()} className="btn">
+          <button onClick={() => videoInputRef.current?.click()} className="btn" disabled={isGenerating}>
             <MdVideoLibrary className="btn-icon" size={18} aria-hidden="true" focusable="false" />
             <span>Add Video</span>
           </button>
-          <button onClick={() => fileInputRef.current?.click()} className="btn">
+          <button onClick={() => fileInputRef.current?.click()} className="btn" disabled={isGenerating}>
             <MdImage className="btn-icon" size={18} aria-hidden="true" focusable="false" />
             <span>Add Image</span>
           </button>
-          <button onClick={addText} className="btn">
+          <button onClick={addText} className="btn" disabled={isGenerating}>
             <MdTitle className="btn-icon" size={18} aria-hidden="true" focusable="false" />
             <span>Add Text</span>
           </button>
           {/*
-          <button onClick={() => fontInputRef.current?.click()} className="btn">
+          <button onClick={() => fontInputRef.current?.click()} className="btn" disabled={isGenerating}>
             <MdFontDownload className="btn-icon" size={18} aria-hidden="true" focusable="false" />
             <span>Add Font</span>
           </button>
           */}
-          <button onClick={() => setPaletteDialogOpen(true)} className="btn">
+          <button onClick={() => setPaletteDialogOpen(true)} className="btn" disabled={isGenerating}>
             <MdPalette className="btn-icon" size={18} aria-hidden="true" focusable="false" />
             <span>Add Palette</span>
           </button>
@@ -223,7 +230,7 @@ function Topbar() {
           <MdZoomOutMap className="btn-icon" size={18} aria-hidden="true" focusable="false" />
           <span>Fit View</span>
         </button>
-        <button onClick={clearAll} className="btn btn-danger">
+        <button onClick={clearAll} className="btn btn-danger" disabled={isGenerating}>
           <MdDeleteSweep className="btn-icon" size={18} aria-hidden="true" focusable="false" />
           <span>Clear All</span>
         </button>
@@ -231,7 +238,7 @@ function Topbar() {
           <MdSave className="btn-icon" size={18} aria-hidden="true" focusable="false" />
           <span>Save</span>
         </button>
-        <button onClick={() => loadInputRef.current?.click()} className="btn btn-success">
+        <button onClick={() => loadInputRef.current?.click()} className="btn btn-success" disabled={isGenerating}>
           <MdFolderOpen className="btn-icon" size={18} aria-hidden="true" focusable="false" />
           <span>Load</span>
         </button>

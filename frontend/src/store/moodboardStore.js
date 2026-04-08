@@ -373,6 +373,7 @@ export const useMoodboardStore = create((set, get) => ({
 
   // Add image node
   addImage: (src) => {
+    if (get().isGenerating) return
     const position = get().getCenterPosition()
     const nodeId = `image-${Date.now()}`
     const image = new Image()
@@ -415,6 +416,7 @@ export const useMoodboardStore = create((set, get) => ({
 
   // Add video node
   addVideo: (src) => {
+    if (get().isGenerating) return
     const position = get().getCenterPosition()
     const nodeId = `video-${Date.now()}`
     const video = document.createElement('video')
@@ -467,6 +469,7 @@ export const useMoodboardStore = create((set, get) => ({
 
   // Add text node
   addText: () => {
+    if (get().isGenerating) return
     const position = get().getCenterPosition()
     const width = DEFAULT_SIZES.TEXT.width
     const height = DEFAULT_SIZES.TEXT.height
@@ -484,6 +487,7 @@ export const useMoodboardStore = create((set, get) => ({
 
   // Add font node
   addFont: (fontData, fontName) => {
+    if (get().isGenerating) return
     const position = get().getCenterPosition()
     const nodeId = `font-${Date.now()}`
     const uniqueFontFamily = `CustomFont-${nodeId}`
@@ -522,6 +526,7 @@ export const useMoodboardStore = create((set, get) => ({
 
   // Add 3D model node
   addModel: (src, fileName) => {
+    if (get().isGenerating) return
     const position = get().getCenterPosition()
     const nodeId = `model-${Date.now()}`
     
@@ -546,6 +551,7 @@ export const useMoodboardStore = create((set, get) => ({
 
   // Add palette node
   addPalette: (colors, options = {}) => {
+    if (get().isGenerating) return
     const paletteColors = Array.isArray(colors) ? [...colors] : []
     const position = get().getCenterPosition()
     const width = Number.isFinite(options.width) ? options.width : DEFAULT_SIZES.PALETTE.width
@@ -570,6 +576,7 @@ export const useMoodboardStore = create((set, get) => ({
 
   // Add cluster node
   addCluster: (title) => {
+    if (get().isGenerating) return
     const position = get().getCenterPosition()
     const clusterTitle =
       typeof title === 'string' && title.trim().length > 0 ? title.trim() : 'Cluster'
@@ -610,6 +617,7 @@ export const useMoodboardStore = create((set, get) => ({
 
   // Clear all nodes
   clearAll: () => {
+    if (get().isGenerating) return
     if (confirm('Are you sure you want to clear all elements?')) {
       set({ nodes: [], edges: [] })
     }
@@ -1009,6 +1017,7 @@ export const useMoodboardStore = create((set, get) => ({
 
   // Load moodboard from JSON data
   loadMoodboard: (data) => {
+    if (get().isGenerating) return
     try {
       if (data.nodes && Array.isArray(data.nodes)) {
         set((state) => ({
