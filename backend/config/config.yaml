@@ -13,7 +13,7 @@ engine:
   exe: "blender"
   resolution_x: 512
   resolution_y: 512
-  num_views: 5
+  num_views: 3
   timeout_s: 60
 
 trellis:
