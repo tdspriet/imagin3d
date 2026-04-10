@@ -521,12 +521,70 @@ async def extract(payload: MoodboardPayload) -> StreamingResponse:
 
         # ----- Master Prompt Generation -----
 
+        adapt_subject_image_path = None
+        if payload.adapt_subject_file:
+            progress_event = {
+                "type": "progress",
+                "data": {
+                    "current": 0,
+                    "total": 3,
+                    "stage": "Processing adapt subject...",
+                },
+            }
+            yield f"data: {json.dumps(progress_event)}\n\n"
+
+            subject_element = {
+                "id": "adapt_subject",
+                "content": payload.adapt_subject_file,
+            }
+            # Add "src" to "data" for compatibility
+            subject_element["content"]["data"] = {
+                "src": subject_element["content"]["data"],
+                "fileName": subject_element["content"].get(
+                    "name", "adapt_subject_model.glb"
+                ),
+            }
+
+            try:
+                if subject_element["content"]["type"] == "model":
+                    title, description = await orchestrator.handle_model(
+                        subject_element
+                    )
+                    renders_dir = (
+                        ROOT_DIR / "artifacts" / "model_renders" / "adapt_subject"
+                    )
+                    renders = sorted(renders_dir.glob("*.jpg"))
+                    if renders:
+                        adapt_subject_image_path = renders[0]
+                elif subject_element["content"]["type"] == "image":
+                    title, description = await orchestrator.handle_image(
+                        subject_element
+                    )
+                    adapt_subject_image_path = (
+                        ROOT_DIR
+                        / "artifacts"
+                        / "images"
+                        / "adapt_subject"
+                        / "image.jpg"
+                    )
+
+                # Append title and description to adapt_subject_text
+                text_addition = f"{title}: {description}"
+                if payload.adapt_subject_text:
+                    payload.adapt_subject_text += (
+                        f"\n\nReference file details:\n{text_addition}"
+                    )
+                else:
+                    payload.adapt_subject_text = text_addition
+            except Exception as e:
+                logger.error("Failed to process adapt subject file", error=e)
+
         # Send progress update for master prompt generation
         progress_event = {
             "type": "progress",
             "data": {
-                "current": 0,
-                "total": 2,
+                "current": 1 if payload.adapt_subject_file else 0,
+                "total": 3 if payload.adapt_subject_file else 2,
                 "stage": "Generating master prompt...",
             },
         }
@@ -535,6 +593,7 @@ async def extract(payload: MoodboardPayload) -> StreamingResponse:
         master_prompt = await orchestrator.synthesize_master_prompt(
             payload.prompt,
             cluster_descriptors,
+            payload.adapt_subject_text,
         )
 
         # ----- Master Image Generation -----
@@ -543,8 +602,8 @@ async def extract(payload: MoodboardPayload) -> StreamingResponse:
         progress_event = {
             "type": "progress",
             "data": {
-                "current": 1,
-                "total": 2,
+                "current": 2 if payload.adapt_subject_file else 1,
+                "total": 3 if payload.adapt_subject_file else 2,
                 "stage": "Generating master image...",
             },
         }
@@ -553,6 +612,7 @@ async def extract(payload: MoodboardPayload) -> StreamingResponse:
         master_image_path = await orchestrator.generate_master_image(
             master_prompt,
             cluster_descriptors,
+            base_image_path=adapt_subject_image_path,
         )
         reference_images = orchestrator.get_reference_images_preview(
             cluster_descriptors

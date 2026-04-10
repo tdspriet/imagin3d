@@ -21,9 +21,15 @@ class Visualizer(agent.BaseAgent):
         self,
         master_prompt: str,
         style_images: list[pydantic_ai.BinaryImage],
+        base_image: pydantic_ai.BinaryImage | None = None,
     ) -> pydantic_ai.AgentRunResult[pydantic_ai.BinaryImage]:
+        extra = []
+        if base_image:
+            extra.append(base_image)
+        extra.extend(style_images)
+
         result, _ = await self._prompt(
-            {"master_prompt": master_prompt},
-            extra=style_images,
+            {"master_prompt": master_prompt, "has_base_image": bool(base_image)},
+            extra=extra,
         )
         return result

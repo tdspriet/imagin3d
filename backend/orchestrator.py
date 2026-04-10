@@ -194,6 +194,7 @@ def generate_embedding(title: str) -> list[float]:
 async def synthesize_master_prompt(
     user_prompt: str,
     clusters: list[common.ClusterDescriptor],
+    adapt_subject_text: str | None = None,
 ) -> str:
     filtered_clusters = []
     for cluster in clusters:
@@ -217,7 +218,9 @@ async def synthesize_master_prompt(
                 }
             )
 
-    result = await prompt_synthesizer.run(user_prompt, filtered_clusters)
+    result = await prompt_synthesizer.run(
+        user_prompt, filtered_clusters, adapt_subject_text
+    )
     master_prompt = result.output.info.prompt
 
     # Save master prompt to artifacts
@@ -231,14 +234,20 @@ async def synthesize_master_prompt(
 async def generate_master_image(
     master_prompt: str,
     clusters: list[common.ClusterDescriptor],
+    base_image_path: Path | None = None,
 ) -> Path:
     style_images = _collect_style_images(clusters)
     logger.info(
         f"Collected {len(style_images)} style images for master image generation"
     )
 
+    base_image = None
+    if base_image_path and Path(base_image_path).exists():
+        with open(base_image_path, "rb") as f:
+            base_image = pydantic_ai.BinaryImage(data=f.read(), media_type="image/jpeg")
+
     # Generate master image
-    result = await visualizer.run(master_prompt, style_images)
+    result = await visualizer.run(master_prompt, style_images, base_image)
 
     # Save master image to artifacts
     master_image_path = ROOT_DIR / "artifacts" / "master_image.jpg"

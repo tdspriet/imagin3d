@@ -640,17 +640,27 @@ export const useMoodboardStore = create((set, get) => ({
   },
 
   // Send moodboard generation request to backend
-  generateMoodboard: async (prompt = '') => {
+  generateMoodboard: async (prompt = '', subjectText = '', subjectFile = null) => {
     const { nodes, applyWeights } = get()
     const { payload, idMaps } = serializeDataForBackend(nodes)
 
     // If no elements or clusters, skip generation
-    if ((!payload.elements || payload.elements.length === 0) && (!payload.clusters || payload.clusters.length === 0)) {
+    if ((!payload.elements || payload.elements.length === 0) && (!payload.clusters || payload.clusters.length === 0) && !subjectFile) {
       return { weights: {}, cluster_weights: {} }
     }
 
     // Add the user prompt to the payload
     payload.prompt = prompt
+    if (subjectText) {
+      payload.adapt_subject_text = subjectText
+    }
+    if (subjectFile) {
+      payload.adapt_subject_file = {
+        type: subjectFile.type,
+        data: subjectFile.data,
+        name: subjectFile.name
+      }
+    }
 
     set({ 
       isGenerating: true, 

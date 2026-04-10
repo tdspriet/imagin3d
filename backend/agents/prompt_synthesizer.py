@@ -22,9 +22,13 @@ class PromptSynthesizer(agent.BaseAgent):
         self,
         user_prompt: str,
         clusters: list[dict],
+        adapt_subject_text: str | None = None,
     ) -> pydantic_ai.AgentRunResult[Output]:
-        result, _ = await self._prompt({
-            "user_prompt": user_prompt,
-            "clusters": clusters,
-        })
+        result, _ = await self._prompt(
+            {
+                "user_prompt": user_prompt,
+                "clusters": clusters,
+                "adapt_subject_text": adapt_subject_text,
+            }
+        )
         return result
