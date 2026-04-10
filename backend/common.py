@@ -16,6 +16,8 @@ class MoodboardPayload(BaseModel):
     elements: List[Element] = Field(default_factory=list)
     clusters: List[Cluster] = Field(default_factory=list)
     prompt: str = Field(default="")
+    adapt_subject_text: Optional[str] = Field(default=None)
+    adapt_subject_file: Optional[Dict[str, Any]] = Field(default=None)
 
 
 class WeightsRequest(BaseModel):
