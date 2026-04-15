@@ -103,7 +103,7 @@ function AdaptDialog({ isOpen, onClose, onAdapt, isGenerating }) {
 
         <header className="generate-dialog__header">
           <h2>Adapt to Moodboard</h2>
-          <p>Provide a subject (text or file) and describe which part of the moodboard it should adapt to.</p>
+          <p>Provide a subject and describe which part of the moodboard it should adapt to.</p>
         </header>
 
         <form onSubmit={handleSubmit} className="generate-dialog__form">
@@ -116,7 +116,7 @@ function AdaptDialog({ isOpen, onClose, onAdapt, isGenerating }) {
                   className="generate-dialog__input"
                   value={subjectText}
                   onChange={(e) => setSubjectText(e.target.value)}
-                  placeholder="e.g., A basic wooden chair, OR upload a reference file..."
+                  placeholder="e.g., A basic wooden chair..."
                   rows={2}
                   disabled={isGenerating}
                 />
