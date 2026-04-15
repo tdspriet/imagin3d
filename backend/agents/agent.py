@@ -30,11 +30,23 @@ class BaseAgent(ABC, Generic[T]):
         ctx: Any,
         extra: list[pydantic_ai.UserContent | None] = [],
         log_run: bool = True,
+        template_subdir: str | None = None,
     ) -> tuple[pydantic_ai.AgentRunResult[T], common.Cost]:
         start_time = time.perf_counter()
         prompts_dir = pathlib.Path(__file__).parents[1] / "prompts"
         env = jinja2.Environment(loader=jinja2.FileSystemLoader(str(prompts_dir)))
-        template = env.get_template(f"{self.name}.j2")
+
+        template_name = (
+            f"{template_subdir}/{self.name}.j2"
+            if template_subdir
+            else f"{self.name}.j2"
+        )
+        # Fallback to root if not found in subdir
+        try:
+            template = env.get_template(template_name)
+        except jinja2.exceptions.TemplateNotFound:
+            template = env.get_template(f"{self.name}.j2")
+
         prompt = template.render(ctx=ctx)
         if log_run:
             logger.info(f"Prompt to {self.name}({self.model_ref}):\n{prompt}")

@@ -1,10 +1,5 @@
 User's generation intent:
-"{{ ctx.user_prompt }}"
-
-{% if ctx.adapt_subject_text %}
-Subject to adapt:
-"{{ ctx.adapt_subject_text }}"
-{% endif %}
+"{{ ctx.prompt }}"
 
 Moodboard analysis (ordered by relevance):
 {% for cluster in ctx.clusters %}
@@ -18,9 +13,5 @@ Key elements:
 {% endfor %}
 {% endif %}
 {% endfor %}
-{% if ctx.adapt_subject_text %}
-Take the subject described above and adapt it to the moodboard style (ordered by relevance below). Synthesize these into a single generation prompt.
-{% else %}
 Synthesize these into a single generation prompt.
-{% endif %}
 The subject must be fully in-frame isolated against a seamless pure white background.

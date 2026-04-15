@@ -20,15 +20,20 @@ class PromptSynthesizer(agent.BaseAgent):
 
     async def run(
         self,
-        user_prompt: str,
+        prompt: str,
         clusters: list[dict],
-        adapt_subject_text: str | None = None,
+        subject: str | None = None,
     ) -> pydantic_ai.AgentRunResult[Output]:
+        mode = "adapt" if subject else "generation"
+        ctx = {"clusters": clusters}
+        if subject:
+            ctx["subject"] = subject
+            ctx["adaptation"] = prompt
+        else:
+            ctx["prompt"] = prompt
+
         result, _ = await self._prompt(
-            {
-                "user_prompt": user_prompt,
-                "clusters": clusters,
-                "adapt_subject_text": adapt_subject_text,
-            }
+            ctx,
+            template_subdir=mode,
         )
         return result

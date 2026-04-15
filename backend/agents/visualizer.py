@@ -22,14 +22,21 @@ class Visualizer(agent.BaseAgent):
         master_prompt: str,
         style_images: list[pydantic_ai.BinaryImage],
         base_image: pydantic_ai.BinaryImage | None = None,
+        prompt: str | None = None,
     ) -> pydantic_ai.AgentRunResult[pydantic_ai.BinaryImage]:
         extra = []
         if base_image:
             extra.append(base_image)
         extra.extend(style_images)
 
+        mode = "adapt" if base_image or prompt else "generation"
+        ctx = {"master_prompt": master_prompt, "has_base_image": bool(base_image)}
+        if prompt:
+            ctx["adaptation"] = prompt
+
         result, _ = await self._prompt(
-            {"master_prompt": master_prompt, "has_base_image": bool(base_image)},
+            ctx,
             extra=extra,
+            template_subdir=mode,
         )
         return result
