@@ -1,13 +1,56 @@
 import React, { useCallback, useEffect, useState, useRef, Suspense } from 'react'
 import { MdImage, MdViewInAr, MdClose, MdAdsClick } from 'react-icons/md'
 import { Canvas } from '@react-three/fiber'
-import { OrbitControls, useGLTF, Center, Bounds, Environment } from '@react-three/drei'
+import { OrbitControls, useGLTF, Environment, Html } from '@react-three/drei'
 import { useMoodboardStore } from '../../store/moodboardStore'
+import * as THREE from 'three'
 import './GenerateDialog.css' // Reuse the same CSS
+
+class ModelErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props)
+    this.state = { hasError: false }
+  }
+  static getDerivedStateFromError(error) {
+    return { hasError: true }
+  }
+  render() {
+    if (this.state.hasError) {
+      return <Html center><div style={{ color: 'var(--color-error)' }}>Failed to load model</div></Html>
+    }
+    return this.props.children
+  }
+}
 
 function Model3D({ url }) {
   const { scene } = useGLTF(url)
-  return <primitive object={scene} />
+  const clonedScene = React.useMemo(() => scene ? scene.clone() : null, [scene])
+  
+  React.useEffect(() => {
+    if (!clonedScene) return
+    
+    // Reset to compute actual size
+    clonedScene.scale.setScalar(1)
+    clonedScene.position.set(0, 0, 0)
+    clonedScene.updateMatrixWorld(true)
+    
+    const box = new THREE.Box3().setFromObject(clonedScene)
+    const center = box.getCenter(new THREE.Vector3())
+    const size = box.getSize(new THREE.Vector3())
+    
+    const maxDim = Math.max(size.x, size.y, size.z) || 1
+    const scale = 2.5 / maxDim
+    clonedScene.scale.setScalar(scale)
+    
+    // Push the object up 0.25 unit after centering
+    clonedScene.position.set(
+      -center.x * scale,
+      -center.y * scale + 0.25,
+      -center.z * scale
+    )
+  }, [clonedScene])
+
+  return clonedScene ? <primitive object={clonedScene} /> : null
 }
 
 function AdaptDialog({ isOpen, onClose, onAdapt, isGenerating }) {
@@ -174,20 +217,18 @@ function AdaptDialog({ isOpen, onClose, onAdapt, isGenerating }) {
                   <img src={subjectFile.data} style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} alt="Subject" />
                 ) : (
                   <div style={{ width: '100%', height: '100%' }}>
-                    <Suspense fallback={<div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-secondary)' }}>Loading model...</div>}>
                       <Canvas camera={{ position: [0, 0, 5], fov: 50 }}>
                         <ambientLight intensity={1.5} />
                         <directionalLight position={[10, 10, 10]} intensity={2.5} />
                         <directionalLight position={[-10, -10, -10]} intensity={1} />
-                        <Bounds fit clip observe margin={1.2}>
-                          <Center>
+                        <Suspense fallback={null}>
+                          <ModelErrorBoundary>
                             <Model3D url={subjectFile.data} />
-                          </Center>
-                        </Bounds>
+                          </ModelErrorBoundary>
+                        </Suspense>
                         <Environment preset="city" />
                         <OrbitControls makeDefault enableZoom={true} />
                       </Canvas>
-                    </Suspense>
                   </div>
                 )}
               </div>
