@@ -528,7 +528,7 @@ async def extract(payload: MoodboardPayload) -> StreamingResponse:
                 "data": {
                     "current": 0,
                     "total": 3,
-                    "stage": "Processing adapt subject...",
+                    "stage": "Processing subject...",
                 },
             }
             yield f"data: {json.dumps(progress_event)}\n\n"

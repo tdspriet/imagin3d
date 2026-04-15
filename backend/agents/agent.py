@@ -3,7 +3,7 @@ import time
 from abc import ABC, abstractmethod
 from typing import Any, Generic, TypeVar
 
-T = TypeVar('T')
+T = TypeVar("T")
 
 import genai_prices
 import jinja2
