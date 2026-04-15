@@ -200,7 +200,7 @@ function AdaptDialog({ isOpen, onClose, onAdapt, isGenerating }) {
               className="generate-dialog__input"
               value={styleIntent}
               onChange={(e) => setStyleIntent(e.target.value)}
-              placeholder="e.g., Adapt it to the magical forest part of my moodboard..."
+              placeholder="e.g., The magical forest..."
               rows={3}
               disabled={isGenerating}
             />
