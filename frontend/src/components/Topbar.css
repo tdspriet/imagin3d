@@ -3,7 +3,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   padding: 12px 24px;
   background-color: var(--color-surface);
   border-bottom: 1px solid var(--color-border);
@@ -153,7 +153,11 @@
   white-space: nowrap;
 }
 
-@media (max-width: 1550px) {
+@media (max-width: 1750px) {
+  .topbar {
+    flex-wrap: wrap; 
+  }
+
   .topbar-left {
     flex-wrap: wrap;
     align-items: flex-start;
