@@ -27,9 +27,9 @@ const addInitialSize = (data, width, height) => ({
   initialSize: { width, height },
 })
 
-const serializeDataForBackend = (nodes = []) => {
+const serializeDataForBackend = (nodes = [], excludeNodeId = null) => {
   const clusterNodes = nodes.filter(n => n.type === 'clusterNode')
-  const contentNodes = nodes.filter(n => n.type !== 'clusterNode')
+  const contentNodes = nodes.filter(n => n.type !== 'clusterNode' && n.id !== excludeNodeId)
 
   // ELEMENTS
   const elements = contentNodes.map((node, index) => {
@@ -249,6 +249,13 @@ export const useMoodboardStore = create((set, get) => ({
   },
   backendModelLabel: null,
   score: null,
+
+  // Picking element
+  isPickingElement: false,
+  pickedElement: null,
+  setIsPickingElement: (isPicking) => set({ isPickingElement: isPicking }),
+  setPickedElement: (element) => set({ pickedElement: element, isPickingElement: false }),
+  adaptedSubjectNodeId: null,
 
   // Set ReactFlow instance
   setReactFlowInstance: (instance) => set({ reactFlowInstance: instance }),
@@ -642,7 +649,7 @@ export const useMoodboardStore = create((set, get) => ({
   // Send moodboard generation request to backend
   generateMoodboard: async (prompt = '', subjectText = '', subjectFile = null) => {
     const { nodes, applyWeights } = get()
-    const { payload, idMaps } = serializeDataForBackend(nodes)
+    const { payload, idMaps } = serializeDataForBackend(nodes, subjectFile?.nodeId)
 
     // If no elements or clusters, skip generation
     if ((!payload.elements || payload.elements.length === 0) && (!payload.clusters || payload.clusters.length === 0) && !subjectFile) {
@@ -671,6 +678,7 @@ export const useMoodboardStore = create((set, get) => ({
       masterPromptSessionId: null,
       masterPromptData: null,
       masterPromptIsLoading: false,
+      adaptedSubjectNodeId: subjectFile?.nodeId || null,
       progress: { current: 0, total: 0, stage: 'Starting...' },
       score: null,
     })

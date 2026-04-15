@@ -33,7 +33,7 @@ const nodeTypes = {
  * Main ReactFlow canvas for the moodboard
  */
 function Canvas() {
-  const { nodes, setNodes, onNodesChange, edges, fitViewTrigger, setReactFlowInstance } = useMoodboardStore()
+  const { nodes, setNodes, onNodesChange, edges, fitViewTrigger, setReactFlowInstance, isPickingElement, setPickedElement, awaitingWeightsConfirmation, adaptedSubjectNodeId } = useMoodboardStore()
   const isGenerating = useMoodboardStore((s) => s.isGenerating)
   const reactFlowWrapper = useRef(null)
   const [localNodes, setLocalNodes] = useNodesState(nodes)
@@ -77,31 +77,95 @@ function Canvas() {
     }
   }, [fitViewTrigger])
 
-  // Handle keyboard events (Delete key)
-  useEffect(() => {
-    const handleKeyDown = (event) => {
-      if (isGenerating) return
-      if (event.key === 'Delete' || event.key === 'Backspace') {
-        const selectedNodes = localNodes.filter((node) => node.selected)
-        if (selectedNodes.length > 0) {
-          event.preventDefault()
-          const remainingNodes = localNodes.filter((node) => !node.selected)
-          setLocalNodes(remainingNodes)
-          setNodes(remainingNodes)
+// Handle keyboard events (Delete key, Escape key)
+    useEffect(() => {
+      const handleKeyDown = (event) => {
+        if (isPickingElement && event.key === 'Escape') {
+          setPickedElement(null) // Cancel picking
+          return
+        }
+
+        if (isGenerating) return
+        if (event.key === 'Delete' || event.key === 'Backspace') {
+          const selectedNodes = localNodes.filter((node) => node.selected)
+          if (selectedNodes.length > 0) {
+            event.preventDefault()
+            const remainingNodes = localNodes.filter((node) => !node.selected)
+            setLocalNodes(remainingNodes)
+            setNodes(remainingNodes)
+          }
         }
       }
-    }
 
-    document.addEventListener('keydown', handleKeyDown)
-    return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [localNodes, setLocalNodes, setNodes, isGenerating])
+      document.addEventListener('keydown', handleKeyDown)
+      return () => document.removeEventListener('keydown', handleKeyDown)
+    }, [localNodes, setLocalNodes, setNodes, isGenerating, isPickingElement, setPickedElement])
+
+  // Prepare nodes for picking mode
+  const displayNodes = isPickingElement
+    ? localNodes.map(node => {
+        const isPickable = node.type === 'imageNode' || node.type === 'modelNode'
+        return {
+          ...node,
+          draggable: false,
+          selectable: false,
+          style: {
+            ...node.style,
+            opacity: isPickable ? 1 : 0.3,
+            pointerEvents: isPickable ? 'auto' : 'none',
+            boxShadow: isPickable ? '0 0 0 4px var(--color-primary)' : node.style?.boxShadow,
+            filter: isPickable ? 'brightness(1.1)' : 'grayscale(100%)',
+            transition: 'all 0.2s ease',
+            cursor: isPickable ? 'pointer' : 'default',
+          }
+        }
+      })
+    : awaitingWeightsConfirmation && adaptedSubjectNodeId
+      ? localNodes.map(node => {
+          const isSubject = node.id === adaptedSubjectNodeId
+          if (isSubject) {
+            return {
+              ...node,
+              draggable: false,
+              selectable: false,
+              style: {
+                ...node.style,
+                opacity: 0.4,
+                pointerEvents: 'none',
+                filter: 'grayscale(100%)',
+                transition: 'all 0.3s ease',
+              }
+            }
+          }
+          return node
+        })
+      : localNodes
+
+  const handleNodeClick = useCallback((event, node) => {
+    if (isPickingElement) {
+      if (node.type === 'imageNode' || node.type === 'modelNode') {
+        const type = node.type === 'imageNode' ? 'image' : 'model'
+        const data = node.data.src
+        const name = node.data.fileName || `picked-${type}-${node.id}`
+        setPickedElement({ type, data, name, nodeId: node.id })
+      }
+    }
+  }, [isPickingElement, setPickedElement])
+
+  const handlePaneClick = useCallback((event) => {
+    if (isPickingElement) {
+      setPickedElement(null) // Cancel picking
+    }
+  }, [isPickingElement, setPickedElement])
 
   return (
-    <div className="canvas-container" ref={reactFlowWrapper}>
+    <div className={`canvas-container ${isPickingElement ? 'picking-mode' : ''}`} ref={reactFlowWrapper}>
       <ReactFlow
-        nodes={localNodes}
+        nodes={displayNodes}
         edges={localEdges}
         onNodesChange={handleNodesChange}
+        onNodeClick={handleNodeClick}
+        onPaneClick={handlePaneClick}
         onInit={onInit}
         nodeTypes={nodeTypes}
         nodesConnectable={!isGenerating}

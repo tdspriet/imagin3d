@@ -1,12 +1,25 @@
-import React, { useCallback, useEffect, useState, useRef } from 'react'
-import { MdImage, MdViewInAr, MdClose } from 'react-icons/md'
+import React, { useCallback, useEffect, useState, useRef, Suspense } from 'react'
+import { MdImage, MdViewInAr, MdClose, MdAdsClick } from 'react-icons/md'
+import { Canvas } from '@react-three/fiber'
+import { OrbitControls, useGLTF, Center, Bounds, Environment } from '@react-three/drei'
+import { useMoodboardStore } from '../../store/moodboardStore'
 import './GenerateDialog.css' // Reuse the same CSS
+
+function Model3D({ url }) {
+  const { scene } = useGLTF(url)
+  return <primitive object={scene} />
+}
 
 function AdaptDialog({ isOpen, onClose, onAdapt, isGenerating }) {
   const [subjectText, setSubjectText] = useState('')
   const [styleIntent, setStyleIntent] = useState('')
   const [subjectFile, setSubjectFile] = useState(null) // { type: 'image'|'model', data: base64, name: string }
   
+  const isPickingElement = useMoodboardStore((s) => s.isPickingElement)
+  const setIsPickingElement = useMoodboardStore((s) => s.setIsPickingElement)
+  const pickedElement = useMoodboardStore((s) => s.pickedElement)
+  const setPickedElement = useMoodboardStore((s) => s.setPickedElement)
+
   const fileInputRef = useRef(null)
   const modelInputRef = useRef(null)
 
@@ -21,10 +34,16 @@ function AdaptDialog({ isOpen, onClose, onAdapt, isGenerating }) {
       setSubjectText('')
       setStyleIntent('')
       setSubjectFile(null)
+      if (isPickingElement) {
+        setIsPickingElement(false)
+      }
       return
     }
 
     const handleKeyDown = (event) => {
+      // If picking an element from the moodboard, let Canvas handle Escape to cancel picking
+      if (isPickingElement) return
+      
       if (event.key === 'Escape' && !isGenerating) {
         event.preventDefault()
         handleClose()
@@ -33,7 +52,7 @@ function AdaptDialog({ isOpen, onClose, onAdapt, isGenerating }) {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [isOpen, handleClose, isGenerating])
+  }, [isOpen, handleClose, isGenerating, isPickingElement, setIsPickingElement])
 
   const handleSubmit = (e) => {
     e.preventDefault()
@@ -80,7 +99,16 @@ function AdaptDialog({ isOpen, onClose, onAdapt, isGenerating }) {
 
   const clearSubjectFile = () => setSubjectFile(null)
 
-  if (!isOpen) {
+  useEffect(() => {
+    if (pickedElement) {
+      setSubjectFile(pickedElement)
+      setPickedElement(null)
+      // also clear text when a file is picked
+      setSubjectText('')
+    }
+  }, [pickedElement, setPickedElement])
+
+  if (!isOpen || isPickingElement) {
     return null
   }
 
@@ -120,24 +148,48 @@ function AdaptDialog({ isOpen, onClose, onAdapt, isGenerating }) {
                   rows={2}
                   disabled={isGenerating}
                 />
-                <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
-                  <button type="button" onClick={() => fileInputRef.current?.click()} className="btn btn-secondary" style={{ flex: 1 }}>
-                    <MdImage className="btn-icon" size={18} /> Upload Image
+                <div style={{ display: 'flex', alignItems: 'center', margin: '0.5rem 0' }}>
+                  <div style={{ flex: 1, height: '1px', backgroundColor: 'var(--color-border)' }}></div>
+                  <div style={{ margin: '0 1rem', fontWeight: 'bold', color: '#888', fontSize: '0.9rem' }}>OR</div>
+                  <div style={{ flex: 1, height: '1px', backgroundColor: 'var(--color-border)' }}></div>
+                </div>
+                <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0', flexWrap: 'wrap' }}>
+                    <button type="button" onClick={() => fileInputRef.current?.click()} className="btn btn-secondary" style={{ flex: '1 1 auto', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', padding: '0.5rem' }}>
+                      <MdImage className="btn-icon" size={18} /> <span style={{ whiteSpace: 'nowrap' }}>Upload Image</span>
                   </button>
-                  <button type="button" onClick={() => modelInputRef.current?.click()} className="btn btn-secondary" style={{ flex: 1 }}>
-                    <MdViewInAr className="btn-icon" size={18} /> Upload 3D Model
+                    <button type="button" onClick={() => modelInputRef.current?.click()} className="btn btn-secondary" style={{ flex: '1 1 auto', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', padding: '0.5rem' }}>
+                      <MdViewInAr className="btn-icon" size={18} /> <span style={{ whiteSpace: 'nowrap' }}>Upload 3D</span>
+                  </button>
+                    <button type="button" onClick={() => setIsPickingElement(true)} className="btn btn-secondary" style={{ flex: '1 1 auto', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', padding: '0.5rem' }}>
+                      <MdAdsClick className="btn-icon" size={18} /> <span style={{ whiteSpace: 'nowrap' }}>Pick from Moodboard</span>
                   </button>
                 </div>
               </div>
             ) : (
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.75rem', background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: '4px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  {subjectFile.type === 'image' ? <MdImage size={24}/> : <MdViewInAr size={24}/>}
-                  <span style={{ wordBreak: 'break-all' }}>{subjectFile.name} attached</span>
-                </div>
-                <button type="button" onClick={clearSubjectFile} disabled={isGenerating} className="btn-icon" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-danger)' }}>
-                  <MdClose size={20} />
+              <div style={{ position: 'relative', width: '100%', height: '240px', background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: '4px', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <button type="button" onClick={clearSubjectFile} disabled={isGenerating} title="Remove subject" style={{ position: 'absolute', top: '0.5rem', right: '0.5rem', zIndex: 10, background: 'var(--color-button-bg)', border: '1px solid var(--color-border)', cursor: 'pointer', color: 'var(--color-text-primary)', borderRadius: '50%', width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s', padding: 0 }}>
+                  <MdClose size={16} />
                 </button>
+                {subjectFile.type === 'image' ? (
+                  <img src={subjectFile.data} style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} alt="Subject" />
+                ) : (
+                  <div style={{ width: '100%', height: '100%' }}>
+                    <Suspense fallback={<div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-secondary)' }}>Loading model...</div>}>
+                      <Canvas camera={{ position: [0, 0, 5], fov: 50 }}>
+                        <ambientLight intensity={1.5} />
+                        <directionalLight position={[10, 10, 10]} intensity={2.5} />
+                        <directionalLight position={[-10, -10, -10]} intensity={1} />
+                        <Bounds fit clip observe margin={1.2}>
+                          <Center>
+                            <Model3D url={subjectFile.data} />
+                          </Center>
+                        </Bounds>
+                        <Environment preset="city" />
+                        <OrbitControls makeDefault enableZoom={true} />
+                      </Canvas>
+                    </Suspense>
+                  </div>
+                )}
               </div>
             )}
           </div>

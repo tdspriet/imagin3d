@@ -1,3 +1,4 @@
+import { useEffect } from "react"
 import React, { useRef, useState } from 'react'
 import {
   MdVideoLibrary,
@@ -14,6 +15,7 @@ import {
   MdAutoAwesome,
 } from 'react-icons/md'
 import { useMoodboardStore } from '../store/moodboardStore'
+import { useShallow } from 'zustand/react/shallow'
 import PaletteDialog from './dialog/PaletteDialog'
 import GenerateDialog from './dialog/GenerateDialog'
 import AdaptDialog from './dialog/AdaptDialog'
@@ -39,7 +41,7 @@ function Topbar() {
     generateMoodboard,
     isGenerating,
     backendModelLabel,
-  } = useMoodboardStore((state) => ({
+  } = useMoodboardStore(useShallow((state) => ({
     addImage: state.addImage,
     addVideo: state.addVideo,
     addText: state.addText,
@@ -54,7 +56,7 @@ function Topbar() {
     generateMoodboard: state.generateMoodboard,
     isGenerating: state.isGenerating,
     backendModelLabel: state.backendModelLabel,
-  }))
+  })))
   const fileInputRef = useRef(null)
   const videoInputRef = useRef(null)
   const fontInputRef = useRef(null)
