@@ -80,8 +80,10 @@ function Canvas() {
 // Handle keyboard events (Delete key, Escape key)
     useEffect(() => {
       const handleKeyDown = (event) => {
-        if (isPickingElement && event.key === 'Escape') {
-          setPickedElement(null) // Cancel picking
+        if (isPickingElement) {
+          if (event.key === 'Escape') {
+            setPickedElement(null) // Cancel picking
+          }
           return
         }
 
