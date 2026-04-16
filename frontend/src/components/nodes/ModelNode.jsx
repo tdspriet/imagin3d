@@ -1,7 +1,7 @@
 import React, { useRef, useState, Suspense, useEffect, memo } from 'react'
 import { useMoodboardStore } from '../../store/moodboardStore'
 import { Canvas } from '@react-three/fiber'
-import { OrbitControls, useGLTF, Environment, Html } from '@react-three/drei'
+import { OrbitControls, useGLTF, Environment } from '@react-three/drei'
 import { NodeResizer } from 'reactflow'
 import NodeLayerControls from './NodeLayerControls'
 import WeightOverlay from './WeightOverlay'
