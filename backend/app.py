@@ -151,7 +151,12 @@ async def regenerate_master_prompt_image(
         return {"error": "Session has no cluster context"}
 
     if session.get("multiview"):
-        images = await orchestrator.generate_multiview_master_images(prompt, clusters)
+        images = {}
+        async for update in orchestrator.generate_multiview_master_images(
+            prompt, clusters
+        ):
+            if update["event"] == "all_done":
+                images = update["images"]
         session["front_image_path"] = str(images["front"])
         session["back_image_path"] = str(images["back"])
 
@@ -626,11 +631,12 @@ async def extract(payload: MoodboardPayload) -> StreamingResponse:
         # ----- Master Prompt Generation -----
 
         # Send progress update for master prompt generation
+        total_phases = 3 if payload.multiview else 2
         progress_event = {
             "type": "progress",
             "data": {
                 "current": 0,
-                "total": 2,
+                "total": total_phases,
                 "stage": "Generating master prompt...",
             },
         }
@@ -649,21 +655,37 @@ async def extract(payload: MoodboardPayload) -> StreamingResponse:
             "type": "progress",
             "data": {
                 "current": 1,
-                "total": 2,
-                "stage": "Generating master image...",
+                "total": total_phases,
+                "stage": "Generating front view..."
+                if payload.multiview
+                else "Generating master image...",
             },
         }
         yield f"data: {json.dumps(progress_event)}\n\n"
 
         if payload.multiview:
-            images = await orchestrator.generate_multiview_master_images(
+            images = {}
+            async for update in orchestrator.generate_multiview_master_images(
                 master_prompt,
                 cluster_descriptors,
                 base_image_path=adapt_subject_image_path,
                 prompt=payload.prompt
                 if (payload.adapt_subject_file or payload.adapt_subject_text)
                 else None,
-            )
+            ):
+                if update["event"] == "front_done":
+                    progress_event = {
+                        "type": "progress",
+                        "data": {
+                            "current": 2,
+                            "total": total_phases,
+                            "stage": "Generating back view...",
+                        },
+                    }
+                    yield f"data: {json.dumps(progress_event)}\n\n"
+                elif update["event"] == "all_done":
+                    images = update["images"]
+
             master_image_path = images["front"]  # Fallback
             front_image_path = images["front"]
             back_image_path = images["back"]

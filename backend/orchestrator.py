@@ -286,7 +286,7 @@ async def generate_multiview_master_images(
     clusters: list[common.ClusterDescriptor],
     base_image_path: Path | None = None,
     prompt: str | None = None,
-) -> dict[str, Path]:
+):
     style_images = _collect_style_images(clusters)
     logger.info(f"Collected {len(style_images)} style images for multiview generation")
 
@@ -303,6 +303,8 @@ async def generate_multiview_master_images(
     with open(front_image_path, "wb") as f:
         f.write(result_front.output.data)
 
+    yield {"event": "front_done"}
+
     # Generate back view
     result_back = await visualizer.run(
         master_prompt, style_images, base_image, prompt=prompt, view="back"
@@ -311,7 +313,10 @@ async def generate_multiview_master_images(
     with open(back_image_path, "wb") as f:
         f.write(result_back.output.data)
 
-    return {"front": front_image_path, "back": back_image_path}
+    yield {
+        "event": "all_done",
+        "images": {"front": front_image_path, "back": back_image_path},
+    }
 
 
 async def edit_multiview_master_images(
