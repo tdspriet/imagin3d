@@ -189,6 +189,20 @@ function MasterPromptDialog({
           </div>
 
           <div className="master-prompt-dialog__edit-row">
+            <input
+              type="text"
+              className="master-prompt-dialog__edit-input"
+              value={editInstruction}
+              onChange={(event) => setEditInstruction(event.target.value)}
+              placeholder="e.g. make it brighter"
+              disabled={isLoading}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !disableSendEdit) {
+                  e.preventDefault()
+                  handleSendEdit()
+                }
+              }}
+            />
             {isMultiview && (
               <select 
                 className="master-prompt-dialog__edit-select"
@@ -201,14 +215,6 @@ function MasterPromptDialog({
                 <option value="back">Back Only</option>
               </select>
             )}
-            <input
-              type="text"
-              className="master-prompt-dialog__edit-input"
-              value={editInstruction}
-              onChange={(event) => setEditInstruction(event.target.value)}
-              placeholder="e.g. make it brighter"
-              disabled={isLoading}
-            />
             <button
               type="button"
               className="master-prompt-dialog__btn master-prompt-dialog__btn--edit"

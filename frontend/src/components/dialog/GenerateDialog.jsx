@@ -74,14 +74,18 @@ function GenerateDialog({ isOpen, onClose, onGenerate, isGenerating }) {
           />
 
           <div className="generate-dialog__option">
-            <label className="generate-dialog__checkbox">
+            <label className="generate-dialog__toggle">
               <input
                 type="checkbox"
+                className="generate-dialog__toggle-input"
                 checked={isMultiview}
                 onChange={(e) => setIsMultiview(e.target.checked)}
                 disabled={isGenerating}
               />
-              <span>Generate multiple views (Front and Back)</span>
+              <div className="generate-dialog__toggle-track">
+                <div className="generate-dialog__toggle-thumb"></div>
+              </div>
+              <span className="generate-dialog__toggle-label">Generate multiple views</span>
             </label>
           </div>
 
