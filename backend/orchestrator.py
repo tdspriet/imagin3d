@@ -281,6 +281,66 @@ async def edit_master_image(
     return master_image_path
 
 
+async def generate_multiview_master_images(
+    master_prompt: str,
+    clusters: list[common.ClusterDescriptor],
+    base_image_path: Path | None = None,
+    prompt: str | None = None,
+) -> dict[str, Path]:
+    style_images = _collect_style_images(clusters)
+    logger.info(f"Collected {len(style_images)} style images for multiview generation")
+
+    base_image = None
+    if base_image_path and Path(base_image_path).exists():
+        with open(base_image_path, "rb") as f:
+            base_image = pydantic_ai.BinaryImage(data=f.read(), media_type="image/jpeg")
+
+    # Generate front view
+    result_front = await visualizer.run(
+        master_prompt, style_images, base_image, prompt=prompt, view="front"
+    )
+    front_image_path = ROOT_DIR / "artifacts" / "master_image_front.jpg"
+    with open(front_image_path, "wb") as f:
+        f.write(result_front.output.data)
+
+    # Generate back view
+    result_back = await visualizer.run(
+        master_prompt, style_images, base_image, prompt=prompt, view="back"
+    )
+    back_image_path = ROOT_DIR / "artifacts" / "master_image_back.jpg"
+    with open(back_image_path, "wb") as f:
+        f.write(result_back.output.data)
+
+    return {"front": front_image_path, "back": back_image_path}
+
+
+async def edit_multiview_master_images(
+    edit_prompt: str, front_data_url: str, back_data_url: str, view: str = "both"
+) -> dict[str, Path]:
+    source_front = common.decode_data_url_to_binary_image(front_data_url)
+    source_back = common.decode_data_url_to_binary_image(back_data_url)
+
+    prompt = (
+        "Edit the attached image according to this instruction: "
+        f"{edit_prompt}. The subject must be fully in-frame isolated against a transparent background."
+    )
+
+    front_image_path = ROOT_DIR / "artifacts" / "master_image_front.jpg"
+    back_image_path = ROOT_DIR / "artifacts" / "master_image_back.jpg"
+
+    if view in ["both", "front"]:
+        result_front = await visualizer.run(prompt, [source_front], view="front")
+        with open(front_image_path, "wb") as f:
+            f.write(result_front.output.data)
+
+    if view in ["both", "back"]:
+        result_back = await visualizer.run(prompt, [source_back], view="back")
+        with open(back_image_path, "wb") as f:
+            f.write(result_back.output.data)
+
+    return {"front": front_image_path, "back": back_image_path}
+
+
 def get_reference_images_preview(
     clusters: list[common.ClusterDescriptor],
     max_images: int = 8,
@@ -296,7 +356,7 @@ def get_reference_images_preview(
     return previews
 
 
-async def generate_3d_model(master_image_path: Path) -> Path:
+async def generate_3d_model(master_image_path: Path | list[Path]) -> Path:
     logger.info(
         "Generating 3D model from master image", image_path=str(master_image_path)
     )

@@ -72,6 +72,9 @@ function App() {
         onSendEdit={editMasterPromptImage}
         masterPrompt={masterPromptData?.prompt}
         masterImage={masterPromptData?.image}
+        frontImage={masterPromptData?.front_image}
+        backImage={masterPromptData?.back_image}
+        isMultiview={masterPromptData?.multiview}
         referenceImages={masterPromptData?.referenceImages || []}
         isLoading={masterPromptIsLoading}
       />

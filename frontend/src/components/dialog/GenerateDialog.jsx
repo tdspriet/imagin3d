@@ -3,6 +3,7 @@ import './GenerateDialog.css'
 
 function GenerateDialog({ isOpen, onClose, onGenerate, isGenerating }) {
   const [prompt, setPrompt] = useState('')
+  const [isMultiview, setIsMultiview] = useState(false)
 
   const handleClose = useCallback(() => {
     if (!isGenerating) {
@@ -13,6 +14,7 @@ function GenerateDialog({ isOpen, onClose, onGenerate, isGenerating }) {
   useEffect(() => {
     if (!isOpen) {
       setPrompt('')
+      setIsMultiview(false)
       return
     }
 
@@ -30,7 +32,7 @@ function GenerateDialog({ isOpen, onClose, onGenerate, isGenerating }) {
   const handleSubmit = (e) => {
     e.preventDefault()
     if (prompt.trim() && !isGenerating) {
-      onGenerate(prompt.trim())
+      onGenerate(prompt.trim(), isMultiview)
     }
   }
 
@@ -70,6 +72,19 @@ function GenerateDialog({ isOpen, onClose, onGenerate, isGenerating }) {
             disabled={isGenerating}
             autoFocus
           />
+
+          <div className="generate-dialog__option">
+            <label className="generate-dialog__checkbox">
+              <input
+                type="checkbox"
+                checked={isMultiview}
+                onChange={(e) => setIsMultiview(e.target.checked)}
+                disabled={isGenerating}
+              />
+              <span>Generate multiple views (Front and Back)</span>
+            </label>
+          </div>
+
           <div className="generate-dialog__actions">
             <button
               type="button"

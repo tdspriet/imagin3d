@@ -647,7 +647,7 @@ export const useMoodboardStore = create((set, get) => ({
   },
 
   // Send moodboard generation request to backend
-  generateMoodboard: async (prompt = '', subjectText = '', subjectFile = null) => {
+  generateMoodboard: async (prompt = '', subjectText = '', subjectFile = null, isMultiview = false) => {
     const { nodes, applyWeights } = get()
     const { payload, idMaps } = serializeDataForBackend(nodes, subjectFile?.nodeId)
 
@@ -658,6 +658,7 @@ export const useMoodboardStore = create((set, get) => ({
 
     // Add the user prompt to the payload
     payload.prompt = prompt
+    payload.multiview = isMultiview
     if (subjectText) {
       payload.adapt_subject_text = subjectText
     }
@@ -775,6 +776,9 @@ export const useMoodboardStore = create((set, get) => ({
                   masterPromptData: {
                     prompt: data.prompt,
                     image: data.image,
+                    front_image: data.front_image,
+                    back_image: data.back_image,
+                    multiview: data.multiview,
                     referenceImages: data.reference_images || [],
                   },
                   masterPromptIsLoading: false,
@@ -922,10 +926,14 @@ export const useMoodboardStore = create((set, get) => ({
           ? {
               ...state.masterPromptData,
               image: data.image || state.masterPromptData.image,
+              front_image: data.front_image || state.masterPromptData.front_image,
+              back_image: data.back_image || state.masterPromptData.back_image,
             }
           : {
               prompt: nextPrompt,
               image: data.image || '',
+              front_image: data.front_image || '',
+              back_image: data.back_image || '',
               referenceImages: [],
             },
       }))
@@ -936,10 +944,11 @@ export const useMoodboardStore = create((set, get) => ({
     }
   },
 
-  editMasterPromptImage: async (editPrompt) => {
+  editMasterPromptImage: async (editPrompt, view = "both") => {
     const { masterPromptSessionId, masterPromptData } = get()
     const nextEditPrompt = (editPrompt || '').trim()
-    if (!masterPromptSessionId || !masterPromptData?.image || !nextEditPrompt) return
+    const hasImage = masterPromptData?.multiview ? (masterPromptData?.front_image && masterPromptData?.back_image) : masterPromptData?.image;
+    if (!masterPromptSessionId || !hasImage || !nextEditPrompt) return
 
     set({ masterPromptIsLoading: true })
     try {
@@ -949,6 +958,9 @@ export const useMoodboardStore = create((set, get) => ({
         body: JSON.stringify({
           prompt: nextEditPrompt,
           image: masterPromptData.image,
+          front_image: masterPromptData.front_image,
+          back_image: masterPromptData.back_image,
+          view: view
         }),
       })
       if (!response.ok) {
@@ -958,7 +970,12 @@ export const useMoodboardStore = create((set, get) => ({
       const data = await response.json()
       set((state) => ({
         masterPromptData: state.masterPromptData
-          ? { ...state.masterPromptData, image: data.image || state.masterPromptData.image }
+          ? { 
+              ...state.masterPromptData, 
+              image: data.image || state.masterPromptData.image,
+              front_image: data.front_image || state.masterPromptData.front_image,
+              back_image: data.back_image || state.masterPromptData.back_image,
+            }
           : state.masterPromptData,
       }))
     } catch (error) {

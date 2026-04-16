@@ -185,6 +185,56 @@
   font-size: 0.9rem;
 }
 
+.master-prompt-dialog__image-container--multiview {
+  display: flex;
+  gap: 16px;
+  width: 100%;
+  aspect-ratio: auto;
+  border: none;
+  background: transparent;
+  overflow: visible;
+  justify-content: center;
+}
+
+.master-prompt-dialog__multiview-item {
+  flex: 1;
+  max-width: 260px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.master-prompt-dialog__multiview-label {
+  font-size: 0.85rem;
+  color: var(--color-text-secondary);
+  text-align: center;
+  font-weight: 500;
+}
+
+.master-prompt-dialog__image-container--multiview img.master-prompt-dialog__image,
+.master-prompt-dialog__image-container--multiview div.master-prompt-dialog__image-placeholder {
+  aspect-ratio: 1 / 1;
+  width: 100%;
+  height: auto;
+  border-radius: 10px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+.master-prompt-dialog__edit-select {
+  padding: 9px 11px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: 0.9rem;
+}
+
+.master-prompt-dialog__edit-select:focus-visible {
+  outline: 2px solid var(--accent-progress);
+  outline-offset: 1px;
+}
+
 .master-prompt-dialog__loading-overlay {
   position: absolute;
   inset: 0;

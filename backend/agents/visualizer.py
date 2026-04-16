@@ -23,6 +23,7 @@ class Visualizer(agent.BaseAgent):
         style_images: list[pydantic_ai.BinaryImage],
         base_image: pydantic_ai.BinaryImage | None = None,
         prompt: str | None = None,
+        view: str | None = None,
     ) -> pydantic_ai.AgentRunResult[pydantic_ai.BinaryImage]:
         extra = []
         if base_image:
@@ -30,6 +31,9 @@ class Visualizer(agent.BaseAgent):
         extra.extend(style_images)
 
         mode = "adapt" if base_image or prompt else "generation"
+        if view:
+            mode = f"multiview/{mode}/{view}"
+
         ctx = {"master_prompt": master_prompt, "has_base_image": bool(base_image)}
         if prompt:
             ctx["adaptation"] = prompt

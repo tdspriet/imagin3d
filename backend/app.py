@@ -150,16 +150,30 @@ async def regenerate_master_prompt_image(
     if not clusters:
         return {"error": "Session has no cluster context"}
 
-    master_image_path = await orchestrator.generate_master_image(prompt, clusters)
-    session["master_image_path"] = str(master_image_path)
+    if session.get("multiview"):
+        images = await orchestrator.generate_multiview_master_images(prompt, clusters)
+        session["front_image_path"] = str(images["front"])
+        session["back_image_path"] = str(images["back"])
 
-    master_prompt_path = ROOT_DIR / "artifacts" / "master_prompt.txt"
-    with open(master_prompt_path, "w", encoding="utf-8") as f:
-        f.write(prompt)
+        master_prompt_path = ROOT_DIR / "artifacts" / "master_prompt.txt"
+        with open(master_prompt_path, "w", encoding="utf-8") as f:
+            f.write(prompt)
 
-    return {
-        "image": encode_image_to_data_url(master_image_path),
-    }
+        return {
+            "front_image": encode_image_to_data_url(images["front"]),
+            "back_image": encode_image_to_data_url(images["back"]),
+        }
+    else:
+        master_image_path = await orchestrator.generate_master_image(prompt, clusters)
+        session["master_image_path"] = str(master_image_path)
+
+        master_prompt_path = ROOT_DIR / "artifacts" / "master_prompt.txt"
+        with open(master_prompt_path, "w", encoding="utf-8") as f:
+            f.write(prompt)
+
+        return {
+            "image": encode_image_to_data_url(master_image_path),
+        }
 
 
 @app.post("/master-prompt/{session_id}/edit-image")
@@ -176,12 +190,34 @@ async def edit_master_prompt_image(
 
     session = pending_confirmations[session_id]
 
-    master_image_path = await orchestrator.edit_master_image(edit_prompt, payload.image)
-    session["master_image_path"] = str(master_image_path)
+    if session.get("multiview"):
+        if not payload.front_image or not payload.back_image:
+            return {
+                "error": "Both front_image and back_image data URLs are required for multiview edits"
+            }
 
-    return {
-        "image": encode_image_to_data_url(master_image_path),
-    }
+        images = await orchestrator.edit_multiview_master_images(
+            edit_prompt, payload.front_image, payload.back_image, payload.view
+        )
+        session["front_image_path"] = str(images["front"])
+        session["back_image_path"] = str(images["back"])
+
+        return {
+            "front_image": encode_image_to_data_url(images["front"]),
+            "back_image": encode_image_to_data_url(images["back"]),
+        }
+    else:
+        if not payload.image:
+            return {"error": "Image data URL is required for single view edits"}
+
+        master_image_path = await orchestrator.edit_master_image(
+            edit_prompt, payload.image
+        )
+        session["master_image_path"] = str(master_image_path)
+
+        return {
+            "image": encode_image_to_data_url(master_image_path),
+        }
 
 
 @app.post("/extract")
@@ -619,37 +655,72 @@ async def extract(payload: MoodboardPayload) -> StreamingResponse:
         }
         yield f"data: {json.dumps(progress_event)}\n\n"
 
-        master_image_path = await orchestrator.generate_master_image(
-            master_prompt,
-            cluster_descriptors,
-            base_image_path=adapt_subject_image_path,
-            prompt=payload.prompt
-            if (payload.adapt_subject_file or payload.adapt_subject_text)
-            else None,
-        )
+        if payload.multiview:
+            images = await orchestrator.generate_multiview_master_images(
+                master_prompt,
+                cluster_descriptors,
+                base_image_path=adapt_subject_image_path,
+                prompt=payload.prompt
+                if (payload.adapt_subject_file or payload.adapt_subject_text)
+                else None,
+            )
+            master_image_path = images["front"]  # Fallback
+            front_image_path = images["front"]
+            back_image_path = images["back"]
+        else:
+            master_image_path = await orchestrator.generate_master_image(
+                master_prompt,
+                cluster_descriptors,
+                base_image_path=adapt_subject_image_path,
+                prompt=payload.prompt
+                if (payload.adapt_subject_file or payload.adapt_subject_text)
+                else None,
+            )
+
         reference_images = orchestrator.get_reference_images_preview(
             cluster_descriptors
         )
 
         # Send master prompt and image to frontend for confirmation
         master_image_base64 = ""
-        if master_image_path and Path(master_image_path).exists():
-            master_image_base64 = encode_image_to_data_url(Path(master_image_path))
+        front_image_base64 = ""
+        back_image_base64 = ""
+
+        if payload.multiview:
+            if Path(front_image_path).exists():
+                front_image_base64 = encode_image_to_data_url(Path(front_image_path))
+            if Path(back_image_path).exists():
+                back_image_base64 = encode_image_to_data_url(Path(back_image_path))
+        else:
+            if master_image_path and Path(master_image_path).exists():
+                master_image_base64 = encode_image_to_data_url(Path(master_image_path))
 
         # Create new session for master prompt confirmation
         master_session_id = str(uuid.uuid4())
-        pending_confirmations[master_session_id] = {
+
+        session_data = {
             "event": asyncio.Event(),
             "confirmed": False,
-            "clusters": cluster_descriptors,  # Keep cluster context for potential regeneration
-            "master_image_path": str(master_image_path),
+            "clusters": cluster_descriptors,
+            "multiview": payload.multiview,
         }
+
+        if payload.multiview:
+            session_data["front_image_path"] = str(front_image_path)
+            session_data["back_image_path"] = str(back_image_path)
+        else:
+            session_data["master_image_path"] = str(master_image_path)
+
+        pending_confirmations[master_session_id] = session_data
 
         master_prompt_event = {
             "type": "master_prompt",
             "data": {
                 "prompt": master_prompt,
                 "image": master_image_base64,
+                "front_image": front_image_base64,
+                "back_image": back_image_base64,
+                "multiview": payload.multiview,
                 "reference_images": reference_images,
             },
             "session_id": master_session_id,
@@ -662,7 +733,13 @@ async def extract(payload: MoodboardPayload) -> StreamingResponse:
         # Check if user confirmed or cancelled
         master_session = pending_confirmations[master_session_id]
         master_confirmed = master_session["confirmed"]
-        master_image_path = Path(master_session["master_image_path"])
+
+        if payload.multiview:
+            front_image_path_conf = Path(master_session["front_image_path"])
+            back_image_path_conf = Path(master_session["back_image_path"])
+        else:
+            master_image_path_conf = Path(master_session["master_image_path"])
+
         del pending_confirmations[master_session_id]  # Clean up
         if not master_confirmed:
             logger.info("User cancelled master prompt")
@@ -688,7 +765,12 @@ async def extract(payload: MoodboardPayload) -> StreamingResponse:
         yield f"data: {json.dumps(progress_event)}\n\n"
 
         # Generate 3D model from master image using TRELLIS
-        model_path = await orchestrator.generate_3d_model(master_image_path)
+        if payload.multiview:
+            model_path = await orchestrator.generate_3d_model(
+                [front_image_path_conf, back_image_path_conf]
+            )
+        else:
+            model_path = await orchestrator.generate_3d_model(master_image_path_conf)
 
         progress_event = {
             "type": "progress",
@@ -708,9 +790,18 @@ async def extract(payload: MoodboardPayload) -> StreamingResponse:
         # Send final response
         relative_path = model_path.relative_to(ROOT_DIR / "artifacts")
         model_url = f"/artifacts/{relative_path}"
+
+        multiview_images = None
+        if payload.multiview:
+            multiview_images = {
+                "front": f"/artifacts/{front_image_path_conf.relative_to(ROOT_DIR / 'artifacts')}",
+                "back": f"/artifacts/{back_image_path_conf.relative_to(ROOT_DIR / 'artifacts')}",
+            }
+
         final_response = GenerateResponse(
             count=len(payload.elements),
             file=model_url,
+            multiview_images=multiview_images,
         )
         final_event = {"type": "complete", "data": final_response.dict()}
         yield f"data: {json.dumps(final_event)}\n\n"

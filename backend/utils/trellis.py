@@ -5,7 +5,7 @@ import os
 import sys
 import tempfile
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, Union, List
 
 import jinja2
 import structlog
@@ -68,7 +68,9 @@ class TrellisEngine:
     def display_name(self) -> str:
         return f"TrellisV{self.version}"
 
-    async def generate_3d_model(self, image_path: Path, output_dir: Path) -> Path:
+    async def generate_3d_model(
+        self, image_path: Union[Path, List[Path]], output_dir: Path
+    ) -> Path:
         output_dir.mkdir(parents=True, exist_ok=True)
 
         output_glb = output_dir / "sample.glb"
@@ -77,7 +79,10 @@ class TrellisEngine:
         if self.version == 2:
             await self._generate_v2_async(image_path, output_glb)
         else:
-            await self._generate_v1_async(image_path, output_dir, output_glb)
+            v1_image_path = (
+                image_path[0] if isinstance(image_path, list) else image_path
+            )
+            await self._generate_v1_async(v1_image_path, output_dir, output_glb)
 
         if output_glb.exists():
             return output_glb
@@ -111,9 +116,11 @@ class TrellisEngine:
                     f"TRELLIS v{self.version} generation failed: {stderr.decode()}"
                 )
 
-    async def _generate_v2_async(self, image_path: Path, output_glb: Path) -> None:
+    async def _generate_v2_async(
+        self, image_paths: Union[Path, List[Path]], output_glb: Path
+    ) -> None:
         async with self._generate_lock:
-            await asyncio.to_thread(self._run_v2, image_path, output_glb)
+            await asyncio.to_thread(self._run_v2, image_paths, output_glb)
 
     def _load_v2_pipeline(self) -> None:
         if self._pipeline is not None:
@@ -156,15 +163,19 @@ class TrellisEngine:
         self._pipeline.run(warmup_image, seed=0, pipeline_type="1024_cascade")
         logger.info("TRELLIS v2 prewarm complete")
 
-    def _run_v2(self, image_path: Path, output_glb: Path) -> None:
+    def _run_v2(self, image_paths: Union[Path, List[Path]], output_glb: Path) -> None:
         from PIL import Image
 
         if self._pipeline is None or self._o_voxel is None:
             self._load_v2_pipeline()
 
-        image = Image.open(image_path)
+        if isinstance(image_paths, list):
+            images = [Image.open(p) for p in image_paths]
+        else:
+            images = Image.open(image_paths)
+
         mesh = self._pipeline.run(
-            image,
+            images,
             seed=0,
             pipeline_type="1024_cascade",
         )[0]

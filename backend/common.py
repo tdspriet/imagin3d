@@ -18,6 +18,7 @@ class MoodboardPayload(BaseModel):
     prompt: str = Field(default="")
     adapt_subject_text: Optional[str] = Field(default=None)
     adapt_subject_file: Optional[Dict[str, Any]] = Field(default=None)
+    multiview: bool = Field(default=False)
 
 
 class WeightsRequest(BaseModel):
@@ -41,12 +42,16 @@ class MasterImageRegenerateRequest(BaseModel):
 
 class MasterImageEditRequest(BaseModel):
     prompt: str
-    image: str
+    image: Optional[str] = None
+    front_image: Optional[str] = None
+    back_image: Optional[str] = None
+    view: str = Field(default="both")
 
 
 class GenerateResponse(BaseModel):
     count: int
     file: str
+    multiview_images: Optional[Dict[str, str]] = Field(default=None)
 
 
 # --- Internal Data Models ---

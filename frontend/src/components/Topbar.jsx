@@ -176,12 +176,12 @@ function Topbar() {
     return true
   }
 
-  const handleGenerateMoodboard = async (prompt) => {
+  const handleGenerateMoodboard = async (prompt, isMultiview = false) => {
     // Close dialog immediately when starting generation
     setGenerateDialogOpen(false)
     
     try {
-      const result = await generateMoodboard(prompt)
+      const result = await generateMoodboard(prompt, '', null, isMultiview)
     } catch (error) {
       console.error('Failed to extract:', error)
     }
