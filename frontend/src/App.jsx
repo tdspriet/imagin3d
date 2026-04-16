@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useEffect } from 'react'
 import Topbar from './components/Topbar'
 import Canvas from './components/Canvas'
 import ProgressBar from './components/ProgressBar'
@@ -15,6 +15,8 @@ import './App.css'
 function App() {
   const isGenerating = useMoodboardStore((state) => state.isGenerating)
   const progress = useMoodboardStore((state) => state.progress)
+  const backendModelLabel = useMoodboardStore((state) => state.backendModelLabel)
+  const startBackendModelLabelPolling = useMoodboardStore((state) => state.startBackendModelLabelPolling)
 
   // Weights state
   const awaitingWeightsConfirmation = useMoodboardStore((state) => state.awaitingWeightsConfirmation)
@@ -35,7 +37,14 @@ function App() {
   const closeModelDialog = useMoodboardStore((state) => state.closeModelDialog)
 
   // Show progress bar when generating and not awaiting any confirmation
-  const showProgressBar = isGenerating && !awaitingWeightsConfirmation && !awaitingMasterPromptConfirmation && progress.total > 0
+  const showProgressBar = isGenerating && !awaitingWeightsConfirmation && !awaitingMasterPromptConfirmation
+
+  useEffect(() => {
+    const stopPolling = startBackendModelLabelPolling()
+    return () => {
+      stopPolling?.()
+    }
+  }, [startBackendModelLabelPolling])
 
   return (
     <div className="app">
@@ -46,6 +55,7 @@ function App() {
           total={progress.total}
           stage={progress.stage}
           isVisible={showProgressBar}
+          modelLabel={backendModelLabel}
         />
         <ConfirmationBar
           isVisible={awaitingWeightsConfirmation}

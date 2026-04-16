@@ -71,6 +71,8 @@ if ALLOWED_ORIGINS:
 else:
     CORS_ORIGINS = ["*"]
 
+LOCAL_DEV_ORIGIN_REGEX = r"https?://(localhost|127\.0\.0\.1)(:\d+)?$"
+
 # Session management
 # Maps session_id -> {"event": asyncio.Event, "confirmed": bool}
 pending_confirmations: dict[str, dict] = {}
@@ -80,6 +82,7 @@ app = FastAPI(title="Imagin3D Backend", version="1.0.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=CORS_ORIGINS,
+    allow_origin_regex=LOCAL_DEV_ORIGIN_REGEX,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -92,6 +95,23 @@ artifacts_dir.mkdir(parents=True, exist_ok=True)
 app.mount("/artifacts", StaticFiles(directory=ROOT_DIR / "artifacts"), name="artifacts")
 
 
+@app.on_event("startup")
+async def initialize_orchestrator() -> None:
+    await asyncio.to_thread(orchestrator._initialize)
+
+
+@app.get("/status")
+async def status():
+    engine = orchestrator.trellis_engine
+    version = engine.version if engine is not None else None
+    response = {
+        "initialized": orchestrator._initialized,
+    }
+    if version is not None:
+        response["model"] = f"TrellisV{version}"
+    return response
+
+
 @app.post("/confirm-weights/{session_id}")
 async def confirm_weights(
     session_id: str,
@@ -102,10 +122,9 @@ async def confirm_weights(
 
     session = pending_confirmations[session_id]
     session["confirmed"] = payload.confirmed
-    if payload.weights or payload.cluster_weights:
+    if payload.weights:
         session["edited_weights"] = {
             "weights": payload.weights,
-            "cluster_weights": payload.cluster_weights,
         }
     session["event"].set()
 
@@ -209,7 +228,9 @@ async def extract(payload: MoodboardPayload) -> StreamingResponse:
         # Calculate total steps for progress tracking
         total_elements = len(payload.elements)
         total_clusters = len(payload.clusters)
-        total_steps = total_elements + total_clusters + total_elements + total_clusters
+        total_steps = total_elements + total_clusters + total_elements
+        if payload.adapt_subject_file:
+            total_steps += 1
 
         # Shared progress state
         progress_state = {"current": 0, "lock": asyncio.Lock()}
@@ -348,7 +369,6 @@ async def extract(payload: MoodboardPayload) -> StreamingResponse:
 
         # Turn clusters into cluster descriptors
         async def process_cluster(cluster: dict) -> ClusterDescriptor:
-
             # 1) Gather elements for this cluster
             elements: list[DesignToken] = [
                 token_lookup[element_id]
@@ -415,53 +435,73 @@ async def extract(payload: MoodboardPayload) -> StreamingResponse:
             with cluster_descriptor_path.open("w", encoding="utf-8") as f:
                 json.dump(cluster_descriptor.dict(), f, ensure_ascii=False, indent=2)
 
+        # ----- Process Adapt Subject -----
+
+        adapt_subject_image_path = None
+        if payload.adapt_subject_file:
+            current = await increment_progress()
+            progress_event = {
+                "type": "progress",
+                "data": {
+                    "current": current,
+                    "total": total_steps,
+                    "stage": "Processing subject...",
+                },
+            }
+            yield f"data: {json.dumps(progress_event)}\n\n"
+
+            subject_element = {
+                "id": "adapt_subject",
+                "content": payload.adapt_subject_file,
+            }
+            # Add "src" to "data" for compatibility
+            subject_element["content"]["data"] = {
+                "src": subject_element["content"]["data"],
+                "fileName": subject_element["content"].get(
+                    "name", "adapt_subject_model.glb"
+                ),
+            }
+
+            try:
+                if subject_element["content"]["type"] == "model":
+                    title, description = await orchestrator.handle_model(
+                        subject_element
+                    )
+                    renders_dir = (
+                        ROOT_DIR / "artifacts" / "model_renders" / "adapt_subject"
+                    )
+                    renders = sorted(renders_dir.glob("*.jpg"))
+                    if renders:
+                        adapt_subject_image_path = renders[0]
+                elif subject_element["content"]["type"] == "image":
+                    title, description = await orchestrator.handle_image(
+                        subject_element
+                    )
+                    adapt_subject_image_path = (
+                        ROOT_DIR
+                        / "artifacts"
+                        / "images"
+                        / "adapt_subject"
+                        / "image.jpg"
+                    )
+
+                # Append title and description to adapt_subject_text
+                text_addition = f"{title}: {description}"
+                if payload.adapt_subject_text:
+                    payload.adapt_subject_text += (
+                        f"\n\nReference file details:\n{text_addition}"
+                    )
+                else:
+                    payload.adapt_subject_text = text_addition
+            except Exception as e:
+                logger.error("Failed to process adapt subject file", error=e)
+
         # ----- Intent Router -----
 
         # Initialize weight tracking
         element_weights: dict[int, int] = {}
-        cluster_weights: dict[int, int] = {}
 
-        # 1) Route clusters and assign weights
-        async def route_single_cluster(
-            cluster_descriptor: ClusterDescriptor,
-        ) -> tuple[int, int]:
-            weight = await orchestrator.route_cluster(
-                payload.prompt, cluster_descriptor
-            )
-            # Signal progress
-            current = await increment_progress()
-            await progress_queue.put(
-                {
-                    "current": current,
-                    "total": total_steps,
-                    "stage": "Weighing clusters...",
-                }
-            )
-            return cluster_descriptor.id, weight
-
-        # Start routing all clusters in parallel
-        cluster_routing_tasks = [
-            asyncio.create_task(route_single_cluster(cd)) for cd in cluster_descriptors
-        ]
-
-        # Yield progress updates as they come in
-        completed = 0
-        while completed < len(cluster_routing_tasks):
-            progress_data = await progress_queue.get()
-            completed += 1
-            progress_event = {"type": "progress", "data": progress_data}
-            yield f"data: {json.dumps(progress_event)}\n\n"
-
-        # Collect all results
-        cluster_routing_results = list(await asyncio.gather(*cluster_routing_tasks))
-
-        # Apply the routing results to cluster descriptors
-        cluster_descriptor_lookup = {cd.id: cd for cd in cluster_descriptors}
-        for cluster_id, weight in cluster_routing_results:
-            cluster_descriptor_lookup[cluster_id].weight = weight
-            cluster_weights[cluster_id] = weight
-
-        # 2) Provide cluster context for design tokens
+        # 1) Provide cluster context for design tokens
         token_cluster_context: dict[int, str] = {}
         for cluster_descriptor in cluster_descriptors:
             for element in cluster_descriptor.elements:
@@ -469,11 +509,16 @@ async def extract(payload: MoodboardPayload) -> StreamingResponse:
                     f"{cluster_descriptor.title},{cluster_descriptor.description}"
                 )
 
-        # 3) Route design tokens and assign weights
+        # 2) Route design tokens and assign weights
         async def route_single_token(token: DesignToken) -> tuple[int, int]:
             cluster_context = token_cluster_context.get(token.id)
+            subject_info = (
+                payload.adapt_subject_text
+                if payload.adapt_subject_text
+                else ("file" if payload.adapt_subject_file else None)
+            )
             weight = await orchestrator.route_token(
-                payload.prompt, token, cluster_context
+                payload.prompt, token, cluster_context, subject=subject_info
             )
             # Signal progress
             current = await increment_progress()
@@ -524,7 +569,7 @@ async def extract(payload: MoodboardPayload) -> StreamingResponse:
         }
         weights_response = WeightsRequest(
             weights=element_weights,
-            cluster_weights=cluster_weights,
+            cluster_weights={},
         )
         weights_event = {
             "type": "weights",
@@ -551,7 +596,6 @@ async def extract(payload: MoodboardPayload) -> StreamingResponse:
             return
         if edited_weights:
             edited_element_weights = edited_weights.get("weights", {})
-            edited_cluster_weights = edited_weights.get("cluster_weights", {})
 
             for token_id, user_weight in edited_element_weights.items():
                 if token_id in token_lookup_for_routing:
@@ -559,13 +603,6 @@ async def extract(payload: MoodboardPayload) -> StreamingResponse:
                     token_lookup_for_routing[token_id].weight = clamped_weight
                     if token_id in element_weights:
                         element_weights[token_id] = clamped_weight
-
-            for cluster_id, user_weight in edited_cluster_weights.items():
-                if cluster_id in cluster_descriptor_lookup:
-                    clamped_weight = max(0, min(100, int(user_weight)))
-                    cluster_descriptor_lookup[cluster_id].weight = clamped_weight
-                    if cluster_id in cluster_weights:
-                        cluster_weights[cluster_id] = clamped_weight
 
         logger.info("User confirmed weights, continuing pipeline...")
 
@@ -585,6 +622,7 @@ async def extract(payload: MoodboardPayload) -> StreamingResponse:
         master_prompt = await orchestrator.synthesize_master_prompt(
             payload.prompt,
             cluster_descriptors,
+            subject=payload.adapt_subject_text,
         )
 
         # ----- Master Image Generation -----
@@ -603,6 +641,10 @@ async def extract(payload: MoodboardPayload) -> StreamingResponse:
         master_image_path = await orchestrator.generate_master_image(
             master_prompt,
             cluster_descriptors,
+            base_image_path=adapt_subject_image_path,
+            prompt=payload.prompt
+            if (payload.adapt_subject_file or payload.adapt_subject_text)
+            else None,
         )
         
         master_image_paths = master_image_path if isinstance(master_image_path, list) else [master_image_path]

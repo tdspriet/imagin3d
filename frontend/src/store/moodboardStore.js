@@ -1,8 +1,7 @@
 import { create } from 'zustand'
 
 // Backend configuration
-// NOTE: this should not be hardcoded in production
-const BACKEND_URL = 'http://localhost:8000'.replace(/\/$/, '')
+const BACKEND_URL = (import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000').replace(/\/$/, '')
 
 // Z-index constants
 const SELECTED_Z_OFFSET = 2000
@@ -28,9 +27,9 @@ const addInitialSize = (data, width, height) => ({
   initialSize: { width, height },
 })
 
-const serializeDataForBackend = (nodes = []) => {
+const serializeDataForBackend = (nodes = [], excludeNodeId = null) => {
   const clusterNodes = nodes.filter(n => n.type === 'clusterNode')
-  const contentNodes = nodes.filter(n => n.type !== 'clusterNode')
+  const contentNodes = nodes.filter(n => n.type !== 'clusterNode' && n.id !== excludeNodeId)
 
   // ELEMENTS
   const elements = contentNodes.map((node, index) => {
@@ -205,7 +204,6 @@ const buildEditedWeightsPayload = (nodes = [], idMaps = null) => {
 
   const nodeLookup = new Map(nodes.map((node) => [node.id, node]))
   const weights = {}
-  const cluster_weights = {}
 
   if (idMaps.elements instanceof Map) {
     for (const [backendId, frontendId] of idMaps.elements.entries()) {
@@ -216,16 +214,7 @@ const buildEditedWeightsPayload = (nodes = [], idMaps = null) => {
     }
   }
 
-  if (idMaps.clusters instanceof Map) {
-    for (const [backendId, frontendId] of idMaps.clusters.entries()) {
-      const node = nodeLookup.get(frontendId)
-      if (typeof node?.data?.weight === 'number') {
-        cluster_weights[backendId] = Math.max(0, Math.min(100, Math.round(node.data.weight)))
-      }
-    }
-  }
-
-  return { weights, cluster_weights }
+  return { weights, cluster_weights: {} }
 }
 
 /**
@@ -258,7 +247,15 @@ export const useMoodboardStore = create((set, get) => ({
     isOpen: false,
     modelUrl: null,
   },
+  backendModelLabel: null,
   score: null,
+
+  // Picking element
+  isPickingElement: false,
+  pickedElement: null,
+  setIsPickingElement: (isPicking) => set({ isPickingElement: isPicking }),
+  setPickedElement: (element) => set({ pickedElement: element, isPickingElement: false }),
+  adaptedSubjectNodeId: null,
 
   // Set ReactFlow instance
   setReactFlowInstance: (instance) => set({ reactFlowInstance: instance }),
@@ -383,6 +380,7 @@ export const useMoodboardStore = create((set, get) => ({
 
   // Add image node
   addImage: (src) => {
+    if (get().isGenerating) return
     const position = get().getCenterPosition()
     const nodeId = `image-${Date.now()}`
     const image = new Image()
@@ -425,6 +423,7 @@ export const useMoodboardStore = create((set, get) => ({
 
   // Add video node
   addVideo: (src) => {
+    if (get().isGenerating) return
     const position = get().getCenterPosition()
     const nodeId = `video-${Date.now()}`
     const video = document.createElement('video')
@@ -477,6 +476,7 @@ export const useMoodboardStore = create((set, get) => ({
 
   // Add text node
   addText: () => {
+    if (get().isGenerating) return
     const position = get().getCenterPosition()
     const width = DEFAULT_SIZES.TEXT.width
     const height = DEFAULT_SIZES.TEXT.height
@@ -494,6 +494,7 @@ export const useMoodboardStore = create((set, get) => ({
 
   // Add font node
   addFont: (fontData, fontName) => {
+    if (get().isGenerating) return
     const position = get().getCenterPosition()
     const nodeId = `font-${Date.now()}`
     const uniqueFontFamily = `CustomFont-${nodeId}`
@@ -532,6 +533,7 @@ export const useMoodboardStore = create((set, get) => ({
 
   // Add 3D model node
   addModel: (src, fileName) => {
+    if (get().isGenerating) return
     const position = get().getCenterPosition()
     const nodeId = `model-${Date.now()}`
     
@@ -556,6 +558,7 @@ export const useMoodboardStore = create((set, get) => ({
 
   // Add palette node
   addPalette: (colors, options = {}) => {
+    if (get().isGenerating) return
     const paletteColors = Array.isArray(colors) ? [...colors] : []
     const position = get().getCenterPosition()
     const width = Number.isFinite(options.width) ? options.width : DEFAULT_SIZES.PALETTE.width
@@ -580,6 +583,7 @@ export const useMoodboardStore = create((set, get) => ({
 
   // Add cluster node
   addCluster: (title) => {
+    if (get().isGenerating) return
     const position = get().getCenterPosition()
     const clusterTitle =
       typeof title === 'string' && title.trim().length > 0 ? title.trim() : 'Cluster'
@@ -620,6 +624,7 @@ export const useMoodboardStore = create((set, get) => ({
 
   // Clear all nodes
   clearAll: () => {
+    if (get().isGenerating) return
     if (confirm('Are you sure you want to clear all elements?')) {
       set({ nodes: [], edges: [] })
     }
@@ -629,11 +634,11 @@ export const useMoodboardStore = create((set, get) => ({
   applyWeights: (weightsData, idMaps) => {
     set((state) => ({
       nodes: state.nodes.map((node) => {
-        const map = node.type === 'clusterNode' ? idMaps.clusters : idMaps.elements
-        const source = node.type === 'clusterNode' ? weightsData.cluster_weights : weightsData.weights
-        for (const [backendId, frontendId] of map.entries()) {
-          if (frontendId === node.id && source?.[backendId] != null) {
-            return { ...node, data: { ...node.data, weight: source[backendId] } }
+        if (node.type !== 'clusterNode') {
+          for (const [backendId, frontendId] of idMaps.elements.entries()) {
+            if (frontendId === node.id && weightsData.weights?.[backendId] != null) {
+              return { ...node, data: { ...node.data, weight: weightsData.weights[backendId] } }
+            }
           }
         }
         return node
@@ -642,17 +647,27 @@ export const useMoodboardStore = create((set, get) => ({
   },
 
   // Send moodboard generation request to backend
-  generateMoodboard: async (prompt = '') => {
+  generateMoodboard: async (prompt = '', subjectText = '', subjectFile = null) => {
     const { nodes, applyWeights } = get()
-    const { payload, idMaps } = serializeDataForBackend(nodes)
+    const { payload, idMaps } = serializeDataForBackend(nodes, subjectFile?.nodeId)
 
     // If no elements or clusters, skip generation
-    if ((!payload.elements || payload.elements.length === 0) && (!payload.clusters || payload.clusters.length === 0)) {
+    if ((!payload.elements || payload.elements.length === 0) && (!payload.clusters || payload.clusters.length === 0) && !subjectFile) {
       return { weights: {}, cluster_weights: {} }
     }
 
     // Add the user prompt to the payload
     payload.prompt = prompt
+    if (subjectText) {
+      payload.adapt_subject_text = subjectText
+    }
+    if (subjectFile) {
+      payload.adapt_subject_file = {
+        type: subjectFile.type,
+        data: subjectFile.data,
+        name: subjectFile.name
+      }
+    }
 
     set({ 
       isGenerating: true, 
@@ -663,6 +678,7 @@ export const useMoodboardStore = create((set, get) => ({
       masterPromptSessionId: null,
       masterPromptData: null,
       masterPromptIsLoading: false,
+      adaptedSubjectNodeId: subjectFile?.nodeId || null,
       progress: { current: 0, total: 0, stage: 'Starting...' },
       score: null,
     })
@@ -952,6 +968,41 @@ export const useMoodboardStore = create((set, get) => ({
     }
   },
 
+  startBackendModelLabelPolling: () => {
+    let isStopped = false
+    let retryTimeoutId = null
+
+    const poll = async () => {
+      if (isStopped || get().backendModelLabel) return
+
+      try {
+        const response = await fetch(`${BACKEND_URL}/status`)
+        if (response.ok) {
+          const data = await response.json()
+          if (data?.model) {
+            set({ backendModelLabel: data.model })
+            return
+          }
+        }
+      } catch {
+        // Backend may not be up yet. Keep retrying quietly.
+      }
+
+      if (!isStopped && !get().backendModelLabel) {
+        retryTimeoutId = setTimeout(poll, 3000)
+      }
+    }
+
+    poll()
+
+    return () => {
+      isStopped = true
+      if (retryTimeoutId) {
+        clearTimeout(retryTimeoutId)
+      }
+    }
+  },
+
   openModelDialog: (url) => set({ modelDialog: { isOpen: true, modelUrl: url } }),
   closeModelDialog: () => set({ modelDialog: { isOpen: false, modelUrl: null } }),
 
@@ -984,6 +1035,7 @@ export const useMoodboardStore = create((set, get) => ({
 
   // Load moodboard from JSON data
   loadMoodboard: (data) => {
+    if (get().isGenerating) return
     try {
       if (data.nodes && Array.isArray(data.nodes)) {
         set((state) => ({

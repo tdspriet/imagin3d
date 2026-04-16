@@ -1,10 +1,10 @@
 User's generation intent:
-"{{ ctx.user_prompt }}"
+"{{ ctx.prompt }}"
 
 Moodboard analysis (ordered by relevance):
 {% for cluster in ctx.clusters %}
 
-Cluster: "{{ cluster.title }}" (relevance: {{ cluster.weight }}%)
+Cluster: "{{ cluster.title }}"
 Description: {{ cluster.description }}
 {% if cluster.elements %}
 Key elements:

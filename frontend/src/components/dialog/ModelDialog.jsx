@@ -1,86 +1,58 @@
-import { useCallback, useEffect, useState, Suspense } from 'react'
+import React, { useCallback, useEffect, Suspense, useState } from 'react'
 import { Canvas } from '@react-three/fiber'
-import { OrbitControls, } from '@react-three/drei'
-import * as THREE from 'three'
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader'
+import { OrbitControls, useGLTF, Environment, Html } from '@react-three/drei'
 import { useMoodboardStore } from '../../store/moodboardStore'
+import * as THREE from 'three'
 import './ModelDialog.css'
 
-function Model3D({ url, onError }) {
-  const [model, setModel] = useState(null)
+class ModelErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props)
+    this.state = { hasError: false }
+  }
+  static getDerivedStateFromError(error) {
+    return { hasError: true }
+  }
+  componentDidCatch(error) {
+    if (this.props.onError) this.props.onError(true)
+  }
+  render() {
+    if (this.state.hasError) {
+      return <Html center><div style={{ color: 'var(--color-error)' }}>Failed to load model</div></Html>
+    }
+    return this.props.children
+  }
+}
+
+function Model3D({ url }) {
+  const { scene } = useGLTF(url)
+  const clonedScene = React.useMemo(() => scene ? scene.clone() : null, [scene])
   
-  useEffect(() => {
-    let isMounted = true
+  React.useEffect(() => {
+    if (!clonedScene) return
     
-    const loadModel = async () => {
-      try {
-        const gltf = await new Promise((resolve, reject) => {
-          const loader = new GLTFLoader()
-          loader.load(
-            url,
-            (gltf) => resolve(gltf),
-            undefined,
-            (error) => reject(error)
-          )
-        })
-        
-        if (!isMounted) return
-        
-        // Process the scene
-        gltf.scene.traverse((child) => {
-          if (!child.isMesh) return
-          child.castShadow = false
-          child.receiveShadow = false
-        })
-                
-        // Calculate bounding box
-        const box = new THREE.Box3().setFromObject(gltf.scene)
-        const center = box.getCenter(new THREE.Vector3())
-        const size = box.getSize(new THREE.Vector3())
-
-        // Calculate scale
-        const maxDim = Math.max(size.x, size.y, size.z)
-        const scale = 2.5 / maxDim 
-        gltf.scene.scale.setScalar(scale)
-
-        // Position
-        const yOffset = size.y * scale * 0.1
-        gltf.scene.position.set(
-          -center.x * scale,
-          -center.y * scale + yOffset,
-          -center.z * scale
-        )
-        
-        setModel(gltf.scene)
-      } catch (error) {
-        console.error('Error loading 3D model:', error)
-        if (isMounted && onError) {
-          onError()
-        }
-      }
-    }
+    // Reset to compute actual size
+    clonedScene.scale.setScalar(1)
+    clonedScene.position.set(0, 0, 0)
+    clonedScene.updateMatrixWorld(true)
     
-    loadModel()
+    const box = new THREE.Box3().setFromObject(clonedScene)
+    const center = box.getCenter(new THREE.Vector3())
+    const size = box.getSize(new THREE.Vector3())
     
-    return () => {
-      isMounted = false
-      if (model) {
-        model.traverse((child) => {
-          if (child.geometry) child.geometry.dispose()
-          if (child.material) {
-            if (Array.isArray(child.material)) {
-                child.material.forEach(m => m.dispose())
-            } else {
-                child.material.dispose()
-            }
-          }
-        })
-      }
-    }
-  }, [url, onError])
+    const maxDim = Math.max(size.x, size.y, size.z) || 1
+    const scale = 2.5 / maxDim
+    clonedScene.scale.setScalar(scale)
+    
+    // Push the object up 0.25 unit after centering
+    clonedScene.position.set(
+      -center.x * scale,
+      -center.y * scale + 0.25,
+      -center.z * scale
+    )
+  }, [clonedScene])
 
-  if (!model) return null
-  return <primitive object={model} />
+  return clonedScene ? <primitive object={clonedScene} /> : null
 }
 
 function ModelDialog({ 
@@ -146,23 +118,18 @@ function ModelDialog({
         <div className="model-dialog__body">
           <div className="model-dialog__canvas-container">
              <Canvas camera={{ position: [0, 0, 5], fov: 50 }}>
-                {/* Top & Bottom */}
-                <directionalLight position={[0, 10, 0]} intensity={5} />
-                <directionalLight position={[0, -10, 0]} intensity={5} />
-                {/* Front, Back, Left, Right */}
-                <directionalLight position={[10, 0, 0]} intensity={5} />
-                <directionalLight position={[-10, 0, 0]} intensity={5} />
-                <directionalLight position={[0, 0, 10]} intensity={5} />
-                <directionalLight position={[0, 0, -10]} intensity={5} />
-                {/* 4 Diagonals */}
-                <directionalLight position={[7, 0, 7]} intensity={5} />
-                <directionalLight position={[-7, 0, 7]} intensity={5} />
-                <directionalLight position={[7, 0, -7]} intensity={5} />
-                <directionalLight position={[-7, 0, -7]} intensity={5} />
-                <Suspense fallback={null}>
-                    {modelUrl && <Model3D url={modelUrl} />}
-                </Suspense>
-                <OrbitControls makeDefault />
+               <ambientLight intensity={1.5} />
+               <directionalLight position={[10, 10, 10]} intensity={2.5} />
+               <directionalLight position={[-10, -10, -10]} intensity={1} />
+               <Suspense fallback={null}>
+                 {modelUrl && (
+                   <ModelErrorBoundary>
+                     <Model3D url={modelUrl} />
+                   </ModelErrorBoundary>
+                 )}
+               </Suspense>
+               <Environment preset="city" />
+               <OrbitControls makeDefault enableZoom={true} />
              </Canvas>
           </div>
         </div>

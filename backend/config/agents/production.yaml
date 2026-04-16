@@ -23,4 +23,7 @@ visualizer:
   _target_: backend.agents.visualizer.Visualizer
   llm:
     _target_: pydantic_ai.models.google.GoogleModel
+    _convert_: all
     model_name: gemini-2.5-flash-image
+    settings:
+      seed: ${image_generation.seed}

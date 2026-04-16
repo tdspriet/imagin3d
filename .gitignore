@@ -1,9 +1,11 @@
-# Frontend Dependencies
+# Frontend
 node_modules
+dist
 
-# Backend Environment
+# Backend
 .venv
 .pants.d
+hf_cache
 
 # Python
 __pycache__
@@ -15,7 +17,8 @@ __pycache__
 artifacts
 
 # Models
-ckpts
+trellisv1
+trellisv2
 
 # Notes
 notes.txt

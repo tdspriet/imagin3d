@@ -11,9 +11,9 @@ engine:
   name: "Blender"
   version: "4.5.3"
   exe: "blender"
-  resolution_x: 1024
-  resolution_y: 1024
-  num_views: 5
+  resolution_x: 512
+  resolution_y: 512
+  num_views: 3
   timeout_s: 60
 
 trellis:
@@ -24,3 +24,6 @@ hunyuan:
 
 logging:
   filename: ${now:%Y-%m-%d}-${now:%H-%M-%S}.log
+
+image_generation:
+  seed: 42

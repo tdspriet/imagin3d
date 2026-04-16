@@ -30,8 +30,9 @@ from backend.utils.video import extract_key_frames
 logger = structlog.stdlib.get_logger(__name__)
 
 # Global state
-RELEVANCE_THRESHOLD = 40
+RELEVANCE_THRESHOLD = 50
 ROOT_DIR = Path(__file__).parent.resolve()
+_initialized = False
 blender_engine: Union[Blender, None] = None
 trellis_engine: Union[TrellisEngine, None] = None
 hunyuan_engine: Union[HunyuanEngine, None] = None
@@ -58,6 +59,9 @@ def _initialize():
         bedrock_client, \
         embedding_function
 
+    if _initialized:
+        return
+
     # Initialize via Hydra configuration
     config_dir = str(ROOT_DIR / "config")
     with initialize_config_dir(config_dir=config_dir, version_base=None):
@@ -73,6 +77,7 @@ def _initialize():
     visualizer = hydra.utils.instantiate(cfg.visualizer)
     bedrock_client = boto3.client("bedrock-runtime")
     embedding_function = BedrockEmbeddingFunction(bedrock_client)
+    _initialized = True
 
 
 async def handle_model(element: dict) -> tuple[str, str]:
@@ -171,8 +176,9 @@ async def handle_cluster(
 async def route_cluster(
     prompt: str,
     cluster: common.ClusterDescriptor,
+    subject: str | None = None,
 ) -> int:
-    result = await intent_router.run_for_cluster(prompt, cluster)
+    result = await intent_router.run_for_cluster(prompt, cluster, subject)
     return result.output.info.weight
 
 
@@ -180,8 +186,9 @@ async def route_token(
     prompt: str,
     token: common.DesignToken,
     cluster_context: str | None = None,
+    subject: str | None = None,
 ) -> int:
-    result = await intent_router.run_for_token(prompt, token, cluster_context)
+    result = await intent_router.run_for_token(prompt, token, cluster_context, subject)
     return result.output.info.weight
 
 
@@ -191,8 +198,9 @@ def generate_embedding(title: str) -> list[float]:
 
 
 async def synthesize_master_prompt(
-    user_prompt: str,
+    prompt: str,
     clusters: list[common.ClusterDescriptor],
+    subject: str | None = None,
 ) -> str:
     filtered_clusters = []
     for cluster in clusters:
@@ -201,10 +209,10 @@ async def synthesize_master_prompt(
                 "type": elem.type,
                 "title": elem.title,
                 "description": elem.description,
-                "weight": (elem.weight * cluster.weight) / 100,
+                "weight": elem.weight,
             }
             for elem in cluster.elements
-            if (elem.weight * cluster.weight) / 100 > RELEVANCE_THRESHOLD
+            if elem.weight > RELEVANCE_THRESHOLD
         ]
         if filtered_elements:
             filtered_clusters.append(
@@ -216,7 +224,7 @@ async def synthesize_master_prompt(
                 }
             )
 
-    result = await prompt_synthesizer.run(user_prompt, filtered_clusters)
+    result = await prompt_synthesizer.run(prompt, filtered_clusters, subject)
     master_prompt = result.output.info.prompt
 
     # Save master prompt to artifacts
@@ -230,14 +238,23 @@ async def synthesize_master_prompt(
 async def generate_master_image(
     master_prompt: str,
     clusters: list[common.ClusterDescriptor],
+    base_image_path: Path | None = None,
+    prompt: str | None = None,
 ) -> Path | list[Path]:
     style_images = _collect_style_images(clusters)
     logger.info(
         f"Collected {len(style_images)} style images for master image generation"
     )
 
+    base_image = None
+    if base_image_path and Path(base_image_path).exists():
+        with open(base_image_path, "rb") as f:
+            base_image = pydantic_ai.BinaryImage(data=f.read(), media_type="image/jpeg")
+
     # Generate master image
-    result = await visualizer.run(master_prompt, style_images)
+    result = await visualizer.run(
+        master_prompt, style_images, base_image, prompt=prompt
+    )
 
     # Save master image to artifacts
     master_image_path = ROOT_DIR / "artifacts" / "master_image.jpg"
@@ -262,12 +279,13 @@ async def edit_master_image(
     source_image = common.decode_data_url_to_binary_image(image_data_url)
     prompt = (
         "Edit the attached image according to this instruction: "
-        f"{edit_prompt}. The subject must be fully in-frame isolated against a seamless pure white background."
+        f"{edit_prompt}. The subject must be fully in-frame isolated against a transparent background."
     )
 
     result = await visualizer.run(prompt, [source_image])
-
+    # Save master image to artifacts
     master_image_path = ROOT_DIR / "artifacts" / "master_image.jpg"
+
     with open(master_image_path, "wb") as f:
         f.write(result.output.data)
 
@@ -337,12 +355,12 @@ async def evaluate_model(
 
     for cluster in clusters:
         for token in cluster.elements:
-            if (token.weight * cluster.weight) / 100 <= RELEVANCE_THRESHOLD:
+            if token.weight <= RELEVANCE_THRESHOLD:
                 continue
 
             if token.embedding and len(token.embedding) > 0:
                 embeddings.append(token.embedding)
-                weights.append((token.weight * cluster.weight) / 100)
+                weights.append(token.weight)
 
     embeddings_np = np.array(embeddings)
     weights_np = np.array(weights)
@@ -386,6 +404,20 @@ async def evaluate_model(
 # --- Helper functions ---
 
 
+def _save_master_image(output: pydantic_ai.BinaryImage) -> Path:
+    image = Image.open(io.BytesIO(output.data))
+    image.load()
+
+    master_image_path = ROOT_DIR / "artifacts" / "master_image.png"
+    if "A" in image.getbands():
+        image = image.convert("RGBA")
+    else:
+        image = image.convert("RGB")
+    image.save(master_image_path, format="PNG")
+
+    return master_image_path
+
+
 async def _save_model_file(element: dict) -> Path:
     # Save a model file from base64 data and return its path
     model_data = element["content"]["data"]["src"]
@@ -426,7 +458,7 @@ def _collect_style_image_paths(
     image_paths: list[Path] = []
     for cluster in clusters:
         for elem in cluster.elements:
-            if (elem.weight * cluster.weight) / 100 <= RELEVANCE_THRESHOLD:
+            if elem.weight <= RELEVANCE_THRESHOLD:
                 continue
 
             if elem.type == "image":

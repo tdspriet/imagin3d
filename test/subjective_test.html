@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Generation Subjective Test</title>
+    <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.4.0/model-viewer.min.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #ffffff;
+            color: #000000;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+        .container {
+            background-color: #ffffff;
+            padding: 2rem;
+            border: 2px solid #000000;
+        }
+        h1 { 
+            color: #000000; 
+            margin-top: 0;
+            margin-bottom: 1.5rem;
+            text-align: center;
+        }
+        h2 { 
+            color: #000000; 
+            margin-top: 2rem; 
+        }
+        .rules-box {
+            background-color: #ffffff;
+            padding: 1.5rem;
+            border: 1px solid #000000;
+            margin-top: 2rem;
+            margin-bottom: 2rem;
+            text-align: center;
+        }
+        .rules-box h2 {
+            margin-top: 0;
+        }
+        .rules-box ul {
+            display: inline-block;
+            text-align: left;
+            margin: 0 auto;
+            padding: 0;
+            list-style-position: inside;
+        }
+        .timer-display {
+            font-size: 3rem;
+            font-weight: bold;
+            text-align: center;
+            margin: 1.5rem 0;
+            color: #000000;
+            font-variant-numeric: tabular-nums;
+        }
+        .btn-group {
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+        button {
+            padding: 0.75rem 1.5rem;
+            font-size: 1rem;
+            font-weight: bold;
+            background-color: #ffffff;
+            color: #000000;
+            border: 2px solid #000000;
+            cursor: pointer;
+            transition: all 0.2s ease-in-out;
+        }
+        button:hover { 
+            background-color: #000000; 
+            color: #ffffff; 
+        }
+        .likert-scale {
+            display: flex;
+            justify-content: space-between;
+            background-color: #ffffff;
+            padding: 1rem 2rem;
+            border: 1px solid #000000;
+            margin-top: 1rem;
+        }
+        .likert-option {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            gap: 0.5rem;
+            width: 100px;
+            text-align: center;
+        }
+        input[type="radio"] {
+            transform: scale(1.5);
+            accent-color: #000000;
+            margin-bottom: 0.25rem;
+        }
+        .likert-number {
+            font-weight: bold;
+            font-size: 1.1rem;
+        }
+        .likert-label {
+            font-size: 0.85rem;
+        }
+        
+        /* 3D Viewer Styles */
+        .models-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 2rem;
+            margin-top: 1rem;
+        }
+        .model-box {
+            flex: 1;
+            min-width: 300px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .model-box h3 {
+            margin-top: 0;
+            margin-bottom: 0.5rem;
+        }
+        
+        /* Drag and Drop Container Wrapper */
+        .viewer-wrapper {
+            position: relative;
+            width: 100%;
+            height: 400px;
+        }
+        
+        .drop-hint {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-weight: bold;
+            color: #666666;
+            pointer-events: none; /* Allows dropping directly onto the viewer behind it */
+            text-align: center;
+            z-index: 10;
+        }
+
+        model-viewer {
+            width: 100%;
+            height: 100%;
+            border: 1px dashed #000000;
+            background-color: #f9f9f9;
+            transition: background-color 0.2s;
+            --poster-color: transparent;
+        }
+        
+        /* Highlight class added via JS when dragging over */
+        model-viewer.drag-over {
+            background-color: #e0e0e0;
+            border: 2px dashed #000000;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Imagin3D - Subjective Evaluation</h1>
+        
+        <div class="models-container">
+            <div class="model-box">
+                <div class="viewer-wrapper">
+                    <model-viewer id="viewer-baseline" camera-controls auto-rotate shadow-intensity="1"></model-viewer>
+                </div>
+            </div>
+            
+            <div class="model-box">
+                <div class="viewer-wrapper">
+                    <span class="drop-hint" id="hint-imagin3d">Drag & Drop .glb here</span>
+                    <model-viewer id="viewer-imagin3d" camera-controls auto-rotate shadow-intensity="1"></model-viewer>
+                </div>
+            </div>
+        </div>
+
+        <div class="rules-box">
+            <h2>Test Objective</h2>
+            <p><strong>Goal:</strong> Recreate the target 3D models using the provided tools.</p>
+            <p><strong>Constraints:</strong></p>
+            <ul>
+                <li>You have a maximum of 6 minutes to reach a satisfactory result.</li>
+                <li>Start the timer right before you begin designing/prompting.</li>
+                <li>Stop the timer the moment you have generated your final acceptable 3D asset.</li>
+                <li>Click "+1m" when using Trellis on the baseline, as ours locally runs 1m slower.</li>
+            </ul>
+        </div>
+
+        <h2 style="text-align: center;">1. Time to Satisfaction</h2>
+        <div class="timer-display" id="display">00:00.00</div>
+        <div class="btn-group">
+            <button onclick="startTimer()">Start</button>
+            <button onclick="stopTimer()">Finish & Stop</button>
+            <button onclick="resetTimer()">Reset</button>
+            <button onclick="addOneMinute()">+1m</button>
+        </div>
+
+        <h2 style="text-align: center;">2. Intuitiveness Rating</h2>
+        <p style="text-align: center;">How naturally could you express your structural and stylistic goals using this workflow?</p>
+        <div class="likert-scale">
+            <label class="likert-option">
+                <input type="radio" name="intuitiveness" value="1">
+                <span class="likert-number">1</span>
+                <span class="likert-label">Very Unintuitive</span>
+            </label>
+            <label class="likert-option">
+                <input type="radio" name="intuitiveness" value="2">
+                <span class="likert-number">2</span>
+            </label>
+            <label class="likert-option">
+                <input type="radio" name="intuitiveness" value="3">
+                <span class="likert-number">3</span>
+                <span class="likert-label">Neutral</span>
+            </label>
+            <label class="likert-option">
+                <input type="radio" name="intuitiveness" value="4">
+                <span class="likert-number">4</span>
+            </label>
+            <label class="likert-option">
+                <input type="radio" name="intuitiveness" value="5">
+                <span class="likert-number">5</span>
+                <span class="likert-label">Very Intuitive</span>
+            </label>
+        </div>
+    </div>
+
+    <script>
+        // --- Timer Logic ---
+        let startTime, updatedTime, difference, tInterval;
+        let running = false;
+        const display = document.getElementById('display');
+
+        function startTimer() {
+            if (!running) {
+                startTime = new Date().getTime() - (difference || 0);
+                tInterval = setInterval(updateTime, 10);
+                running = true;
+            }
+        }
+
+        function stopTimer() {
+            if (running) {
+                clearInterval(tInterval);
+                running = false;
+            }
+        }
+
+        function resetTimer() {
+            clearInterval(tInterval);
+            running = false;
+            difference = 0;
+            display.innerHTML = "00:00.00";
+        }
+
+        function addOneMinute() {
+            const oneMinuteMs = 60000;
+            
+            if (running) {
+                // If running, shift the start time back by 1 minute
+                startTime -= oneMinuteMs;
+            } else {
+                // If paused, add to the difference and update the display manually
+                difference = (difference || 0) + oneMinuteMs;
+                
+                if (difference >= 360000) {
+                    difference = 360000;
+                    display.innerHTML = "06:00.00 (Time Up)";
+                    return;
+                }
+
+                let minutes = Math.floor((difference % (1000 * 60 * 60)) / (1000 * 60));
+                let seconds = Math.floor((difference % (1000 * 60)) / 1000);
+                let milliseconds = Math.floor((difference % 1000) / 10);
+
+                minutes = (minutes < 10) ? "0" + minutes : minutes;
+                seconds = (seconds < 10) ? "0" + seconds : seconds;
+                milliseconds = (milliseconds < 10) ? "0" + milliseconds : milliseconds;
+
+                display.innerHTML = minutes + ":" + seconds + "." + milliseconds;
+            }
+        }
+
+        function updateTime() {
+            updatedTime = new Date().getTime();
+            difference = updatedTime - startTime;
+            
+            let minutes = Math.floor((difference % (1000 * 60 * 60)) / (1000 * 60));
+            let seconds = Math.floor((difference % (1000 * 60)) / 1000);
+            let milliseconds = Math.floor((difference % 1000) / 10);
+
+            minutes = (minutes < 10) ? "0" + minutes : minutes;
+            seconds = (seconds < 10) ? "0" + seconds : seconds;
+            milliseconds = (milliseconds < 10) ? "0" + milliseconds : milliseconds;
+
+            display.innerHTML = minutes + ":" + seconds + "." + milliseconds;
+            
+            if (difference >= 360000) {
+                stopTimer();
+                difference = 360000; // Cap it exactly at 6 minutes internally
+                display.innerHTML = "06:00.00 (Time Up)";
+            }
+        }
+
+        // --- Drag and Drop Logic ---
+        function setupDropZone(viewerId, hintId) {
+            const viewer = document.getElementById(viewerId);
+            const hint = document.getElementById(hintId);
+
+            viewer.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                viewer.classList.add('drag-over');
+            });
+
+            viewer.addEventListener('dragleave', (e) => {
+                e.preventDefault();
+                viewer.classList.remove('drag-over');
+            });
+
+            viewer.addEventListener('drop', (e) => {
+                e.preventDefault();
+                viewer.classList.remove('drag-over');
+
+                if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                    const file = e.dataTransfer.files[0];
+                    
+                    // Basic check to ensure it's a 3D model
+                    if (file.name.toLowerCase().endsWith('.glb') || file.name.toLowerCase().endsWith('.gltf')) {
+                        const objectURL = URL.createObjectURL(file);
+                        viewer.src = objectURL;
+                        
+                        // Hide the hint text once a file is loaded
+                        if(hint) {
+                            hint.style.display = 'none';
+                        }
+                    } else {
+                        alert('Please drop a valid .glb or .gltf file.');
+                    }
+                }
+            });
+        }
+
+        // Initialize drag and drop for both viewers
+        setupDropZone('viewer-baseline', 'hint-baseline');
+        setupDropZone('viewer-imagin3d', 'hint-imagin3d');
+    </script>
+</body>
+</html>
