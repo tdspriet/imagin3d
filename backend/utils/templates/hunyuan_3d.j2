@@ -1,0 +1,26 @@
+import torch
+from PIL import Image
+
+def main():
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    dtype = torch.bfloat16
+    
+    # Pseudo-code matching LRM initiation for Hunyuan3D-2.
+    from hunyuan.lrm import HunyuanLRM pipeline
+    
+    pipeline = HunyuanLRM.from_pretrained("{{ ckpt_path }}", torch_dtype=dtype).to(device)
+    
+    image_paths = [
+        {% for path in image_paths %}"{{ path }}",{% endfor %}
+    ]
+    
+    # Reassemble the images if the model requires it array-form or stitched
+    images = [Image.open(p).convert("RGB") for p in image_paths]
+    
+    mesh = pipeline(images=images)[0]
+    
+    # Export
+    mesh.export("{{ output_glb }}")
+
+if __name__ == "__main__":
+    main()

@@ -131,15 +131,21 @@ async def regenerate_master_prompt_image(
     if not clusters:
         return {"error": "Session has no cluster context"}
 
-    master_image_path = await orchestrator.generate_master_image(prompt, clusters)
-    session["master_image_path"] = str(master_image_path)
+    master_image_path_or_paths = await orchestrator.generate_master_image(prompt, clusters)
+    if isinstance(master_image_path_or_paths, list):
+        session["master_image_paths"] = [str(p) for p in master_image_path_or_paths]
+        encoded_images = [encode_image_to_data_url(p) for p in master_image_path_or_paths]
+    else:
+        session["master_image_path"] = str(master_image_path_or_paths)
+        encoded_images = [encode_image_to_data_url(master_image_path_or_paths)]
 
     master_prompt_path = ROOT_DIR / "artifacts" / "master_prompt.txt"
     with open(master_prompt_path, "w", encoding="utf-8") as f:
         f.write(prompt)
 
     return {
-        "image": encode_image_to_data_url(master_image_path),
+        "images": encoded_images,
+        "base_image": encode_image_to_data_url(ROOT_DIR / "artifacts" / "master_image.jpg"),
     }
 
 
@@ -157,11 +163,24 @@ async def edit_master_prompt_image(
 
     session = pending_confirmations[session_id]
 
-    master_image_path = await orchestrator.edit_master_image(edit_prompt, payload.image)
-    session["master_image_path"] = str(master_image_path)
+    master_prompt = ""
+    master_prompt_path = ROOT_DIR / "artifacts" / "master_prompt.txt"
+    if master_prompt_path.exists():
+        with open(master_prompt_path, "r", encoding="utf-8") as f:
+            master_prompt = f.read().strip()
+
+    master_image_path_or_paths = await orchestrator.edit_master_image(edit_prompt, payload.image, master_prompt)
+    
+    if isinstance(master_image_path_or_paths, list):
+        session["master_image_paths"] = [str(p) for p in master_image_path_or_paths]
+        encoded_images = [encode_image_to_data_url(p) for p in master_image_path_or_paths]
+    else:
+        session["master_image_path"] = str(master_image_path_or_paths)
+        encoded_images = [encode_image_to_data_url(master_image_path_or_paths)]
 
     return {
-        "image": encode_image_to_data_url(master_image_path),
+        "images": encoded_images,
+        "base_image": encode_image_to_data_url(ROOT_DIR / "artifacts" / "master_image.jpg"),
     }
 
 
@@ -585,14 +604,18 @@ async def extract(payload: MoodboardPayload) -> StreamingResponse:
             master_prompt,
             cluster_descriptors,
         )
+        
+        master_image_paths = master_image_path if isinstance(master_image_path, list) else [master_image_path]
+
         reference_images = orchestrator.get_reference_images_preview(
             cluster_descriptors
         )
 
-        # Send master prompt and image to frontend for confirmation
-        master_image_base64 = ""
-        if master_image_path and Path(master_image_path).exists():
-            master_image_base64 = encode_image_to_data_url(Path(master_image_path))
+        # Send master prompt and images to frontend for confirmation
+        master_images_base64 = []
+        for p in master_image_paths:
+            if p and Path(p).exists():
+                master_images_base64.append(encode_image_to_data_url(Path(p)))
 
         # Create new session for master prompt confirmation
         master_session_id = str(uuid.uuid4())
@@ -600,14 +623,15 @@ async def extract(payload: MoodboardPayload) -> StreamingResponse:
             "event": asyncio.Event(),
             "confirmed": False,
             "clusters": cluster_descriptors,  # Keep cluster context for potential regeneration
-            "master_image_path": str(master_image_path),
+            "master_image_paths": [str(p) for p in master_image_paths],
         }
 
         master_prompt_event = {
             "type": "master_prompt",
             "data": {
                 "prompt": master_prompt,
-                "image": master_image_base64,
+                "images": master_images_base64,
+                "base_image": encode_image_to_data_url(ROOT_DIR / "artifacts" / "master_image.jpg"),
                 "reference_images": reference_images,
             },
             "session_id": master_session_id,
@@ -620,7 +644,13 @@ async def extract(payload: MoodboardPayload) -> StreamingResponse:
         # Check if user confirmed or cancelled
         master_session = pending_confirmations[master_session_id]
         master_confirmed = master_session["confirmed"]
-        master_image_path = Path(master_session["master_image_path"])
+        
+        master_image_paths = []
+        if "master_image_paths" in master_session:
+            master_image_paths = [Path(p) for p in master_session["master_image_paths"]]
+        elif "master_image_path" in master_session:
+            master_image_paths = [Path(master_session["master_image_path"])]
+
         del pending_confirmations[master_session_id]  # Clean up
         if not master_confirmed:
             logger.info("User cancelled master prompt")
@@ -645,8 +675,8 @@ async def extract(payload: MoodboardPayload) -> StreamingResponse:
         }
         yield f"data: {json.dumps(progress_event)}\n\n"
 
-        # Generate 3D model from master image using TRELLIS
-        model_path = await orchestrator.generate_3d_model(master_image_path)
+        # Generate 3D model from master image(s) using Engine
+        model_path = await orchestrator.generate_3d_model(master_image_paths)
 
         progress_event = {
             "type": "progress",

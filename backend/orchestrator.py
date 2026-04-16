@@ -22,6 +22,7 @@ from backend.agents.prompt_synthesizer import PromptSynthesizer
 from backend.agents.visualizer import Visualizer
 from backend.engines.blender import Blender
 from backend.utils.trellis import TrellisEngine
+from backend.utils.hunyuan import HunyuanEngine
 from backend.utils.embeddings import BedrockEmbeddingFunction
 from backend.utils.video import extract_key_frames
 
@@ -33,6 +34,7 @@ RELEVANCE_THRESHOLD = 40
 ROOT_DIR = Path(__file__).parent.resolve()
 blender_engine: Union[Blender, None] = None
 trellis_engine: Union[TrellisEngine, None] = None
+hunyuan_engine: Union[HunyuanEngine, None] = None
 descriptor: Union[Descriptor, None] = None
 clusterer: Union[Clusterer, None] = None
 intent_router: Union[IntentRouter, None] = None
@@ -47,6 +49,7 @@ def _initialize():
         _initialized, \
         blender_engine, \
         trellis_engine, \
+        hunyuan_engine, \
         descriptor, \
         clusterer, \
         intent_router, \
@@ -62,6 +65,7 @@ def _initialize():
 
     blender_engine = hydra.utils.instantiate(cfg.engine)
     trellis_engine = hydra.utils.instantiate(cfg.trellis)
+    hunyuan_engine = hydra.utils.instantiate(cfg.hunyuan)
     descriptor = hydra.utils.instantiate(cfg.descriptor)
     clusterer = hydra.utils.instantiate(cfg.clusterer)
     intent_router = hydra.utils.instantiate(cfg.intent_router)
@@ -226,7 +230,7 @@ async def synthesize_master_prompt(
 async def generate_master_image(
     master_prompt: str,
     clusters: list[common.ClusterDescriptor],
-) -> Path:
+) -> Path | list[Path]:
     style_images = _collect_style_images(clusters)
     logger.info(
         f"Collected {len(style_images)} style images for master image generation"
@@ -241,13 +245,20 @@ async def generate_master_image(
     with open(master_image_path, "wb") as f:
         f.write(result.output.data)
 
+    import os
+    if os.getenv("CONDA_DEFAULT_ENV") == "hunyuan":
+        logger.info("Generating Hunyuan multi-views from master image...")
+        output_dir = ROOT_DIR / "artifacts" / "views"
+        return await hunyuan_engine.generate_multiview(master_image_path, output_dir, master_prompt)
+
     return master_image_path
 
 
 async def edit_master_image(
     edit_prompt: str,
     image_data_url: str,
-) -> Path:
+    master_prompt: str = ""
+) -> Path | list[Path]:
     source_image = common.decode_data_url_to_binary_image(image_data_url)
     prompt = (
         "Edit the attached image according to this instruction: "
@@ -259,6 +270,13 @@ async def edit_master_image(
     master_image_path = ROOT_DIR / "artifacts" / "master_image.jpg"
     with open(master_image_path, "wb") as f:
         f.write(result.output.data)
+
+    import os
+    if os.getenv("CONDA_DEFAULT_ENV") == "hunyuan":
+        logger.info("Generating Hunyuan multi-views from edited master image...")
+        output_dir = ROOT_DIR / "artifacts" / "views"
+        full_prompt = f"{master_prompt}, {edit_prompt}" if master_prompt else edit_prompt
+        return await hunyuan_engine.generate_multiview(master_image_path, output_dir, full_prompt)
 
     return master_image_path
 
@@ -278,17 +296,29 @@ def get_reference_images_preview(
     return previews
 
 
-async def generate_3d_model(master_image_path: Path) -> Path:
+async def generate_3d_model(inputs: Path | list[Path]) -> Path:
     logger.info(
-        "Generating 3D model from master image", image_path=str(master_image_path)
+        "Generating 3D model", inputs=str(inputs)
     )
 
-    # Create output directory for TRELLIS
-    output_dir = ROOT_DIR / "artifacts" / "trellis"
-    output_dir.mkdir(parents=True, exist_ok=True)
+    import os
+    if os.getenv("CONDA_DEFAULT_ENV") == "hunyuan":
+        output_dir = ROOT_DIR / "artifacts" / "hunyuan"
+        output_dir.mkdir(parents=True, exist_ok=True)
+        # For Hunyuan, inputs is a list of multi-view images
+        if not isinstance(inputs, list):
+            inputs = [inputs]
+        model_path = await hunyuan_engine.generate_3d_model(inputs, output_dir)
+    else:
+        # Create output directory for TRELLIS
+        output_dir = ROOT_DIR / "artifacts" / "trellis"
+        output_dir.mkdir(parents=True, exist_ok=True)
 
-    # Use TRELLIS engine to generate 3D model
-    model_path = await trellis_engine.generate_3d_model(master_image_path, output_dir)
+        # Use TRELLIS engine to generate 3D model
+        # Trellis expects a single image Path in V1/V2 template
+        if isinstance(inputs, list):
+            inputs = inputs[0]
+        model_path = await trellis_engine.generate_3d_model(inputs, output_dir)
 
     logger.info("3D model generation completed", model_path=str(model_path))
     return model_path

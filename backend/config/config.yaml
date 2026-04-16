@@ -19,5 +19,8 @@ engine:
 trellis:
   _target_: backend.utils.trellis.TrellisEngine
 
+hunyuan:
+  _target_: backend.utils.hunyuan.HunyuanEngine
+
 logging:
   filename: ${now:%Y-%m-%d}-${now:%H-%M-%S}.log

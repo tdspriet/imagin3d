@@ -1,0 +1,24 @@
+from PIL import Image
+import torch
+from diffusers import SemanticMVD
+
+def main():
+    # Setup MVD model in fp16/bf16 to prevent OOM
+    # Pipeline is loaded strictly for the image-to-multiview stage.
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    dtype = torch.bfloat16
+    
+    # Load hunyuan multiview model (this is pseudo-code matching typical integration)
+    pipeline = SemanticMVD.from_pretrained("{{ ckpt_path }}", torch_dtype=dtype).to(device)
+    
+    input_image = Image.open("{{ image_path }}")
+    prompt = "{{ prompt }}"
+    
+    # Generate 6-view grid
+    grid_image = pipeline(image=input_image, prompt=prompt).images[0]
+    
+    # Save the output grid
+    grid_image.save("{{ output_grid }}")
+
+if __name__ == "__main__":
+    main()
