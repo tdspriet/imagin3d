@@ -57,6 +57,7 @@ function AdaptDialog({ isOpen, onClose, onAdapt, isGenerating }) {
   const [subjectText, setSubjectText] = useState('')
   const [styleIntent, setStyleIntent] = useState('')
   const [subjectFile, setSubjectFile] = useState(null) // { type: 'image'|'model', data: base64, name: string }
+  const [isMultiview, setIsMultiview] = useState(false)
   
   const isPickingElement = useMoodboardStore((s) => s.isPickingElement)
   const setIsPickingElement = useMoodboardStore((s) => s.setIsPickingElement)
@@ -77,6 +78,7 @@ function AdaptDialog({ isOpen, onClose, onAdapt, isGenerating }) {
       setSubjectText('')
       setStyleIntent('')
       setSubjectFile(null)
+      setIsMultiview(false)
       if (isPickingElement) {
         setIsPickingElement(false)
       }
@@ -103,7 +105,8 @@ function AdaptDialog({ isOpen, onClose, onAdapt, isGenerating }) {
       onAdapt({
         subjectText: subjectText.trim(),
         subjectFile: subjectFile,
-        styleIntent: styleIntent.trim()
+        styleIntent: styleIntent.trim(),
+        isMultiview: isMultiview
       })
     }
   }
@@ -245,6 +248,22 @@ function AdaptDialog({ isOpen, onClose, onAdapt, isGenerating }) {
               rows={3}
               disabled={isGenerating}
             />
+          </div>
+
+          <div className="generate-dialog__option">
+            <label className="generate-dialog__toggle">
+              <input
+                type="checkbox"
+                className="generate-dialog__toggle-input"
+                checked={isMultiview}
+                onChange={(e) => setIsMultiview(e.target.checked)}
+                disabled={isGenerating}
+              />
+              <div className="generate-dialog__toggle-track">
+                <div className="generate-dialog__toggle-thumb"></div>
+              </div>
+              <span className="generate-dialog__toggle-label">Generate multiple views</span>
+            </label>
           </div>
 
           <div className="generate-dialog__actions">

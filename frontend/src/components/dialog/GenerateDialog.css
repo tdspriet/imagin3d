@@ -73,7 +73,6 @@
 .generate-dialog__form {
   display: flex;
   flex-direction: column;
-  gap: 16px;
 }
 
 .generate-dialog__input {

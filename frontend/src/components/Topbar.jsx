@@ -187,11 +187,11 @@ function Topbar() {
     }
   }
 
-  const handleAdaptMoodboard = async ({ subjectText, subjectFile, styleIntent }) => {
+  const handleAdaptMoodboard = async ({ subjectText, subjectFile, styleIntent, isMultiview }) => {
     setAdaptDialogOpen(false)
     
     try {
-      const result = await generateMoodboard(styleIntent, subjectText, subjectFile)
+      const result = await generateMoodboard(styleIntent, subjectText, subjectFile, isMultiview)
     } catch (error) {
       console.error('Failed to adapt:', error)
     }
