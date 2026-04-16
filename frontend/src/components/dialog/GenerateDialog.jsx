@@ -71,6 +71,7 @@ function GenerateDialog({ isOpen, onClose, onGenerate, isGenerating }) {
             rows={4}
             disabled={isGenerating}
             autoFocus
+            style={{ marginBottom: '1rem' }}
           />
 
           <div className="generate-dialog__option">
