@@ -32,8 +32,9 @@ class Visualizer(agent.BaseAgent):
 
         mode = "adapt" if base_image or prompt else "generation"
         if view:
-            mode = f"multiview/{mode}/{view}"
-
+            self.name = f"visualizer_{view}"
+            mode = f"multiview/{mode}"
+        
         ctx = {"master_prompt": master_prompt, "has_base_image": bool(base_image)}
         if prompt:
             ctx["adaptation"] = prompt
