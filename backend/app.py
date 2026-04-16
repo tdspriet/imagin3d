@@ -210,6 +210,8 @@ async def extract(payload: MoodboardPayload) -> StreamingResponse:
         total_elements = len(payload.elements)
         total_clusters = len(payload.clusters)
         total_steps = total_elements + total_clusters + total_elements
+        if payload.adapt_subject_file:
+            total_steps += 1
 
         # Shared progress state
         progress_state = {"current": 0, "lock": asyncio.Lock()}
@@ -414,6 +416,67 @@ async def extract(payload: MoodboardPayload) -> StreamingResponse:
             with cluster_descriptor_path.open("w", encoding="utf-8") as f:
                 json.dump(cluster_descriptor.dict(), f, ensure_ascii=False, indent=2)
 
+        # ----- Process Adapt Subject -----
+
+        adapt_subject_image_path = None
+        if payload.adapt_subject_file:
+            current = await increment_progress()
+            progress_event = {
+                "type": "progress",
+                "data": {
+                    "current": current,
+                    "total": total_steps,
+                    "stage": "Processing subject...",
+                },
+            }
+            yield f"data: {json.dumps(progress_event)}\n\n"
+
+            subject_element = {
+                "id": "adapt_subject",
+                "content": payload.adapt_subject_file,
+            }
+            # Add "src" to "data" for compatibility
+            subject_element["content"]["data"] = {
+                "src": subject_element["content"]["data"],
+                "fileName": subject_element["content"].get(
+                    "name", "adapt_subject_model.glb"
+                ),
+            }
+
+            try:
+                if subject_element["content"]["type"] == "model":
+                    title, description = await orchestrator.handle_model(
+                        subject_element
+                    )
+                    renders_dir = (
+                        ROOT_DIR / "artifacts" / "model_renders" / "adapt_subject"
+                    )
+                    renders = sorted(renders_dir.glob("*.jpg"))
+                    if renders:
+                        adapt_subject_image_path = renders[0]
+                elif subject_element["content"]["type"] == "image":
+                    title, description = await orchestrator.handle_image(
+                        subject_element
+                    )
+                    adapt_subject_image_path = (
+                        ROOT_DIR
+                        / "artifacts"
+                        / "images"
+                        / "adapt_subject"
+                        / "image.jpg"
+                    )
+
+                # Append title and description to adapt_subject_text
+                text_addition = f"{title}: {description}"
+                if payload.adapt_subject_text:
+                    payload.adapt_subject_text += (
+                        f"\n\nReference file details:\n{text_addition}"
+                    )
+                else:
+                    payload.adapt_subject_text = text_addition
+            except Exception as e:
+                logger.error("Failed to process adapt subject file", error=e)
+
         # ----- Intent Router -----
 
         # Initialize weight tracking
@@ -430,8 +493,13 @@ async def extract(payload: MoodboardPayload) -> StreamingResponse:
         # 2) Route design tokens and assign weights
         async def route_single_token(token: DesignToken) -> tuple[int, int]:
             cluster_context = token_cluster_context.get(token.id)
+            subject_info = (
+                payload.adapt_subject_text
+                if payload.adapt_subject_text
+                else ("file" if payload.adapt_subject_file else None)
+            )
             weight = await orchestrator.route_token(
-                payload.prompt, token, cluster_context
+                payload.prompt, token, cluster_context, subject=subject_info
             )
             # Signal progress
             current = await increment_progress()
@@ -535,6 +603,7 @@ async def extract(payload: MoodboardPayload) -> StreamingResponse:
         master_prompt = await orchestrator.synthesize_master_prompt(
             payload.prompt,
             cluster_descriptors,
+            subject=payload.adapt_subject_text,
         )
 
         # ----- Master Image Generation -----
@@ -553,6 +622,10 @@ async def extract(payload: MoodboardPayload) -> StreamingResponse:
         master_image_path = await orchestrator.generate_master_image(
             master_prompt,
             cluster_descriptors,
+            base_image_path=adapt_subject_image_path,
+            prompt=payload.prompt
+            if (payload.adapt_subject_file or payload.adapt_subject_text)
+            else None,
         )
         reference_images = orchestrator.get_reference_images_preview(
             cluster_descriptors

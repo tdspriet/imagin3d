@@ -14,8 +14,10 @@ import {
   MdAutoAwesome,
 } from 'react-icons/md'
 import { useMoodboardStore } from '../store/moodboardStore'
+import { useShallow } from 'zustand/react/shallow'
 import PaletteDialog from './dialog/PaletteDialog'
 import GenerateDialog from './dialog/GenerateDialog'
+import AdaptDialog from './dialog/AdaptDialog'
 import './Topbar.css'
 
 /**
@@ -38,7 +40,7 @@ function Topbar() {
     generateMoodboard,
     isGenerating,
     backendModelLabel,
-  } = useMoodboardStore((state) => ({
+  } = useMoodboardStore(useShallow((state) => ({
     addImage: state.addImage,
     addVideo: state.addVideo,
     addText: state.addText,
@@ -53,7 +55,7 @@ function Topbar() {
     generateMoodboard: state.generateMoodboard,
     isGenerating: state.isGenerating,
     backendModelLabel: state.backendModelLabel,
-  }))
+  })))
   const fileInputRef = useRef(null)
   const videoInputRef = useRef(null)
   const fontInputRef = useRef(null)
@@ -61,6 +63,7 @@ function Topbar() {
   const loadInputRef = useRef(null)
   const [isPaletteDialogOpen, setPaletteDialogOpen] = useState(false)
   const [isGenerateDialogOpen, setGenerateDialogOpen] = useState(false)
+  const [isAdaptDialogOpen, setAdaptDialogOpen] = useState(false)
 
   // Handle image file selection
   const handleImageUpload = (e) => {
@@ -184,6 +187,16 @@ function Topbar() {
     }
   }
 
+  const handleAdaptMoodboard = async ({ subjectText, subjectFile, styleIntent }) => {
+    setAdaptDialogOpen(false)
+    
+    try {
+      const result = await generateMoodboard(styleIntent, subjectText, subjectFile)
+    } catch (error) {
+      console.error('Failed to adapt:', error)
+    }
+  }
+
   return (
     <div className="topbar">
       <div className="topbar-left">
@@ -243,6 +256,10 @@ function Topbar() {
           <span>Load</span>
         </button>
         <div className="topbar-generate">
+          <button onClick={() => setAdaptDialogOpen(true)} className="btn btn-warning" disabled={isGenerating}>
+            <MdAutoAwesome className="btn-icon" size={18} aria-hidden="true" focusable="false" />
+            <span>Adapt</span>
+          </button>
           <button onClick={() => setGenerateDialogOpen(true)} className="btn btn-warning" disabled={isGenerating}>
             <MdAutoAwesome className="btn-icon" size={18} aria-hidden="true" focusable="false" />
             <span>Generate</span>
@@ -296,6 +313,12 @@ function Topbar() {
         isOpen={isGenerateDialogOpen}
         onClose={() => setGenerateDialogOpen(false)}
         onGenerate={handleGenerateMoodboard}
+        isGenerating={isGenerating}
+      />
+      <AdaptDialog
+        isOpen={isAdaptDialogOpen}
+        onClose={() => setAdaptDialogOpen(false)}
+        onAdapt={handleAdaptMoodboard}
         isGenerating={isGenerating}
       />
     </div>

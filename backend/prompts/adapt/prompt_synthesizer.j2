@@ -1,0 +1,21 @@
+User prompt
+The user intends to adapt:
+"{{ ctx.subject }}"
+to the style specified by:
+"{{ ctx.adaptation }}"
+
+Moodboard analysis (ordered by relevance):
+{% for cluster in ctx.clusters %}
+
+Cluster: "{{ cluster.title }}"
+Description: {{ cluster.description }}
+{% if cluster.elements %}
+Key elements:
+{% for elem in cluster.elements %}
+- {{ elem.type | capitalize }}: "{{ elem.title }}" ({{ elem.weight }}%) - {{ elem.description }}
+{% endfor %}
+{% endif %}
+{% endfor %}
+
+Take the subject and adapt it to the moodboard style (ordered by relevance below) according to the user's adaptation intent. Synthesize these into a single generation prompt.
+The subject must be fully in-frame isolated against a seamless pure white background.

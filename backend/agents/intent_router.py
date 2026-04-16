@@ -29,19 +29,25 @@ class IntentRouter(agent.BaseAgent):
         self,
         prompt: str,
         cluster: common.ClusterDescriptor,
+        subject: str | None = None,
     ) -> pydantic_ai.AgentRunResult[Output]:
-        result, _ = await self._prompt(
-            {
-                "mode": "cluster",
-                "prompt": prompt,
-                "item": {
-                    "id": cluster.id,
-                    "title": cluster.title,
-                    "description": cluster.description,
-                    "element_count": len(cluster.elements),
-                },
-            }
-        )
+        mode = "adapt" if subject else "generation"
+        ctx = {
+            "mode": "cluster",
+            "item": {
+                "id": cluster.id,
+                "title": cluster.title,
+                "description": cluster.description,
+                "element_count": len(cluster.elements),
+            },
+        }
+        if subject:
+            ctx["subject"] = subject
+            ctx["adaptation"] = prompt
+        else:
+            ctx["prompt"] = prompt
+
+        result, _ = await self._prompt(ctx, template_subdir=mode)
         return result
 
     async def run_for_token(
@@ -49,21 +55,27 @@ class IntentRouter(agent.BaseAgent):
         prompt: str,
         token: common.DesignToken,
         cluster_context: str | None = None,
+        subject: str | None = None,
     ) -> pydantic_ai.AgentRunResult[Output]:
-        result, _ = await self._prompt(
-            {
-                "mode": "token",
-                "prompt": prompt,
-                "cluster_context": cluster_context,
-                "item": {
-                    "id": token.id,
-                    "type": token.type,
-                    "title": token.title,
-                    "description": token.description,
-                    "scale": self._extract_scale(token),
-                },
-            }
-        )
+        mode = "adapt" if subject else "generation"
+        ctx = {
+            "mode": "token",
+            "cluster_context": cluster_context,
+            "item": {
+                "id": token.id,
+                "type": token.type,
+                "title": token.title,
+                "description": token.description,
+                "scale": self._extract_scale(token),
+            },
+        }
+        if subject:
+            ctx["subject"] = subject
+            ctx["adaptation"] = prompt
+        else:
+            ctx["prompt"] = prompt
+
+        result, _ = await self._prompt(ctx, template_subdir=mode)
         return result
 
     async def run(self) -> None:
