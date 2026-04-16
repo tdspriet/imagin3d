@@ -12,6 +12,7 @@ import {
   MdSave,
   MdFolderOpen,
   MdAutoAwesome,
+  MdOutlineAutoFixHigh,
 } from 'react-icons/md'
 import { useMoodboardStore } from '../store/moodboardStore'
 import { useShallow } from 'zustand/react/shallow'
@@ -257,7 +258,7 @@ function Topbar() {
         </button>
         <div className="topbar-generate">
           <button onClick={() => setAdaptDialogOpen(true)} className="btn btn-warning" disabled={isGenerating}>
-            <MdAutoAwesome className="btn-icon" size={18} aria-hidden="true" focusable="false" />
+            <MdOutlineAutoFixHigh className="btn-icon" size={18} aria-hidden="true" focusable="false" />
             <span>Adapt</span>
           </button>
           <button onClick={() => setGenerateDialogOpen(true)} className="btn btn-warning" disabled={isGenerating}>
