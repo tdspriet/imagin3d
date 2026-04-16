@@ -4,3 +4,6 @@
 [submodule "trellis2"]
 	path = trellis2
 	url = git@github.com:microsoft/TRELLIS.2.git
+[submodule "hunyuan3d"]
+	path = hunyuan3d
+	url = https://github.com/Tencent/Hunyuan3D-2.git
