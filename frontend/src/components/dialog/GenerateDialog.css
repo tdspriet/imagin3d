@@ -73,7 +73,6 @@
 .generate-dialog__form {
   display: flex;
   flex-direction: column;
-  gap: 16px;
 }
 
 .generate-dialog__input {
@@ -148,4 +147,70 @@
 
 .generate-dialog__btn--primary:hover:not(:disabled) {
   opacity: 0.85;
+}
+
+.generate-dialog__option {
+  margin-top: 4px;
+}
+
+.generate-dialog__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.generate-dialog__toggle-input {
+  /* hide original checkbox visually but keep accessible */
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.generate-dialog__toggle-track {
+  width: 40px;
+  height: 24px;
+  background: var(--color-border-muted);
+  border: 1px solid var(--color-border-strong);
+  border-radius: 12px;
+  position: relative;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.generate-dialog__toggle-thumb {
+  width: 18px;
+  height: 18px;
+  background: var(--color-text-muted);
+  border-radius: 50%;
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  transition: transform 0.2s cubic-bezier(0.2, 0.85, 0.32, 1.2), background-color 0.2s ease;
+}
+
+.generate-dialog__toggle-input:checked + .generate-dialog__toggle-track {
+  background: var(--accent-progress);
+  border-color: var(--accent-progress);
+}
+
+.generate-dialog__toggle-input:checked + .generate-dialog__toggle-track .generate-dialog__toggle-thumb {
+  transform: translateX(16px);
+  background: #ffffff;
+}
+
+.generate-dialog__toggle-input:focus-visible + .generate-dialog__toggle-track {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.generate-dialog__toggle-input:disabled + .generate-dialog__toggle-track {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.generate-dialog__toggle-label {
+  font-size: 0.95rem;
+  color: var(--color-text);
 }

@@ -18,7 +18,8 @@
   z-index: 1;
   width: min(720px, 94vw);
   max-height: 95vh;
-  overflow: hidden;
+  display: flex;
+  flex-direction: column;
   background: var(--color-surface-raised);
   border-radius: 14px;
   padding: 20px 24px 24px;
@@ -42,19 +43,13 @@
   display: flex;
   align-items: center;
   justify-content: center;
-}
-
-.master-prompt-dialog__close:hover {
-  background: var(--color-surface-hover);
-}
-
-.master-prompt-dialog__close:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+  z-index: 10;
 }
 
 .master-prompt-dialog__header {
+  flex: 0 0 auto;
   margin-bottom: 14px;
+  padding-right: 40px;
 }
 
 .master-prompt-dialog__header h2 {
@@ -73,7 +68,13 @@
 .master-prompt-dialog__body {
   display: flex;
   flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
   gap: 10px;
+  padding: 4px 12px 4px 4px; /* padding around for outlines, 12px right for scrollbar */
+  margin: -4px -12px -4px -4px; /* offset padding */
   margin-bottom: 14px;
 }
 
@@ -81,8 +82,9 @@
   display: flex;
   gap: 12px;
   align-items: stretch;
-  height: min(48vh, 360px);
-  min-height: 280px;
+  height: min(35vh, 300px);
+  min-height: 200px;
+  flex: 0 0 auto;
 }
 
 .master-prompt-dialog__references-block {
@@ -183,6 +185,67 @@
   height: 100%;
   color: var(--color-text-secondary);
   font-size: 0.9rem;
+}
+
+.master-prompt-dialog__image-container--multiview {
+  display: flex;
+  gap: 16px;
+  width: 100%;
+  aspect-ratio: auto;
+  border: none;
+  background: transparent;
+  justify-content: center;
+  align-items: flex-start;
+  overflow: visible;
+}
+
+.master-prompt-dialog__multiview-item {
+  flex: 1;
+  min-width: 0;
+  max-width: 260px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.master-prompt-dialog__multiview-label {
+  font-size: 0.85rem;
+  color: var(--color-text-secondary);
+  text-align: center;
+  font-weight: 500;
+  flex: 0 0 auto;
+}
+
+.master-prompt-dialog__image-container--multiview img.master-prompt-dialog__image,
+.master-prompt-dialog__image-container--multiview div.master-prompt-dialog__image-placeholder {
+  aspect-ratio: auto;
+  width: 100%;
+  height: auto;
+  max-height: 260px;
+  object-fit: contain;
+  border-radius: 10px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+.master-prompt-dialog__edit-select {
+  padding: 9px 11px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: 0.9rem;
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20width%3D%2220%22%20height%3D%2220%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Cpath%20d%3D%22M7%2010l5%205%205-5z%22%20fill%3D%22%23999%22%2F%3E%3C%2Fsvg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  padding-right: 32px;
+}
+
+.master-prompt-dialog__edit-select:focus-visible {
+  outline: 2px solid var(--accent-progress);
+  outline-offset: 1px;
 }
 
 .master-prompt-dialog__loading-overlay {

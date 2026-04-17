@@ -12,6 +12,7 @@ import {
   MdSave,
   MdFolderOpen,
   MdAutoAwesome,
+  MdOutlineAutoFixHigh,
 } from 'react-icons/md'
 import { useMoodboardStore } from '../store/moodboardStore'
 import { useShallow } from 'zustand/react/shallow'
@@ -176,22 +177,22 @@ function Topbar() {
     return true
   }
 
-  const handleGenerateMoodboard = async (prompt) => {
+  const handleGenerateMoodboard = async (prompt, isMultiview = false) => {
     // Close dialog immediately when starting generation
     setGenerateDialogOpen(false)
     
     try {
-      const result = await generateMoodboard(prompt)
+      const result = await generateMoodboard(prompt, '', null, isMultiview)
     } catch (error) {
       console.error('Failed to extract:', error)
     }
   }
 
-  const handleAdaptMoodboard = async ({ subjectText, subjectFile, styleIntent }) => {
+  const handleAdaptMoodboard = async ({ subjectText, subjectFile, styleIntent, isMultiview }) => {
     setAdaptDialogOpen(false)
     
     try {
-      const result = await generateMoodboard(styleIntent, subjectText, subjectFile)
+      const result = await generateMoodboard(styleIntent, subjectText, subjectFile, isMultiview)
     } catch (error) {
       console.error('Failed to adapt:', error)
     }
@@ -257,7 +258,7 @@ function Topbar() {
         </button>
         <div className="topbar-generate">
           <button onClick={() => setAdaptDialogOpen(true)} className="btn btn-warning" disabled={isGenerating}>
-            <MdAutoAwesome className="btn-icon" size={18} aria-hidden="true" focusable="false" />
+            <MdOutlineAutoFixHigh className="btn-icon" size={18} aria-hidden="true" focusable="false" />
             <span>Adapt</span>
           </button>
           <button onClick={() => setGenerateDialogOpen(true)} className="btn btn-warning" disabled={isGenerating}>

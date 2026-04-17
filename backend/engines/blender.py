@@ -40,14 +40,19 @@ class Blender(engine.Engine):
         return cls._semaphore
 
     async def render_views(
-        self, model_path: pathlib.Path, output_dir: pathlib.Path
+        self,
+        model_path: pathlib.Path,
+        output_dir: pathlib.Path,
+        render_back: bool = False,
     ) -> list[engine.Render]:
         async with self.get_semaphore():
             # create renders directory if it doesn't exist
             output_dir.mkdir(exist_ok=True, parents=True)
 
             # create the full script
-            full_script = self._create_render_script(model_path, output_dir)
+            full_script = self._create_render_script(
+                model_path, output_dir, render_back
+            )
 
             # run blender and execute the rendering script
             try:
@@ -94,12 +99,14 @@ class Blender(engine.Engine):
         self,
         model_path: pathlib.Path,
         renders_dir: pathlib.Path,
+        render_back: bool = False,
     ) -> str:
         template = self._jinja_env.get_template("render.j2")
         return template.render(
             cfg=self,
             model_path=str(model_path.resolve()),
             renders_dir=str(renders_dir.resolve()),
+            render_back=render_back,
         )
 
     async def _run_script(self, script_content: str) -> tuple[str, str, int | None]:

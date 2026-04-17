@@ -3,7 +3,7 @@ from __future__ import annotations
 import base64
 import io
 from pathlib import Path
-from typing import Any, Union, List
+from typing import Any, Union
 
 import boto3
 import numpy as np
@@ -220,7 +220,10 @@ async def synthesize_master_prompt(
                 }
             )
 
-    result = await prompt_synthesizer.run(prompt, filtered_clusters, subject)
+    style_images = _collect_style_images(clusters)
+    result = await prompt_synthesizer.run(
+        prompt, filtered_clusters, subject, images=style_images
+    )
     master_prompt = result.output.info.prompt
 
     # Save master prompt to artifacts
@@ -264,14 +267,14 @@ async def generate_master_image(
 async def edit_master_image(
     edit_prompt: str,
     image_data_url: str,
+    clusters: list[common.ClusterDescriptor] | None = None,
 ) -> Path:
     source_image = common.decode_data_url_to_binary_image(image_data_url)
-    prompt = (
-        "Edit the attached image according to this instruction: "
-        f"{edit_prompt}. The subject must be fully in-frame isolated against a transparent background."
+    style_images = [source_image] + (
+        _collect_style_images(clusters) if clusters else []
     )
 
-    result = await visualizer.run(prompt, [source_image])
+    result = await visualizer.run(edit_prompt, style_images, is_edit=True)
     # Save master image to artifacts
     master_image_path = ROOT_DIR / "artifacts" / "master_image.jpg"
 
@@ -279,6 +282,79 @@ async def edit_master_image(
         f.write(result.output.data)
 
     return master_image_path
+
+
+async def generate_multiview_master_images(
+    master_prompt: str,
+    clusters: list[common.ClusterDescriptor],
+    base_image_path: Path | None = None,
+    prompt: str | None = None,
+):
+    style_images = _collect_style_images(clusters)
+    logger.info(f"Collected {len(style_images)} style images for multiview generation")
+
+    base_image = None
+    if base_image_path and Path(base_image_path).exists():
+        with open(base_image_path, "rb") as f:
+            base_image = pydantic_ai.BinaryImage(data=f.read(), media_type="image/jpeg")
+
+    # Generate front view
+    result_front = await visualizer.run(
+        master_prompt, style_images, base_image, prompt=prompt, view="front"
+    )
+    front_image_path = ROOT_DIR / "artifacts" / "master_image_front.jpg"
+    with open(front_image_path, "wb") as f:
+        f.write(result_front.output.data)
+
+    yield {"event": "front_done"}
+
+    # Generate back view
+    result_back = await visualizer.run(
+        master_prompt, style_images, base_image, prompt=prompt, view="back"
+    )
+    back_image_path = ROOT_DIR / "artifacts" / "master_image_back.jpg"
+    with open(back_image_path, "wb") as f:
+        f.write(result_back.output.data)
+
+    yield {
+        "event": "all_done",
+        "images": {"front": front_image_path, "back": back_image_path},
+    }
+
+
+async def edit_multiview_master_images(
+    edit_prompt: str,
+    front_data_url: str,
+    back_data_url: str,
+    view: str = "both",
+    clusters: list[common.ClusterDescriptor] | None = None,
+) -> dict[str, Path]:
+    collected_styles = _collect_style_images(clusters) if clusters else []
+
+    source_front = common.decode_data_url_to_binary_image(front_data_url)
+    style_images_front = [source_front] + collected_styles
+
+    source_back = common.decode_data_url_to_binary_image(back_data_url)
+    style_images_back = [source_back] + collected_styles
+
+    front_image_path = ROOT_DIR / "artifacts" / "master_image_front.jpg"
+    back_image_path = ROOT_DIR / "artifacts" / "master_image_back.jpg"
+
+    if view in ["both", "front"]:
+        result_front = await visualizer.run(
+            edit_prompt, style_images_front, view="front", is_edit=True
+        )
+        with open(front_image_path, "wb") as f:
+            f.write(result_front.output.data)
+
+    if view in ["both", "back"]:
+        result_back = await visualizer.run(
+            edit_prompt, style_images_back, view="back", is_edit=True
+        )
+        with open(back_image_path, "wb") as f:
+            f.write(result_back.output.data)
+
+    return {"front": front_image_path, "back": back_image_path}
 
 
 def get_reference_images_preview(
@@ -296,7 +372,7 @@ def get_reference_images_preview(
     return previews
 
 
-async def generate_3d_model(master_image_path: Path) -> Path:
+async def generate_3d_model(master_image_path: Path | list[Path]) -> Path:
     logger.info(
         "Generating 3D model from master image", image_path=str(master_image_path)
     )
@@ -315,11 +391,20 @@ async def generate_3d_model(master_image_path: Path) -> Path:
 async def evaluate_model(
     model_path: Path,
     clusters: list[common.ClusterDescriptor],
+    is_multiview: bool = False,
 ) -> int:
     # TODO: check this WIP objective evaluation score
 
-    # 1. Calculate moodboard centroid
+    unique_name = "generated"
+    renders_dir = ROOT_DIR / "artifacts" / "model_renders" / unique_name
+    renders_dir.mkdir(parents=True, exist_ok=True)
 
+    renders = await blender_engine.render_views(
+        model_path, renders_dir, render_back=is_multiview
+    )
+    images = [render.image for render in renders]
+
+    # 1. Calculate moodboard centroid
     embeddings = []
     weights = []
 
@@ -343,18 +428,20 @@ async def evaluate_model(
     centroid = np.average(embeddings_np, axis=0, weights=weights_np)
 
     # 2. Generate embedding for the generated model
+    if is_multiview:
+        front_desc = await descriptor.run([renders[0].image], type="model")
+        front_model_emb = np.array(generate_embedding(front_desc.output.info.title))
 
-    unique_name = f"generated"
-    renders_dir = ROOT_DIR / "artifacts" / "model_renders" / unique_name
-    renders_dir.mkdir(parents=True, exist_ok=True)
+        with open(renders_dir / "view_back.jpg", "rb") as f:
+            back_image = pydantic_ai.BinaryImage(data=f.read(), media_type="image/jpeg")
+        back_desc = await descriptor.run([back_image], type="model")
+        back_model_emb = np.array(generate_embedding(back_desc.output.info.title))
 
-    renders = await blender_engine.render_views(model_path, renders_dir)
-    images = [render.image for render in renders]
-
-    result = await descriptor.run(images, type="model")
-    title = result.output.info.title
-
-    model_embedding = np.array(generate_embedding(title))
+        model_embedding = np.average([front_model_emb, back_model_emb], axis=0)
+    else:
+        result = await descriptor.run(images, type="model")
+        title = result.output.info.title
+        model_embedding = np.array(generate_embedding(title))
 
     # 3. Calculate distance/score
 
@@ -426,6 +513,7 @@ def _collect_style_image_paths(
     clusters: list[common.ClusterDescriptor],
 ) -> list[Path]:
     image_paths: list[Path] = []
+    model_paths: list[Path] = []
     for cluster in clusters:
         for elem in cluster.elements:
             if elem.weight <= RELEVANCE_THRESHOLD:
@@ -444,6 +532,7 @@ def _collect_style_image_paths(
             elif elem.type == "model":
                 renders_dir = ROOT_DIR / "artifacts" / "model_renders" / str(elem.id)
                 if renders_dir.exists():
-                    image_paths.extend(sorted(renders_dir.glob("*.jpg")))
+                    model_paths.extend(sorted(renders_dir.glob("*.jpg")))
 
+    image_paths.extend(model_paths)
     return image_paths

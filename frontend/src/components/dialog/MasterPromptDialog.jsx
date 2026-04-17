@@ -10,11 +10,15 @@ function MasterPromptDialog({
   onSendEdit,
   masterPrompt, 
   masterImage,
+  frontImage,
+  backImage,
+  isMultiview,
   referenceImages = [],
   isLoading = false,
 }) {
-  const [editablePrompt, setEditablePrompt] = useState(masterPrompt || '')
+  const [editablePrompt, setEditablePrompt] = useState('')
   const [editInstruction, setEditInstruction] = useState('')
+  const [editView, setEditView] = useState('both')
 
   const handleClose = useCallback(() => {
     if (isLoading) return
@@ -39,6 +43,7 @@ function MasterPromptDialog({
     if (!isOpen) return
     setEditablePrompt(masterPrompt || '')
     setEditInstruction('')
+    setEditView('both')
   }, [isOpen, masterPrompt])
 
   const handleConfirm = () => {
@@ -50,7 +55,11 @@ function MasterPromptDialog({
   }
 
   const handleSendEdit = () => {
-    onSendEdit?.(editInstruction)
+    if (isMultiview) {
+      onSendEdit?.(editInstruction, editView)
+    } else {
+      onSendEdit?.(editInstruction)
+    }
   }
 
   const disableRegenerate = useMemo(() => {
@@ -58,12 +67,14 @@ function MasterPromptDialog({
   }, [editablePrompt, isLoading])
 
   const disableSendEdit = useMemo(() => {
-    return isLoading || !editInstruction.trim() || !masterImage
-  }, [editInstruction, masterImage, isLoading])
+    const hasImage = isMultiview ? (frontImage && backImage) : masterImage
+    return isLoading || !editInstruction.trim() || !hasImage
+  }, [editInstruction, masterImage, frontImage, backImage, isMultiview, isLoading])
 
   const disableConfirm = useMemo(() => {
-    return isLoading || !masterImage
-  }, [isLoading, masterImage])
+    const hasImage = isMultiview ? (frontImage && backImage) : masterImage
+    return isLoading || !hasImage
+  }, [isLoading, masterImage, frontImage, backImage, isMultiview])
 
   const stopEvent = (event) => {
     event.stopPropagation()
@@ -139,16 +150,35 @@ function MasterPromptDialog({
           </button>
 
           <div className="master-prompt-dialog__image-wrapper">
-            <h3 className="master-prompt-dialog__prompt-label">Master Image</h3>
-            <div className={`master-prompt-dialog__image-container ${isLoading ? 'master-prompt-dialog__image-container--loading' : ''}`}>
-              {masterImage ? (
-                <img
-                  src={masterImage}
-                  alt="Master Image"
-                  className="master-prompt-dialog__image"
-                />
+            <h3 className="master-prompt-dialog__prompt-label">Master Image{isMultiview && "s"}</h3>
+            <div className={`master-prompt-dialog__image-container ${isMultiview ? 'master-prompt-dialog__image-container--multiview' : ''} ${isLoading ? 'master-prompt-dialog__image-container--loading' : ''}`}>
+              {isMultiview ? (
+                <>
+                  <div className="master-prompt-dialog__multiview-item">
+                    <div className="master-prompt-dialog__multiview-label">Front</div>
+                    {frontImage ? (
+                      <img src={frontImage} alt="Front View" className="master-prompt-dialog__image" />
+                    ) : (
+                      <div className="master-prompt-dialog__image-placeholder">No image yet</div>
+                    )}
+                  </div>
+                  <div className="master-prompt-dialog__multiview-item">
+                    <div className="master-prompt-dialog__multiview-label">Back</div>
+                    {backImage ? (
+                      <img src={backImage} alt="Back View" className="master-prompt-dialog__image" />
+                    ) : (
+                      <div className="master-prompt-dialog__image-placeholder">No image yet</div>
+                    )}
+                  </div>
+                </>
               ) : (
-                <div className="master-prompt-dialog__image-placeholder">No image generated yet</div>
+                <>
+                  {masterImage ? (
+                    <img src={masterImage} alt="Master Image" className="master-prompt-dialog__image" />
+                  ) : (
+                    <div className="master-prompt-dialog__image-placeholder">No image generated yet</div>
+                  )}
+                </>
               )}
               {isLoading && (
                 <div className="master-prompt-dialog__loading-overlay">
@@ -166,7 +196,25 @@ function MasterPromptDialog({
               onChange={(event) => setEditInstruction(event.target.value)}
               placeholder="e.g. make it brighter"
               disabled={isLoading}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !disableSendEdit) {
+                  e.preventDefault()
+                  handleSendEdit()
+                }
+              }}
             />
+            {isMultiview && (
+              <select 
+                className="master-prompt-dialog__edit-select"
+                value={editView}
+                onChange={(e) => setEditView(e.target.value)}
+                disabled={isLoading}
+              >
+                <option value="both">Both Views</option>
+                <option value="front">Front Only</option>
+                <option value="back">Back Only</option>
+              </select>
+            )}
             <button
               type="button"
               className="master-prompt-dialog__btn master-prompt-dialog__btn--edit"

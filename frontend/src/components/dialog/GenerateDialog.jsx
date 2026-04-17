@@ -3,6 +3,7 @@ import './GenerateDialog.css'
 
 function GenerateDialog({ isOpen, onClose, onGenerate, isGenerating }) {
   const [prompt, setPrompt] = useState('')
+  const [isMultiview, setIsMultiview] = useState(false)
 
   const handleClose = useCallback(() => {
     if (!isGenerating) {
@@ -13,6 +14,7 @@ function GenerateDialog({ isOpen, onClose, onGenerate, isGenerating }) {
   useEffect(() => {
     if (!isOpen) {
       setPrompt('')
+      setIsMultiview(false)
       return
     }
 
@@ -30,7 +32,7 @@ function GenerateDialog({ isOpen, onClose, onGenerate, isGenerating }) {
   const handleSubmit = (e) => {
     e.preventDefault()
     if (prompt.trim() && !isGenerating) {
-      onGenerate(prompt.trim())
+      onGenerate(prompt.trim(), isMultiview)
     }
   }
 
@@ -69,7 +71,25 @@ function GenerateDialog({ isOpen, onClose, onGenerate, isGenerating }) {
             rows={4}
             disabled={isGenerating}
             autoFocus
+            style={{ marginBottom: '1rem' }}
           />
+
+          <div className="generate-dialog__option">
+            <label className="generate-dialog__toggle">
+              <input
+                type="checkbox"
+                className="generate-dialog__toggle-input"
+                checked={isMultiview}
+                onChange={(e) => setIsMultiview(e.target.checked)}
+                disabled={isGenerating}
+              />
+              <div className="generate-dialog__toggle-track">
+                <div className="generate-dialog__toggle-thumb"></div>
+              </div>
+              <span className="generate-dialog__toggle-label">Generate multiple views</span>
+            </label>
+          </div>
+
           <div className="generate-dialog__actions">
             <button
               type="button"

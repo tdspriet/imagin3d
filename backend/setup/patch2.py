@@ -80,6 +80,55 @@ TRELLIS_NEW_CUMESH_CODE = """    def fill_holes(self, max_hole_perimeter=3e-2):
         new_vertices, new_faces = mesh.read()"""
 
 
+TRELLIS_OLD_MULTIVIEW_SIG = """    @torch.no_grad()
+    def run(
+        self,
+        image: Image.Image,"""
+
+TRELLIS_NEW_MULTIVIEW_SIG = """    @torch.no_grad()
+    def run(
+        self,
+        image: Union[Image.Image, list[Image.Image]],"""
+
+TRELLIS_OLD_MULTIVIEW_COND = """        if preprocess_image:
+            image = self.preprocess_image(image)
+        torch.manual_seed(seed)
+        cond_512 = self.get_cond([image], 512)
+        cond_1024 = self.get_cond([image], 1024) if pipeline_type != '512' else None"""
+
+TRELLIS_NEW_MULTIVIEW_COND = """        if preprocess_image:
+            if isinstance(image, list):
+                image = [self.preprocess_image(img) for img in image]
+            else:
+                image = self.preprocess_image(image)
+        
+        images = image if isinstance(image, list) else [image]
+        torch.manual_seed(seed)
+        
+        cond_512 = self.get_cond(images, 512)
+        cond_512_ss = self.get_cond([images[0]], 512)
+        cond_1024 = self.get_cond(images, 1024) if pipeline_type != '512' else None
+        
+        if len(images) > 1:
+            cond_512['cond'] = cond_512['cond'].view(1, -1, cond_512['cond'].shape[-1])
+            cond_512['neg_cond'] = cond_512['neg_cond'].view(1, -1, cond_512['neg_cond'].shape[-1])
+            if cond_1024 is not None:
+                cond_1024['cond'] = cond_1024['cond'].view(1, -1, cond_1024['cond'].shape[-1])
+                cond_1024['neg_cond'] = cond_1024['neg_cond'].view(1, -1, cond_1024['neg_cond'].shape[-1])"""
+
+TRELLIS_OLD_MULTIVIEW_COORD = """        ss_res = {'512': 32, '1024': 64, '1024_cascade': 32, '1536_cascade': 32}[pipeline_type]
+        coords = self.sample_sparse_structure(
+            cond_512, ss_res,
+            num_samples, sparse_structure_sampler_params
+        )"""
+
+TRELLIS_NEW_MULTIVIEW_COORD = """        ss_res = {'512': 32, '1024': 64, '1024_cascade': 32, '1536_cascade': 32}[pipeline_type]
+        coords = self.sample_sparse_structure(
+            cond_512_ss, ss_res,
+            num_samples, sparse_structure_sampler_params
+        )"""
+
+
 def patch_file(file_path: Path, old: str, new: str) -> bool:
     """Replaces 'old' with 'new' in the target file. Returns True if patched, False otherwise."""
     if not file_path.exists():
@@ -122,6 +171,16 @@ def patch_trellis_cumesh_oom(repo_root: Path) -> None:
     target_path = repo_root / "trellis2/trellis2/representations/mesh/base.py"
 
     patch_file(target_path, TRELLIS_OLD_CUMESH_CODE, TRELLIS_NEW_CUMESH_CODE)
+
+
+def patch_trellis_multiview(repo_root: Path) -> None:
+    logging.info("Patching TRELLIS for multi-view generation...")
+
+    target_path = repo_root / "trellis2/trellis2/pipelines/trellis2_image_to_3d.py"
+
+    patch_file(target_path, TRELLIS_OLD_MULTIVIEW_SIG, TRELLIS_NEW_MULTIVIEW_SIG)
+    patch_file(target_path, TRELLIS_OLD_MULTIVIEW_COND, TRELLIS_NEW_MULTIVIEW_COND)
+    patch_file(target_path, TRELLIS_OLD_MULTIVIEW_COORD, TRELLIS_NEW_MULTIVIEW_COORD)
 
 
 def download_repo(repo_id: str, target_dir: Path) -> None:
@@ -250,6 +309,7 @@ def main() -> None:
     patch_local_pipeline_config(bundle_dir)
     patch_trellis_dinov3_api(repo_root)
     patch_trellis_cumesh_oom(repo_root)
+    patch_trellis_multiview(repo_root)
 
     logging.info("Setup complete.")
 
