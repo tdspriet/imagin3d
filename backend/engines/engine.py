@@ -30,7 +30,10 @@ class Engine(ABC):
 
     @abstractmethod
     async def render_views(
-        self, model_path: pathlib.Path, output_dir: pathlib.Path
+        self,
+        model_path: pathlib.Path,
+        output_dir: pathlib.Path,
+        render_back: bool = False,
     ) -> list[Render]:
         """Render a number of camera views and return image renders per view."""
         pass

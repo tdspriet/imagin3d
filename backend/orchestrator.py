@@ -388,11 +388,20 @@ async def generate_3d_model(master_image_path: Path | list[Path]) -> Path:
 async def evaluate_model(
     model_path: Path,
     clusters: list[common.ClusterDescriptor],
+    is_multiview: bool = False,
 ) -> int:
     # TODO: check this WIP objective evaluation score
 
-    # 1. Calculate moodboard centroid
+    unique_name = f"generated"
+    renders_dir = ROOT_DIR / "artifacts" / "model_renders" / unique_name
+    renders_dir.mkdir(parents=True, exist_ok=True)
 
+    renders = await blender_engine.render_views(
+        model_path, renders_dir, render_back=is_multiview
+    )
+    images = [render.image for render in renders]
+
+    # 1. Calculate moodboard centroid
     embeddings = []
     weights = []
 
@@ -416,18 +425,20 @@ async def evaluate_model(
     centroid = np.average(embeddings_np, axis=0, weights=weights_np)
 
     # 2. Generate embedding for the generated model
+    if is_multiview:
+        front_desc = await descriptor.run([renders[0].image], type="model")
+        front_model_emb = np.array(generate_embedding(front_desc.output.info.title))
 
-    unique_name = f"generated"
-    renders_dir = ROOT_DIR / "artifacts" / "model_renders" / unique_name
-    renders_dir.mkdir(parents=True, exist_ok=True)
+        with open(renders_dir / "view_back.jpg", "rb") as f:
+            back_image = pydantic_ai.BinaryImage(data=f.read(), media_type="image/jpeg")
+        back_desc = await descriptor.run([back_image], type="model")
+        back_model_emb = np.array(generate_embedding(back_desc.output.info.title))
 
-    renders = await blender_engine.render_views(model_path, renders_dir)
-    images = [render.image for render in renders]
-
-    result = await descriptor.run(images, type="model")
-    title = result.output.info.title
-
-    model_embedding = np.array(generate_embedding(title))
+        model_embedding = np.average([front_model_emb, back_model_emb], axis=0)
+    else:
+        result = await descriptor.run(images, type="model")
+        title = result.output.info.title
+        model_embedding = np.array(generate_embedding(title))
 
     # 3. Calculate distance/score
 

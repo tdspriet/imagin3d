@@ -100,3 +100,24 @@ for i in range({{ cfg.num_views }}):
     render_path = pathlib.Path("{{ renders_dir }}") / render_filename
     scene.render.filepath = str(render_path)
     bpy.ops.render.render(write_still=True)
+
+{% if render_back %}
+# render back view
+angle = math.pi
+cam.location = (
+    center[0] + radius * math.sin(angle),
+    center[1] + radius * math.cos(angle),
+    center[2] + elevation,
+)
+cam.data.angle = math.radians(fov_deg)
+direction = Vector(center) - cam.location
+cam.rotation_euler = direction.to_track_quat("-Z", "Y").to_euler()
+light.location = [
+    cam.location[0] * 0.6 + center[0] * 0.4,
+    cam.location[1] * 0.6 + center[1] * 0.4,
+    cam.location[2] * 0.6 + center[2] * 0.4,
+]
+render_path = pathlib.Path("{{ renders_dir }}") / "view_back.jpg"
+scene.render.filepath = str(render_path)
+bpy.ops.render.render(write_still=True)
+{% endif %}
