@@ -3,7 +3,7 @@ from __future__ import annotations
 import base64
 import io
 from pathlib import Path
-from typing import Any, Union, List
+from typing import Any, Union
 
 import boto3
 import numpy as np
@@ -395,7 +395,7 @@ async def evaluate_model(
 ) -> int:
     # TODO: check this WIP objective evaluation score
 
-    unique_name = f"generated"
+    unique_name = "generated"
     renders_dir = ROOT_DIR / "artifacts" / "model_renders" / unique_name
     renders_dir.mkdir(parents=True, exist_ok=True)
 
