@@ -264,14 +264,14 @@ async def generate_master_image(
 async def edit_master_image(
     edit_prompt: str,
     image_data_url: str,
+    clusters: list[common.ClusterDescriptor] | None = None,
 ) -> Path:
     source_image = common.decode_data_url_to_binary_image(image_data_url)
-    prompt = (
-        "Edit the attached image according to this instruction: "
-        f"{edit_prompt}. The subject must be fully in-frame isolated against a transparent background."
+    style_images = [source_image] + (
+        _collect_style_images(clusters) if clusters else []
     )
 
-    result = await visualizer.run(prompt, [source_image])
+    result = await visualizer.run(edit_prompt, style_images, is_edit=True)
     # Save master image to artifacts
     master_image_path = ROOT_DIR / "artifacts" / "master_image.jpg"
 
@@ -320,26 +320,34 @@ async def generate_multiview_master_images(
 
 
 async def edit_multiview_master_images(
-    edit_prompt: str, front_data_url: str, back_data_url: str, view: str = "both"
+    edit_prompt: str,
+    front_data_url: str,
+    back_data_url: str,
+    view: str = "both",
+    clusters: list[common.ClusterDescriptor] | None = None,
 ) -> dict[str, Path]:
-    source_front = common.decode_data_url_to_binary_image(front_data_url)
-    source_back = common.decode_data_url_to_binary_image(back_data_url)
+    collected_styles = _collect_style_images(clusters) if clusters else []
 
-    prompt = (
-        "Edit the attached image according to this instruction: "
-        f"{edit_prompt}. The subject must be fully in-frame isolated against a transparent background."
-    )
+    source_front = common.decode_data_url_to_binary_image(front_data_url)
+    style_images_front = [source_front] + collected_styles
+
+    source_back = common.decode_data_url_to_binary_image(back_data_url)
+    style_images_back = [source_back] + collected_styles
 
     front_image_path = ROOT_DIR / "artifacts" / "master_image_front.jpg"
     back_image_path = ROOT_DIR / "artifacts" / "master_image_back.jpg"
 
     if view in ["both", "front"]:
-        result_front = await visualizer.run(prompt, [source_front], view="front")
+        result_front = await visualizer.run(
+            edit_prompt, style_images_front, view="front", is_edit=True
+        )
         with open(front_image_path, "wb") as f:
             f.write(result_front.output.data)
 
     if view in ["both", "back"]:
-        result_back = await visualizer.run(prompt, [source_back], view="back")
+        result_back = await visualizer.run(
+            edit_prompt, style_images_back, view="back", is_edit=True
+        )
         with open(back_image_path, "wb") as f:
             f.write(result_back.output.data)
 

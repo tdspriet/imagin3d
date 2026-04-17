@@ -202,7 +202,11 @@ async def edit_master_prompt_image(
             }
 
         images = await orchestrator.edit_multiview_master_images(
-            edit_prompt, payload.front_image, payload.back_image, payload.view
+            edit_prompt,
+            payload.front_image,
+            payload.back_image,
+            payload.view,
+            session.get("clusters"),
         )
         session["front_image_path"] = str(images["front"])
         session["back_image_path"] = str(images["back"])
@@ -216,7 +220,7 @@ async def edit_master_prompt_image(
             return {"error": "Image data URL is required for single view edits"}
 
         master_image_path = await orchestrator.edit_master_image(
-            edit_prompt, payload.image
+            edit_prompt, payload.image, session.get("clusters")
         )
         session["master_image_path"] = str(master_image_path)
 

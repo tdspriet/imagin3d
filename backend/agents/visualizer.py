@@ -24,24 +24,35 @@ class Visualizer(agent.BaseAgent):
         base_image: pydantic_ai.BinaryImage | None = None,
         prompt: str | None = None,
         view: str | None = None,
+        is_edit: bool = False,
     ) -> pydantic_ai.AgentRunResult[pydantic_ai.BinaryImage]:
         extra = []
         if base_image:
             extra.append(base_image)
         extra.extend(style_images)
 
-        mode = "adapt" if base_image or prompt else "generation"
-        if view:
-            self.name = f"visualizer_{view}"
-            mode = f"multiview/{mode}"
-        
-        ctx = {"master_prompt": master_prompt, "has_base_image": bool(base_image)}
-        if prompt:
-            ctx["adaptation"] = prompt
+        original_name = self.name
 
-        result, _ = await self._prompt(
-            ctx,
-            extra=extra,
-            template_subdir=mode,
-        )
-        return result
+        if is_edit:
+            ctx = {"edit_prompt": master_prompt, "is_multiview": view is not None}
+            self.name = f"visualizer_{view}" if view else "edit"
+            mode = "multiview/edit" if view else None
+        else:
+            mode = "adapt" if base_image or prompt else "generation"
+            if view:
+                self.name = f"visualizer_{view}"
+                mode = f"multiview/{mode}"
+
+            ctx = {"master_prompt": master_prompt, "has_base_image": bool(base_image)}
+            if prompt:
+                ctx["adaptation"] = prompt
+
+        try:
+            result, _ = await self._prompt(
+                ctx,
+                extra=extra,
+                template_subdir=mode,
+            )
+            return result
+        finally:
+            self.name = original_name
