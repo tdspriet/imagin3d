@@ -220,7 +220,10 @@ async def synthesize_master_prompt(
                 }
             )
 
-    result = await prompt_synthesizer.run(prompt, filtered_clusters, subject)
+    style_images = _collect_style_images(clusters)
+    result = await prompt_synthesizer.run(
+        prompt, filtered_clusters, subject, images=style_images
+    )
     master_prompt = result.output.info.prompt
 
     # Save master prompt to artifacts
@@ -510,6 +513,7 @@ def _collect_style_image_paths(
     clusters: list[common.ClusterDescriptor],
 ) -> list[Path]:
     image_paths: list[Path] = []
+    model_paths: list[Path] = []
     for cluster in clusters:
         for elem in cluster.elements:
             if elem.weight <= RELEVANCE_THRESHOLD:
@@ -528,6 +532,7 @@ def _collect_style_image_paths(
             elif elem.type == "model":
                 renders_dir = ROOT_DIR / "artifacts" / "model_renders" / str(elem.id)
                 if renders_dir.exists():
-                    image_paths.extend(sorted(renders_dir.glob("*.jpg")))
+                    model_paths.extend(sorted(renders_dir.glob("*.jpg")))
 
+    image_paths.extend(model_paths)
     return image_paths

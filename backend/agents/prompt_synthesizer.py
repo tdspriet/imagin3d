@@ -23,6 +23,7 @@ class PromptSynthesizer(agent.BaseAgent):
         prompt: str,
         clusters: list[dict],
         subject: str | None = None,
+        images: list[pydantic_ai.BinaryImage] | None = None,
     ) -> pydantic_ai.AgentRunResult[Output]:
         mode = "adapt" if subject else "generation"
         ctx = {"clusters": clusters}
@@ -32,8 +33,11 @@ class PromptSynthesizer(agent.BaseAgent):
         else:
             ctx["prompt"] = prompt
 
+        extra = images or []
+
         result, _ = await self._prompt(
             ctx,
             template_subdir=mode,
+            extra=extra,
         )
         return result
