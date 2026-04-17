@@ -248,7 +248,8 @@ export const useMoodboardStore = create((set, get) => ({
     modelUrl: null,
   },
   backendModelLabel: null,
-  score: null,
+  preservationScore: null,
+  closenessScore: null,
 
   // Picking element
   isPickingElement: false,
@@ -681,7 +682,8 @@ export const useMoodboardStore = create((set, get) => ({
       masterPromptIsLoading: false,
       adaptedSubjectNodeId: subjectFile?.nodeId || null,
       progress: { current: 0, total: 0, stage: 'Starting...' },
-      score: null,
+      preservationScore: null,
+      closenessScore: null,
     })
     try {
       const response = await fetch(`${BACKEND_URL}/extract`, {
@@ -786,7 +788,11 @@ export const useMoodboardStore = create((set, get) => ({
                 })
               }
             } else if (type === 'score') {
-              set({ score: data.score })
+              if (data.type === 'preservation') {
+                set({ preservationScore: data.score })
+              } else if (data.type === 'closeness') {
+                set({ closenessScore: data.score })
+              }
             } else if (type === 'error') {
               console.error('Backend error:', data)
               throw new Error(data)

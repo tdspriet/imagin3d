@@ -99,10 +99,40 @@
   gap: 12px;
 }
 
-.model-dialog__score {
-  font-size: 0.95rem;
-  font-weight: 500;
+.model-dialog__scores {
+  display: flex;
+  gap: 20px;
+}
+
+.model-dialog__score-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.model-dialog__score-label {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
   color: var(--color-text-secondary);
+  font-weight: 600;
+  cursor: help;
+}
+
+.model-dialog__score-value {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--color-text);
+  display: flex;
+  align-items: center;
+}
+
+.model-dialog__score-value.loading {
+  color: var(--color-text-secondary);
+  opacity: 0.7;
+  font-size: 0.95rem;
+  font-style: italic;
+  font-weight: 500;
 }
 
 .model-dialog__btn {

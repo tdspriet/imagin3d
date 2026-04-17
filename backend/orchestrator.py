@@ -388,13 +388,11 @@ async def generate_3d_model(master_image_path: Path | list[Path]) -> Path:
     return model_path
 
 
-async def evaluate_model(
+async def evaluate_model_async(
     model_path: Path,
     clusters: list[common.ClusterDescriptor],
     is_multiview: bool = False,
-) -> int:
-    # TODO: check this WIP objective evaluation score
-
+):
     unique_name = "generated"
     renders_dir = ROOT_DIR / "artifacts" / "model_renders" / unique_name
     renders_dir.mkdir(parents=True, exist_ok=True)
@@ -404,30 +402,7 @@ async def evaluate_model(
     )
     images = [render.image for render in renders]
 
-    # 1. Calculate moodboard centroid
-    embeddings = []
-    weights = []
-
-    for cluster in clusters:
-        for token in cluster.elements:
-            if token.weight <= RELEVANCE_THRESHOLD:
-                continue
-
-            if token.embedding and len(token.embedding) > 0:
-                embeddings.append(token.embedding)
-                weights.append(token.weight)
-
-    embeddings_np = np.array(embeddings)
-    weights_np = np.array(weights)
-
-    if np.sum(weights_np) == 0:
-        weights_np = np.ones_like(weights_np) / len(weights_np)
-    else:
-        weights_np = weights_np / np.sum(weights_np)
-
-    centroid = np.average(embeddings_np, axis=0, weights=weights_np)
-
-    # 2. Generate embedding for the generated model
+    # 1. Generate embedding for the generated model
     if is_multiview:
         front_desc = await descriptor.run([renders[0].image], type="model")
         front_model_emb = np.array(generate_embedding(front_desc.output.info.title))
@@ -443,19 +418,113 @@ async def evaluate_model(
         title = result.output.info.title
         model_embedding = np.array(generate_embedding(title))
 
-    # 3. Calculate distance/score
+    # Metric 1: 2D to 3D preservation
+    try:
+        if is_multiview:
+            front_master_path = ROOT_DIR / "artifacts" / "master_image_front.jpg"
+            back_master_path = ROOT_DIR / "artifacts" / "master_image_back.jpg"
+            with open(front_master_path, "rb") as f:
+                front_bytes = f.read()
 
-    dot_product = np.dot(centroid, model_embedding)
-    norm_centroid = np.linalg.norm(centroid)
-    norm_model = np.linalg.norm(model_embedding)
+                img = Image.open(io.BytesIO(front_bytes))
+                fmt = img.format.lower() if img.format else "jpeg"
+                mim_type = f"image/{fmt}"
+                front_master_image = pydantic_ai.BinaryImage(
+                    data=front_bytes, media_type=mim_type
+                )
+            with open(back_master_path, "rb") as f:
+                back_bytes = f.read()
+                img = Image.open(io.BytesIO(back_bytes))
+                fmt = img.format.lower() if img.format else "jpeg"
+                mim_type = f"image/{fmt}"
+                back_master_image = pydantic_ai.BinaryImage(
+                    data=back_bytes, media_type=mim_type
+                )
 
-    if norm_centroid == 0 or norm_model == 0:
-        return 0
+            front_master_desc = await descriptor.run([front_master_image], type="image")
+            front_master_emb = np.array(
+                generate_embedding(front_master_desc.output.info.title)
+            )
 
-    cosine_sim = dot_product / (norm_centroid * norm_model)
+            back_master_desc = await descriptor.run([back_master_image], type="image")
+            back_master_emb = np.array(
+                generate_embedding(back_master_desc.output.info.title)
+            )
 
-    score = int(max(0, cosine_sim) * 100)
-    return score
+            cos_front = np.dot(front_master_emb, front_model_emb) / (
+                np.linalg.norm(front_master_emb) * np.linalg.norm(front_model_emb)
+            )
+            cos_back = np.dot(back_master_emb, back_model_emb) / (
+                np.linalg.norm(back_master_emb) * np.linalg.norm(back_model_emb)
+            )
+            preservation_score = int(max(0, (cos_front + cos_back) / 2) * 100)
+        else:
+            master_path = ROOT_DIR / "artifacts" / "master_image.jpg"
+            with open(master_path, "rb") as f:
+                mb_bytes = f.read()
+                img = Image.open(io.BytesIO(mb_bytes))
+                fmt = img.format.lower() if img.format else "jpeg"
+                mim_type = f"image/{fmt}"
+                master_image = pydantic_ai.BinaryImage(
+                    data=mb_bytes, media_type=mim_type
+                )
+            master_desc = await descriptor.run([master_image], type="image")
+            master_emb = np.array(generate_embedding(master_desc.output.info.title))
+
+            cos_sim = np.dot(master_emb, model_embedding) / (
+                np.linalg.norm(master_emb) * np.linalg.norm(model_embedding)
+            )
+            preservation_score = int(max(0, cos_sim) * 100)
+    except Exception as e:
+        logger.error(f"Error calculating preservation score: {e}")
+        preservation_score = 0
+
+    yield {
+        "type": "score",
+        "data": {"type": "preservation", "score": preservation_score},
+    }
+
+    # Metric 2: Moodboard closeness
+    try:
+        embeddings = []
+        weights = []
+
+        for cluster in clusters:
+            for token in cluster.elements:
+                if token.weight <= RELEVANCE_THRESHOLD:
+                    continue
+
+                if token.embedding and len(token.embedding) > 0:
+                    embeddings.append(token.embedding)
+                    weights.append(token.weight)
+
+        if not embeddings:
+            closeness_score = 0
+        else:
+            embeddings_np = np.array(embeddings)
+            weights_np = np.array(weights)
+
+            if np.sum(weights_np) == 0:
+                weights_np = np.ones_like(weights_np) / len(weights_np)
+            else:
+                weights_np = weights_np / np.sum(weights_np)
+
+            centroid = np.average(embeddings_np, axis=0, weights=weights_np)
+
+            dot_product = np.dot(centroid, model_embedding)
+            norm_centroid = np.linalg.norm(centroid)
+            norm_model = np.linalg.norm(model_embedding)
+
+            if norm_centroid == 0 or norm_model == 0:
+                closeness_score = 0
+            else:
+                cosine_sim = dot_product / (norm_centroid * norm_model)
+                closeness_score = int(max(0, cosine_sim) * 100)
+    except Exception as e:
+        logger.error(f"Error calculating closeness score: {e}")
+        closeness_score = 0
+
+    yield {"type": "score", "data": {"type": "closeness", "score": closeness_score}}
 
 
 # --- Helper functions ---
