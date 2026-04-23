@@ -146,7 +146,7 @@ function ModelDialog({
             <div className="model-dialog__score-item">
               <span className="model-dialog__score-label" title="How close the generated model is to the original moodboard intention">Moodboard Closeness</span>
               <span className={`model-dialog__score-value ${closenessScore === null ? 'loading' : ''}`}>
-                {closenessScore !== null ? `${closenessScore}%` : (preservationScore !== null ? 'Calculating...' : 'Calculating...')}
+                {closenessScore !== null ? `${closenessScore}%` : 'Calculating...'}
               </span>
             </div>
           </div>
