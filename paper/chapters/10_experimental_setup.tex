@@ -47,9 +47,17 @@ Because evaluating multi-faceted stylistic guidance is inherently qualitative, h
 
 Measuring semantic alignment between unstructured 2D/text inputs and 3D outputs requires mapping them into a shared embedding space. We utilize the following automated metrics to provide a quantitative assessment:
 
+% i actually use CLIP because it's much more reliable then ULIP-2, also make sure to mention why this is as it's just much harder to align more modalities like ULIP-2 and it doesn't generalize well yet for things like these i'm using them for, CLIP does generalize a lot better
+
 \begin{itemize}
-    \item \textbf{Moodboard Centroid Distance:} We compute a weighted semantic center, or ``centroid,'' of the moodboard elements using a multimodal embedding model, specifically ULIP-2. ULIP-2 aligns point clouds with pretrained vision-language spaces. We then measure the distance between this calculated moodboard centroid and the final generated 3D model.
-    \item \textbf{Pipeline Delta (Control Boost):} To determine whether the moodboard input adds tangible value, we compare the centroid distance of the Imagin3D output against the centroid distance of the Baseline 1 (single-modal) output. A reduced distance implies that the orchestration framework successfully injected the broader moodboard context into the final 3D geometry.
+    \item \textbf{2D to 3D preservation:} Measures how well the uplifting from 2D to 3D went by comparing 2D images to renders of the generated 3D model
+    \item \textbf{Moodboard Closeness:} We compute a weighted semantic center, or ``centroid,'' of the moodboard elements using a multimodal embedding model, specifically ULIP-2. ULIP-2 aligns point clouds with pretrained vision-language spaces. We then measure the distance between this calculated moodboard centroid and the final generated 3D model.
 \end{itemize}
 
-It must be noted that while models like ULIP-2 are effective at broad categorization, they have historically struggled to capture subtle stylistic variations. When confronted with highly niche design styles or the abstract visual metaphors typical of human moodboards, 3D embedding spaces can become brittle. Therefore, these objective metrics act as a directional proxy rather than an absolute measure of aesthetic success.
+It must be noted that while models , they have historically struggled to capture subtle stylistic variations. When confronted with highly niche design styles or the abstract visual metaphors typical of human moodboards, 3D embedding spaces can become brittle. Therefore, these objective metrics act as a directional proxy rather than an absolute measure of aesthetic success. %-> we use CLIP now so change this
+
+% should also mention how "Hoe vermijd je dat de voorgestelde techniekgeoptimaliseerd is naar uw evaluatiemethode?"
+% Safeguards, Frozen evaluation space, Relative comparison, Cross-metric validation
+
+
+% do you think it would be worthwhile to compare moodboard centroid distance from Imagin3D 3D model vs baseline 3D model? -> we should add that too maybe
