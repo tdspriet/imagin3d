@@ -38,37 +38,46 @@ else:
     center = [0,0,0]
     max_dimension=1
 
-
 # set up rendering
+# EEVEE_NEXT is used instead of Cycles because Blender headless mode cannot load
+# packed textures (from glTF embeds) into Cycles — images stay has_data=False.
+# EEVEE_NEXT handles packed textures correctly and matches the Three.js frontend.
 scene = bpy.context.scene
-scene.render.engine = "CYCLES"
-scene.cycles.samples = 128
+scene.render.engine = "BLENDER_EEVEE_NEXT"
 scene.render.image_settings.file_format = "JPEG"
 scene.render.resolution_x = {{ cfg.resolution_x }}
 scene.render.resolution_y = {{ cfg.resolution_y }}
 scene.render.resolution_percentage = 100
 
-# try GPU but don't fail if unavailable
-try:
-    prefs = bpy.context.preferences
-    cycles_prefs = prefs.addons["cycles"].preferences
-    cycles_prefs.refresh_devices()
-    cycles_prefs.compute_device_type = "CUDA"
-    scene.cycles.device = "GPU"
-except Exception:
-    pass
+# ambient world lighting for fill
+_world = scene.world
+if _world is None:
+    _world = bpy.data.worlds.new("World")
+    scene.world = _world
+_world.use_nodes = True
+_world_bg = _world.node_tree.nodes.get("Background")
+if _world_bg:
+    _world_bg.inputs["Color"].default_value = (0.8, 0.8, 0.8, 1.0)
+    _world_bg.inputs["Strength"].default_value = 0.5
 
-# create camera and light
+# create camera and lights
 cam_data = bpy.data.cameras.new("RenderCamera")
 cam = bpy.data.objects.new("RenderCamera", cam_data)
 scene.collection.objects.link(cam)
 scene.camera = cam
 
-light_data = bpy.data.lights.new("RenderLight", type="POINT")
-light = bpy.data.objects.new("RenderLight", light_data)
-scene.collection.objects.link(light)
-light.data.energy = 200 * max_dimension**1.75  # scale light with object size
-light.data.shadow_soft_size = 0.05 * max_dimension # scale light size
+# key light (sun, scales with object size)
+key_data = bpy.data.lights.new("KeyLight", type="SUN")
+key_data.energy = 3.0
+key_data.angle = math.radians(5.0)
+key = bpy.data.objects.new("KeyLight", key_data)
+scene.collection.objects.link(key)
+
+# fill light (softer, opposite side)
+fill_data = bpy.data.lights.new("FillLight", type="SUN")
+fill_data.energy = 1.0
+fill = bpy.data.objects.new("FillLight", fill_data)
+scene.collection.objects.link(fill)
 
 # render parameters
 radius = max_dimension * 2.5  # distance camera from center
@@ -89,12 +98,10 @@ for i in range({{ cfg.num_views }}):
     direction = Vector(center) - cam.location
     cam.rotation_euler = direction.to_track_quat("-Z", "Y").to_euler()
 
-    # place light near camera
-    light.location = [
-        cam.location[0] * 0.6 + center[0] * 0.4,
-        cam.location[1] * 0.6 + center[1] * 0.4,
-        cam.location[2] * 0.6 + center[2] * 0.4,
-    ]
+    # key light from camera direction, slightly above
+    key.rotation_euler = cam.rotation_euler.copy()
+    # fill from opposite side
+    fill.rotation_euler = (cam.rotation_euler[0], cam.rotation_euler[1], cam.rotation_euler[2] + math.pi)
 
     render_filename = f"view_{i:01d}.jpg"
     render_path = pathlib.Path("{{ renders_dir }}") / render_filename
@@ -112,11 +119,8 @@ cam.location = (
 cam.data.angle = math.radians(fov_deg)
 direction = Vector(center) - cam.location
 cam.rotation_euler = direction.to_track_quat("-Z", "Y").to_euler()
-light.location = [
-    cam.location[0] * 0.6 + center[0] * 0.4,
-    cam.location[1] * 0.6 + center[1] * 0.4,
-    cam.location[2] * 0.6 + center[2] * 0.4,
-]
+key.rotation_euler = cam.rotation_euler.copy()
+fill.rotation_euler = (cam.rotation_euler[0], cam.rotation_euler[1], cam.rotation_euler[2] + math.pi)
 render_path = pathlib.Path("{{ renders_dir }}") / "view_back.jpg"
 scene.render.filepath = str(render_path)
 bpy.ops.render.render(write_still=True)
