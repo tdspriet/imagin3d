@@ -1,0 +1,14 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%                                                             %
+% Note: To add or remove acronyms, modify `personal_data.tex` %
+%                                                             %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+% Print the glossary
+% \printglossary[type=\acronymtype, title={Lijst van afkortingen}] % lang:dutch
+\printglossary[type=\acronymtype, title={List of Acronyms}] % lang:English
+
+\glsaddallunused[\acronymtype]                              % make sure all unused acronyms are in list
+
+\setlist[description]{style=standard} % reset list settings back to default

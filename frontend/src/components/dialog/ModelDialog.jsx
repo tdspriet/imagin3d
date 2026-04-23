@@ -64,7 +64,8 @@ function ModelDialog({
     onClose?.()
   }, [onClose])
 
-  const score = useMoodboardStore((state) => state.score)
+  const preservationScore = useMoodboardStore((state) => state.preservationScore)
+  const closenessScore = useMoodboardStore((state) => state.closenessScore)
 
   useEffect(() => {
     if (!isOpen) return
@@ -135,8 +136,19 @@ function ModelDialog({
         </div>
 
         <div className="model-dialog__actions">
-          <div className="model-dialog__score">
-             {score !== null ? `Score: ${score}%` : 'Calculating score...'}
+          <div className="model-dialog__scores">
+            <div className="model-dialog__score-item">
+              <span className="model-dialog__score-label" title="How well the 3D model preserves the 2D master image generation">2D to 3D Preservation</span>
+              <span className={`model-dialog__score-value ${preservationScore === null ? 'loading' : ''}`}>
+                {preservationScore !== null ? `${preservationScore}%` : 'Calculating...'}
+              </span>
+            </div>
+            <div className="model-dialog__score-item">
+              <span className="model-dialog__score-label" title="How close the generated model is to the original moodboard intention">Moodboard Closeness</span>
+              <span className={`model-dialog__score-value ${closenessScore === null ? 'loading' : ''}`}>
+                {closenessScore !== null ? `${closenessScore}%` : 'Calculating...'}
+              </span>
+            </div>
           </div>
           <div className="model-dialog__buttons">
             <button

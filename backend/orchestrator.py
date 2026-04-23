@@ -388,13 +388,19 @@ async def generate_3d_model(master_image_path: Path | list[Path]) -> Path:
     return model_path
 
 
-async def evaluate_model(
+def _load_image_for_eval(image_path: Path) -> pydantic_ai.BinaryImage:
+    with open(image_path, "rb") as f:
+        img_bytes = f.read()
+        img = Image.open(io.BytesIO(img_bytes))
+        fmt = img.format.lower() if img.format else "jpeg"
+        return pydantic_ai.BinaryImage(data=img_bytes, media_type=f"image/{fmt}")
+
+
+async def evaluate_model_async(
     model_path: Path,
     clusters: list[common.ClusterDescriptor],
     is_multiview: bool = False,
-) -> int:
-    # TODO: check this WIP objective evaluation score
-
+):
     unique_name = "generated"
     renders_dir = ROOT_DIR / "artifacts" / "model_renders" / unique_name
     renders_dir.mkdir(parents=True, exist_ok=True)
@@ -404,58 +410,122 @@ async def evaluate_model(
     )
     images = [render.image for render in renders]
 
-    # 1. Calculate moodboard centroid
-    embeddings = []
-    weights = []
+    model_embedding = None
+    front_model_emb = None
+    back_model_emb = None
+    try:
+        # Generate embedding for the generated model
+        if is_multiview:
+            front_desc = await descriptor.run([renders[0].image], type="model")
+            front_model_emb = np.array(generate_embedding(front_desc.output.info.title))
 
-    for cluster in clusters:
-        for token in cluster.elements:
-            if token.weight <= RELEVANCE_THRESHOLD:
-                continue
+            with open(renders_dir / "view_back.jpg", "rb") as f:
+                back_image = pydantic_ai.BinaryImage(
+                    data=f.read(), media_type="image/jpeg"
+                )
+            back_desc = await descriptor.run([back_image], type="model")
+            back_model_emb = np.array(generate_embedding(back_desc.output.info.title))
 
-            if token.embedding and len(token.embedding) > 0:
-                embeddings.append(token.embedding)
-                weights.append(token.weight)
+            model_embedding = np.average([front_model_emb, back_model_emb], axis=0)
+        else:
+            result = await descriptor.run(images, type="model")
+            title = result.output.info.title
+            model_embedding = np.array(generate_embedding(title))
+    except Exception as e:
+        logger.error(f"Error generating model embeddings: {e}")
 
-    embeddings_np = np.array(embeddings)
-    weights_np = np.array(weights)
+    try:
+        # Metric 1: 2D to 3D preservation
+        if model_embedding is None:
+            preservation_score = 0
+        elif is_multiview:
+            front_master_path = ROOT_DIR / "artifacts" / "master_image_front.jpg"
+            back_master_path = ROOT_DIR / "artifacts" / "master_image_back.jpg"
 
-    if np.sum(weights_np) == 0:
-        weights_np = np.ones_like(weights_np) / len(weights_np)
-    else:
-        weights_np = weights_np / np.sum(weights_np)
+            front_master_image = _load_image_for_eval(front_master_path)
+            back_master_image = _load_image_for_eval(back_master_path)
 
-    centroid = np.average(embeddings_np, axis=0, weights=weights_np)
+            front_master_desc = await descriptor.run([front_master_image], type="image")
+            front_master_emb = np.array(
+                generate_embedding(front_master_desc.output.info.title)
+            )
 
-    # 2. Generate embedding for the generated model
-    if is_multiview:
-        front_desc = await descriptor.run([renders[0].image], type="model")
-        front_model_emb = np.array(generate_embedding(front_desc.output.info.title))
+            back_master_desc = await descriptor.run([back_master_image], type="image")
+            back_master_emb = np.array(
+                generate_embedding(back_master_desc.output.info.title)
+            )
 
-        with open(renders_dir / "view_back.jpg", "rb") as f:
-            back_image = pydantic_ai.BinaryImage(data=f.read(), media_type="image/jpeg")
-        back_desc = await descriptor.run([back_image], type="model")
-        back_model_emb = np.array(generate_embedding(back_desc.output.info.title))
+            cos_front = np.dot(front_master_emb, front_model_emb) / (
+                np.linalg.norm(front_master_emb) * np.linalg.norm(front_model_emb)
+            )
+            cos_back = np.dot(back_master_emb, back_model_emb) / (
+                np.linalg.norm(back_master_emb) * np.linalg.norm(back_model_emb)
+            )
+            preservation_score = int(max(0, (cos_front + cos_back) / 2) * 100)
+        else:
+            master_path = ROOT_DIR / "artifacts" / "master_image.jpg"
+            master_image = _load_image_for_eval(master_path)
 
-        model_embedding = np.average([front_model_emb, back_model_emb], axis=0)
-    else:
-        result = await descriptor.run(images, type="model")
-        title = result.output.info.title
-        model_embedding = np.array(generate_embedding(title))
+            master_desc = await descriptor.run([master_image], type="image")
+            master_emb = np.array(generate_embedding(master_desc.output.info.title))
 
-    # 3. Calculate distance/score
+            cos_sim = np.dot(master_emb, model_embedding) / (
+                np.linalg.norm(master_emb) * np.linalg.norm(model_embedding)
+            )
+            preservation_score = int(max(0, cos_sim) * 100)
+    except Exception as e:
+        logger.error(f"Error calculating preservation score: {e}")
+        preservation_score = 0
 
-    dot_product = np.dot(centroid, model_embedding)
-    norm_centroid = np.linalg.norm(centroid)
-    norm_model = np.linalg.norm(model_embedding)
+    yield {
+        "type": "score",
+        "data": {"type": "preservation", "score": preservation_score},
+    }
 
-    if norm_centroid == 0 or norm_model == 0:
-        return 0
+    # Metric 2: Moodboard closeness
+    try:
+        if model_embedding is None:
+            closeness_score = 0
+        else:
+            embeddings = []
+            weights = []
 
-    cosine_sim = dot_product / (norm_centroid * norm_model)
+            for cluster in clusters:
+                for token in cluster.elements:
+                    if token.weight <= RELEVANCE_THRESHOLD:
+                        continue
 
-    score = int(max(0, cosine_sim) * 100)
-    return score
+                    if token.embedding and len(token.embedding) > 0:
+                        embeddings.append(token.embedding)
+                        weights.append(token.weight)
+
+            if not embeddings:
+                closeness_score = 0
+            else:
+                embeddings_np = np.array(embeddings)
+                weights_np = np.array(weights)
+
+                if np.sum(weights_np) == 0:
+                    weights_np = np.ones_like(weights_np) / len(weights_np)
+                else:
+                    weights_np = weights_np / np.sum(weights_np)
+
+                centroid = np.average(embeddings_np, axis=0, weights=weights_np)
+
+                dot_product = np.dot(centroid, model_embedding)
+                norm_centroid = np.linalg.norm(centroid)
+                norm_model = np.linalg.norm(model_embedding)
+
+                if norm_centroid == 0 or norm_model == 0:
+                    closeness_score = 0
+                else:
+                    cosine_sim = dot_product / (norm_centroid * norm_model)
+                    closeness_score = int(max(0, cosine_sim) * 100)
+    except Exception as e:
+        logger.error(f"Error calculating closeness score: {e}")
+        closeness_score = 0
+
+    yield {"type": "score", "data": {"type": "closeness", "score": closeness_score}}
 
 
 # --- Helper functions ---
