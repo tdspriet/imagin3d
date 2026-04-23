@@ -839,6 +839,7 @@ async def extract(payload: MoodboardPayload) -> StreamingResponse:
             model_path,
             cluster_descriptors,
             is_multiview=payload.multiview,
+            adapt_subject_text=payload.adapt_subject_text,
         ):
             yield f"data: {json.dumps(score_event)}\n\n"
 

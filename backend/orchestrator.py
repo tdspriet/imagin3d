@@ -3,7 +3,7 @@ from __future__ import annotations
 import base64
 import io
 from pathlib import Path
-from typing import Any, Union
+from typing import Any, Optional, Union
 
 import boto3
 import numpy as np
@@ -400,6 +400,7 @@ async def evaluate_model_async(
     model_path: Path,
     clusters: list[common.ClusterDescriptor],
     is_multiview: bool = False,
+    adapt_subject_text: Optional[str] = None,
 ):
     unique_name = "generated"
     renders_dir = ROOT_DIR / "artifacts" / "model_renders" / unique_name
@@ -511,6 +512,18 @@ async def evaluate_model_async(
                     weights_np = weights_np / np.sum(weights_np)
 
                 centroid = np.average(embeddings_np, axis=0, weights=weights_np)
+
+                # In adaptation mode, project out the subject direction so we measure style transfer rather than identity similarity.
+                if adapt_subject_text:
+                    try:
+                        subject_emb = np.array(generate_embedding(adapt_subject_text))
+                        subject_norm = np.linalg.norm(subject_emb)
+                        if subject_norm > 0:
+                            subject_unit = subject_emb / subject_norm
+                            centroid = centroid - np.dot(centroid, subject_unit) * subject_unit
+                            model_embedding = model_embedding - np.dot(model_embedding, subject_unit) * subject_unit
+                    except Exception as e:
+                        logger.warning(f"Could not project out subject embedding, falling back to raw closeness: {e}")
 
                 dot_product = np.dot(centroid, model_embedding)
                 norm_centroid = np.linalg.norm(centroid)
