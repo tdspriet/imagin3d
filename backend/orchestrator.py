@@ -308,9 +308,13 @@ async def generate_multiview_master_images(
 
     yield {"event": "front_done"}
 
-    # Generate back view
+    # Generate back view + prepend the front image so the model can maintain consistency
+    front_binary = pydantic_ai.BinaryImage(
+        data=result_front.output.data, media_type="image/jpeg"
+    )
+    back_style_images = [front_binary] + style_images
     result_back = await visualizer.run(
-        master_prompt, style_images, base_image, prompt=prompt, view="back"
+        master_prompt, back_style_images, base_image, prompt=prompt, view="back"
     )
     back_image_path = ROOT_DIR / "artifacts" / "master_image_back.jpg"
     with open(back_image_path, "wb") as f:
