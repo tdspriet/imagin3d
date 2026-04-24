@@ -117,7 +117,7 @@ function ModelNode({ id, data, selected }) {
             </div>
           ) : (
             <div className="model-canvas-wrapper">
-              <Canvas camera={{ position: [0, 0, 5], fov: 50 }}>
+              <Canvas resize={{ offsetSize: true }} camera={{ position: [0, 0, 5], fov: 50 }}>
                 <ambientLight intensity={1.5} />
                 <directionalLight position={[10, 10, 10]} intensity={2.5} />
                 <directionalLight position={[-10, -10, -10]} intensity={1} />

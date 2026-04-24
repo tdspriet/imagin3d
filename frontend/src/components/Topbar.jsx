@@ -19,6 +19,7 @@ import { useShallow } from 'zustand/react/shallow'
 import PaletteDialog from './dialog/PaletteDialog'
 import GenerateDialog from './dialog/GenerateDialog'
 import AdaptDialog from './dialog/AdaptDialog'
+import SaveDialog from './dialog/SaveDialog'
 import './Topbar.css'
 
 /**
@@ -37,6 +38,7 @@ function Topbar() {
     fitView,
     clearAll,
     saveMoodboard,
+    saveToDataset,
     loadMoodboard,
     generateMoodboard,
     isGenerating,
@@ -52,6 +54,7 @@ function Topbar() {
     fitView: state.fitView,
     clearAll: state.clearAll,
     saveMoodboard: state.saveMoodboard,
+    saveToDataset: state.saveToDataset,
     loadMoodboard: state.loadMoodboard,
     generateMoodboard: state.generateMoodboard,
     isGenerating: state.isGenerating,
@@ -65,6 +68,7 @@ function Topbar() {
   const [isPaletteDialogOpen, setPaletteDialogOpen] = useState(false)
   const [isGenerateDialogOpen, setGenerateDialogOpen] = useState(false)
   const [isAdaptDialogOpen, setAdaptDialogOpen] = useState(false)
+  const [isSaveDialogOpen, setSaveDialogOpen] = useState(false)
 
   // Handle image file selection
   const handleImageUpload = (e) => {
@@ -248,7 +252,7 @@ function Topbar() {
           <MdDeleteSweep className="btn-icon" size={18} aria-hidden="true" focusable="false" />
           <span>Clear All</span>
         </button>
-        <button onClick={saveMoodboard} className="btn btn-success">
+        <button onClick={() => setSaveDialogOpen(true)} className="btn btn-success">
           <MdSave className="btn-icon" size={18} aria-hidden="true" focusable="false" />
           <span>Save</span>
         </button>
@@ -321,6 +325,12 @@ function Topbar() {
         onClose={() => setAdaptDialogOpen(false)}
         onAdapt={handleAdaptMoodboard}
         isGenerating={isGenerating}
+      />
+      <SaveDialog
+        isOpen={isSaveDialogOpen}
+        onClose={() => setSaveDialogOpen(false)}
+        onSaveToSystem={saveMoodboard}
+        onSaveToDataset={saveToDataset}
       />
     </div>
   )

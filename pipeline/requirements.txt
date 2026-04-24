@@ -1,0 +1,6 @@
+# A/B pipeline requirements
+# The backend conda environment already has torch, Pillow, structlog etc.
+# Only add packages not already in the backend.
+
+open-clip-torch>=2.24.0   # CLIP ViT-L/14 for evaluation metrics
+python-dotenv>=1.0         # already in backend but listed for standalone installs

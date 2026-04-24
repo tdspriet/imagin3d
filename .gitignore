@@ -7,6 +7,10 @@ dist
 .pants.d
 hf_cache
 
+# Pipeline
+runs/
+datasets/
+
 # Python
 __pycache__
 
