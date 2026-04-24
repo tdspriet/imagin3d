@@ -967,16 +967,24 @@ async def save_to_dataset(req: DatasetSaveRequest):
             out_el["text"] = c_data.get("text", "")
         elif c_type == "palette":
             out_el["colors"] = c_data.get("colors", [])
-            
+
+        if "pixelSize" in el:
+            out_el["pixelSize"] = el["pixelSize"]
+
         saved_elements.append(out_el)
-        
+
+    saved_clusters = []
+    for c in req.clusters:
+        cluster_out = {k: v for k, v in c.items()}
+        saved_clusters.append(cluster_out)
+
     moodboard_json = {
         "name": req.name,
         "prompt": req.prompt,
         "multiview": req.multiview,
         "adapt_subject": None,
         "elements": saved_elements,
-        "clusters": req.clusters
+        "clusters": saved_clusters
     }
     
     (ds_dir / "moodboard.json").write_text(json.dumps(moodboard_json, indent=2))

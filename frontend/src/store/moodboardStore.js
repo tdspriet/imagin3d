@@ -46,6 +46,10 @@ const serializeDataForBackend = (nodes = [], excludeNodeId = null) => {
           y: Number(node?.position?.y, 0),
         },
         size: computeSizeRatios(node),
+        pixelSize: {
+          width:  Math.round(Number(node?.style?.width  || 0)),
+          height: Math.round(Number(node?.style?.height || 0)),
+        },
       }
     }
   })
@@ -64,7 +68,12 @@ const serializeDataForBackend = (nodes = [], excludeNodeId = null) => {
       formatted: {
         id: index + 1,
         title: cluster.data?.title || 'Cluster',
-        elements: insideNodeIds
+        elements: insideNodeIds,
+        position: cluster.position,
+        pixelSize: {
+          width:  Math.round(Number(cluster.style?.width  || 0)),
+          height: Math.round(Number(cluster.style?.height || 0)),
+        },
       }
     }
   })

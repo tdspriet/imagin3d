@@ -9,8 +9,6 @@ Usage:
   # From the repo root with the backend conda env active:
   python -m pipeline.run_ab --dataset example_chair
   python -m pipeline.run_ab --all
-  python -m pipeline.run_ab --dataset example_chair --skip-imagin3d   # baseline only
-  python -m pipeline.run_ab --dataset example_chair --skip-baseline    # Imagin3D only
 
 Environment:
   Requires the same .env as the backend (BEDROCK_ACCESS_KEY_ID, GOOGLE_API_KEY, etc).
@@ -77,11 +75,8 @@ def _make_run_dir(moodboard_name: str) -> Path:
     return run_dir
 
 
-async def _run_dataset(
-    dataset_dir: Path,
-    skip_imagin3d: bool = False,
-    skip_baseline: bool = False,
-) -> None:
+async def _run_dataset(dataset_dir: Path) -> None:
+    import shutil
     moodboard = load_moodboard(dataset_dir)
     run_dir = _make_run_dir(moodboard.name)
 
@@ -90,42 +85,41 @@ async def _run_dataset(
     # Probe CLIP before starting any GPU work so a missing install is loud.
     _load_clip()
 
+    # Copy dataset assets so they can be served by the /ab-runs/ static mount.
+    shutil.copytree(dataset_dir, run_dir / "moodboard")
+
     imagin3d_scores: dict = {}
     baseline_scores: dict = {}
-    imagin3d_glb: Path | None = None
-    baseline_glb: Path | None = None
 
     # ── Arm 1: Imagin3D ─────────────────────────────────────────────────────
-    if not skip_imagin3d:
-        logger.info("Running Imagin3D arm")
-        try:
-            imagin3d_glb = await run_imagin3d(moodboard, run_dir)
-            imagin3d_scores = await _score_arm(
-                arm="imagin3d",
-                glb_path=imagin3d_glb,
-                run_dir=run_dir,
-                moodboard=moodboard,
-            )
-            _write_scores(run_dir / "imagin3d", imagin3d_scores)
-        except Exception as e:
-            logger.error("Imagin3D arm failed", error=str(e))
-        _free_gpu()
+    logger.info("Running Imagin3D arm")
+    try:
+        imagin3d_glb = await run_imagin3d(moodboard, run_dir)
+        imagin3d_scores = await _score_arm(
+            arm="imagin3d",
+            glb_path=imagin3d_glb,
+            run_dir=run_dir,
+            moodboard=moodboard,
+        )
+        _write_scores(run_dir / "imagin3d", imagin3d_scores)
+    except Exception as e:
+        logger.error("Imagin3D arm failed", error=str(e))
+    _free_gpu()
 
     # ── Arm 2: Baseline ──────────────────────────────────────────────────────
-    if not skip_baseline:
-        logger.info("Running baseline arm")
-        try:
-            baseline_glb = await run_baseline(moodboard, run_dir)
-            baseline_scores = await _score_arm(
-                arm="baseline",
-                glb_path=baseline_glb,
-                run_dir=run_dir,
-                moodboard=moodboard,
-            )
-            _write_scores(run_dir / "baseline", baseline_scores)
-        except Exception as e:
-            logger.error("Baseline arm failed", error=str(e))
-        _free_gpu()
+    logger.info("Running baseline arm")
+    try:
+        baseline_glb = await run_baseline(moodboard, run_dir)
+        baseline_scores = await _score_arm(
+            arm="baseline",
+            glb_path=baseline_glb,
+            run_dir=run_dir,
+            moodboard=moodboard,
+        )
+        _write_scores(run_dir / "baseline", baseline_scores)
+    except Exception as e:
+        logger.error("Baseline arm failed", error=str(e))
+    _free_gpu()
 
     # ── Manifest ────────────────────────────────────────────────────────────
     _write_manifest(run_dir, moodboard, imagin3d_scores, baseline_scores)
@@ -238,11 +232,30 @@ def _write_manifest(
             ]
         return []
 
+    def _ser_elem(e) -> dict:
+        d = {"id": e.id, "type": e.type, "position": e.position, "size": e.size}
+        if e.path:             d["path"]      = e.path
+        if e.file_name:        d["fileName"]  = e.file_name
+        if e.text is not None: d["text"]      = e.text
+        if e.colors:           d["colors"]    = e.colors
+        if e.pixel_size:       d["pixelSize"] = e.pixel_size
+        return d
+
+    def _ser_cluster(c) -> dict:
+        d = {"id": c.id, "title": c.title, "elements": c.elements}
+        if c.position:   d["position"]  = c.position
+        if c.pixel_size: d["pixelSize"] = c.pixel_size
+        return d
+
     manifest = {
         "case_id": f"{moodboard.name}-{run_dir.name.split('_')[0]}",
         "run_dir": run_dir.name,
         "moodboard_name": moodboard.name,
         "prompt": moodboard.prompt,
+        "moodboard": {
+            "elements": [_ser_elem(e) for e in moodboard.elements],
+            "clusters": [_ser_cluster(c) for c in moodboard.clusters],
+        },
         "arms": {
             "imagin3d": {
                 "glb": "imagin3d/sample.glb",
@@ -281,8 +294,6 @@ def _parse_args() -> argparse.Namespace:
     group.add_argument("--dataset", metavar="NAME", help="Dataset name under pipeline/datasets/")
     group.add_argument("--all", action="store_true", help="Run all datasets sequentially")
 
-    parser.add_argument("--skip-imagin3d", action="store_true", help="Skip the Imagin3D arm")
-    parser.add_argument("--skip-baseline", action="store_true", help="Skip the baseline arm")
     return parser.parse_args()
 
 
@@ -299,11 +310,7 @@ async def main() -> None:
         datasets = [dataset_dir]
 
     for dataset_dir in datasets:
-        await _run_dataset(
-            dataset_dir,
-            skip_imagin3d=args.skip_imagin3d,
-            skip_baseline=args.skip_baseline,
-        )
+        await _run_dataset(dataset_dir)
 
 
 if __name__ == "__main__":

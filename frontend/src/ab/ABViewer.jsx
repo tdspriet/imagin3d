@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useMemo } from 'react'
 import { Canvas, useLoader } from '@react-three/fiber'
 import { OrbitControls, Environment, Center } from '@react-three/drei'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
+import MoodboardPreview from './MoodboardPreview'
 
 export default function ABViewer({ caseData, caseNumber, totalCases, backendUrl, onVote }) {
   const [notes, setNotes] = useState('')
@@ -20,6 +21,9 @@ export default function ABViewer({ caseData, caseNumber, totalCases, backendUrl,
 
   const leftGlb  = `${backendUrl}${baseUrl}/${leftArm}/sample.glb`
   const rightGlb = `${backendUrl}${baseUrl}/${rightArm}/sample.glb`
+
+  const hasMoodboard = !!caseData.moodboard?.elements?.length
+
   const handleSubmit = () => {
     if (!preferred) return
     onVote({ preferred, leftArm, rightArm, notes })
@@ -35,38 +39,60 @@ export default function ABViewer({ caseData, caseNumber, totalCases, backendUrl,
         <h2 style={s.caseTitle}>Which model better captures this moodboard?</h2>
       </div>
 
-      {/* 3D model pair */}
-      <div style={s.modelsRow}>
-        <ModelPanel
-          label="A"
-          glbUrl={leftGlb}
-          selected={preferred === 'left'}
-          onSelect={() => setPreferred('left')}
-        />
-        <ModelPanel
-          label="B"
-          glbUrl={rightGlb}
-          selected={preferred === 'right'}
-          onSelect={() => setPreferred('right')}
-        />
-      </div>
+      {/* Main content */}
+      <div style={s.body}>
+        {/* Left: reference moodboard */}
+        {hasMoodboard && (
+          <div style={s.moodboardCol}>
+            <p style={s.colLabel}>Reference Moodboard</p>
+            <div style={s.moodboardCanvas}>
+              <MoodboardPreview
+                elements={caseData.moodboard.elements}
+                clusters={caseData.moodboard.clusters || []}
+                baseUrl={baseUrl}
+                backendUrl={backendUrl}
+              />
+            </div>
+          </div>
+        )}
 
-      {/* Notes + Submit */}
-      <div style={s.submitArea}>
-        <textarea
-          style={s.notes}
-          placeholder="Optional: briefly explain your choice…"
-          value={notes}
-          onChange={e => setNotes(e.target.value)}
-          rows={3}
-        />
-        <button
-          style={{ ...s.btn, opacity: preferred ? 1 : 0.4 }}
-          disabled={!preferred}
-          onClick={handleSubmit}
-        >
-          {caseNumber < totalCases ? `Submit & next →` : `Submit & finish`}
-        </button>
+        {/* Right: A/B comparison */}
+        <div style={{ ...s.comparisonCol, flex: hasMoodboard ? '0 0 62%' : '1' }}>
+          {caseData.prompt && (
+            <p style={s.promptLabel}>{caseData.prompt}</p>
+          )}
+          <div style={s.modelsRow}>
+            <ModelPanel
+              label="A"
+              glbUrl={leftGlb}
+              selected={preferred === 'left'}
+              onSelect={() => setPreferred('left')}
+            />
+            <ModelPanel
+              label="B"
+              glbUrl={rightGlb}
+              selected={preferred === 'right'}
+              onSelect={() => setPreferred('right')}
+            />
+          </div>
+
+          <div style={s.submitArea}>
+            <textarea
+              style={s.notes}
+              placeholder="Optional: briefly explain your choice…"
+              value={notes}
+              onChange={e => setNotes(e.target.value)}
+              rows={3}
+            />
+            <button
+              style={{ ...s.btn, opacity: preferred ? 1 : 0.4 }}
+              disabled={!preferred}
+              onClick={handleSubmit}
+            >
+              {caseNumber < totalCases ? `Submit & next →` : `Submit & finish`}
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   )
@@ -145,25 +171,26 @@ class ErrorBoundaryGLB extends React.Component {
   }
 }
 
+const HEADER_H = 64  // px — kept in sync with s.header padding + font size
+
 const s = {
   page: {
     fontFamily: 'Segoe UI, sans-serif',
-    maxWidth: 1100,
-    margin: '0 auto',
-    padding: '1.5rem',
-    minHeight: '100vh',
-    background: '#fff',
+    width: '100vw',
+    height: '100vh',
     display: 'flex',
     flexDirection: 'column',
-    justifyContent: 'center',
+    background: '#fff',
+    overflow: 'hidden',
   },
   header: {
     display: 'grid',
     gridTemplateColumns: '1fr auto 1fr',
     alignItems: 'center',
-    marginBottom: '1rem',
+    padding: '0 1.5rem',
+    height: `${HEADER_H}px`,
+    flexShrink: 0,
     borderBottom: '2px solid #000',
-    paddingBottom: '0.75rem',
   },
   progress: {
     fontSize: '0.9rem',
@@ -176,15 +203,54 @@ const s = {
     gridColumn: 2,
     textAlign: 'center',
   },
+  body: {
+    display: 'flex',
+    flex: 1,
+    overflow: 'hidden',
+  },
+  moodboardCol: {
+    flex: '0 0 38%',
+    display: 'flex',
+    flexDirection: 'column',
+    borderRight: '1px solid #e0e0e0',
+    overflow: 'hidden',
+  },
+  colLabel: {
+    margin: 0,
+    padding: '8px 12px',
+    fontSize: '0.8rem',
+    color: '#555',
+    borderBottom: '1px solid #e0e0e0',
+    flexShrink: 0,
+  },
+  moodboardCanvas: {
+    flex: 1,
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  comparisonCol: {
+    display: 'flex',
+    flexDirection: 'column',
+    justifyContent: 'center',
+    padding: '1.25rem 1.5rem',
+    overflowY: 'auto',
+    gap: '1.25rem',
+  },
+  promptLabel: {
+    margin: 0,
+    fontSize: '1rem',
+    fontStyle: 'italic',
+    color: '#444',
+    textAlign: 'center',
+  },
   modelsRow: {
     display: 'flex',
     gap: '1.5rem',
-    marginBottom: '1.25rem',
     flexWrap: 'wrap',
   },
   panel: {
     flex: 1,
-    minWidth: 280,
+    minWidth: 240,
     borderRadius: 2,
     padding: '0.75rem',
     display: 'flex',
@@ -198,7 +264,7 @@ const s = {
     letterSpacing: 2,
   },
   canvasWrap: {
-    height: 380,
+    height: 320,
     background: '#f9f9f9',
     overflow: 'hidden',
   },

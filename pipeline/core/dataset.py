@@ -30,6 +30,7 @@ class MoodboardElement:
     file_name: Optional[str] = None  # for model (defaults to path basename)
     text: Optional[str] = None       # for text
     colors: Optional[list[str]] = None  # for palette
+    pixel_size: Optional[dict] = None   # {width, height} actual canvas px
 
 
 @dataclass
@@ -37,6 +38,8 @@ class MoodboardCluster:
     id: int
     title: str
     elements: list[int]          # element IDs
+    position: Optional[dict] = None   # {x, y} canvas position
+    pixel_size: Optional[dict] = None # {width, height} canvas px
 
 
 @dataclass
@@ -77,10 +80,17 @@ def load(moodboard_dir: str | Path) -> Moodboard:
             file_name=e.get("fileName"),
             text=e.get("text"),
             colors=e.get("colors"),
+            pixel_size=e.get("pixelSize"),
         ))
 
     clusters = [
-        MoodboardCluster(id=c["id"], title=c["title"], elements=c["elements"])
+        MoodboardCluster(
+            id=c["id"],
+            title=c["title"],
+            elements=c["elements"],
+            position=c.get("position"),
+            pixel_size=c.get("pixelSize"),
+        )
         for c in data.get("clusters", [])
     ]
 

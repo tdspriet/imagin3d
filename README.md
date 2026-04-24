@@ -103,10 +103,6 @@ python -m pipeline.run_ab --dataset <name>
 
 # Run all datasets sequentially
 python -m pipeline.run_ab --all
-
-# Run one arm only
-python -m pipeline.run_ab --dataset <name> --skip-baseline    # Imagin3D only
-python -m pipeline.run_ab --dataset <name> --skip-imagin3d    # baseline only
 ```
 
 Results are written to `pipeline/runs/<timestamp>_<name>/`:
