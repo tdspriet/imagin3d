@@ -1056,6 +1056,31 @@ export const useMoodboardStore = create((set, get) => ({
     URL.revokeObjectURL(url)
   },
 
+  // Save moodboard as a pipeline dataset on the server
+  saveToDataset: async ({ name, prompt, baselinePrompt }) => {
+    const { nodes } = get()
+    const { payload } = serializeDataForBackend(nodes)
+
+    const response = await fetch(`${BACKEND_URL}/save-to-dataset`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name,
+        prompt,
+        baseline_prompt: baselinePrompt,
+        elements: payload.elements,
+        clusters: payload.clusters,
+      }),
+    })
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}))
+      throw new Error(err.detail || `Server error ${response.status}`)
+    }
+
+    return response.json()
+  },
+
   // Load moodboard from JSON data
   loadMoodboard: (data) => {
     if (get().isGenerating) return

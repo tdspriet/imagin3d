@@ -8,10 +8,12 @@ import uuid
 from datetime import datetime
 from pathlib import Path
 from dotenv import find_dotenv, load_dotenv
+from typing import List, Dict, Any, Optional
 from fastapi import Body, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel, Field
 import uvicorn
 import structlog
 
@@ -93,6 +95,11 @@ artifacts_dir.mkdir(parents=True, exist_ok=True)
 
 # Mount artifacts directory
 app.mount("/artifacts", StaticFiles(directory=ROOT_DIR / "artifacts"), name="artifacts")
+
+# Mount pipeline runs as static files for the A/B viewer
+_PIPELINE_RUNS_DIR = ROOT_DIR.parent / "pipeline" / "runs"
+_PIPELINE_RUNS_DIR.mkdir(parents=True, exist_ok=True)
+app.mount("/ab-runs", StaticFiles(directory=_PIPELINE_RUNS_DIR), name="ab-runs")
 
 
 @app.on_event("startup")
@@ -852,6 +859,130 @@ async def extract(payload: MoodboardPayload) -> StreamingResponse:
         },
     )
 
+
+# ---------------------------------------------------------------------------
+# A/B Study endpoints
+# ---------------------------------------------------------------------------
+
+class ABVote(BaseModel):
+    case_id: str
+    preferred: str        # "left" | "right"
+    left_arm: str         # "imagin3d" | "baseline"
+    right_arm: str
+    notes: str = ""
+    participant_id: str = ""
+
+
+@app.get("/ab/cases")
+async def ab_cases():
+    """List all available A/B run manifests."""
+    manifests = []
+    for manifest_path in sorted(_PIPELINE_RUNS_DIR.glob("*/manifest.json")):
+        try:
+            data = json.loads(manifest_path.read_text())
+            # Inject the static URL prefix for the viewer
+            data["_base_url"] = f"/ab-runs/{manifest_path.parent.name}"
+            manifests.append(data)
+        except Exception:
+            pass
+    return JSONResponse(content=manifests)
+
+
+@app.post("/ab/vote")
+async def ab_vote(vote: ABVote):
+    """Append a participant preference vote to the shared votes log."""
+    votes_path = _PIPELINE_RUNS_DIR / "votes.jsonl"
+    entry = vote.dict()
+    entry["timestamp"] = datetime.now().isoformat()
+    with votes_path.open("a") as f:
+        f.write(json.dumps(entry) + "\n")
+    return {"status": "recorded"}
+
+
+class DatasetSaveRequest(BaseModel):
+    name: str
+    prompt: Optional[str] = ""
+    baseline_prompt: Optional[str] = ""
+    elements: List[Dict[str, Any]] = Field(default_factory=list)
+    clusters: List[Dict[str, Any]] = Field(default_factory=list)
+
+@app.post("/save-to-dataset")
+async def save_to_dataset(req: DatasetSaveRequest):
+    """Save a moodboard payload as a new A/B pipeline dataset."""
+    import re
+    import base64
+    from pathlib import Path
+    
+    # Pipeline datasets dir
+    datasets_dir = Path("pipeline/datasets")
+    if not datasets_dir.exists():
+        datasets_dir = Path("../pipeline/datasets")
+        
+    ds_dir = datasets_dir / req.name
+    if ds_dir.exists():
+        return JSONResponse(status_code=400, content={"detail": f"Dataset '{req.name}' already exists."})
+        
+    ds_dir.mkdir(parents=True, exist_ok=True)
+    
+    saved_elements = []
+    
+    def decode_data_url(data_url: str, default_ext=".png") -> tuple[bytes, str]:
+        match = re.match(r"data:(.*?);base64,(.*)", data_url)
+        if not match:
+            return b"", default_ext
+        mime = match.group(1)
+        b64 = match.group(2)
+        
+        ext = default_ext
+        if "jpeg" in mime or "jpg" in mime: ext = ".jpg"
+        elif "png" in mime: ext = ".png"
+        elif "webp" in mime: ext = ".webp"
+        elif "mp4" in mime: ext = ".mp4"
+        elif "webm" in mime: ext = ".webm"
+        elif "gltf-binary" in mime: ext = ".glb"
+        elif "gltf" in mime: ext = ".gltf"
+        
+        return base64.b64decode(b64), ext
+
+    for el in req.elements:
+        c_type = el.get("content", {}).get("type", "unknown")
+        c_data = el.get("content", {}).get("data", {})
+        
+        out_el = {
+            "id": el.get("id"),
+            "type": c_type,
+            "position": el.get("position", {"x": 0, "y": 0}),
+            "size": el.get("size", {"x": 1, "y": 1})
+        }
+        
+        if c_type in ("image", "video", "model") and "src" in c_data:
+            img_data, ext = decode_data_url(c_data["src"])
+            if img_data:
+                filename = f"element_{el.get('id')}{ext}"
+                (ds_dir / filename).write_bytes(img_data)
+                out_el["path"] = filename
+                if c_type == "model" and "fileName" in c_data:
+                    out_el["fileName"] = c_data["fileName"]
+        elif c_type == "text":
+            out_el["text"] = c_data.get("text", "")
+        elif c_type == "palette":
+            out_el["colors"] = c_data.get("colors", [])
+            
+        saved_elements.append(out_el)
+        
+    moodboard_json = {
+        "name": req.name,
+        "prompt": req.prompt,
+        "baseline_prompt": req.baseline_prompt,
+        "multiview": False,
+        "adapt_subject": None,
+        "elements": saved_elements,
+        "clusters": req.clusters
+    }
+    
+    (ds_dir / "moodboard.json").write_text(json.dumps(moodboard_json, indent=2))
+    
+    return {"status": "saved", "path": str(ds_dir)}
 
 if __name__ == "__main__":
     uvicorn.run(

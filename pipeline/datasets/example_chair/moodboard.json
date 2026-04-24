@@ -1,0 +1,24 @@
+{
+  "name": "example_chair",
+  "prompt": "A minimal Scandinavian dining chair with light wood legs",
+  "multiview": false,
+  "adapt_subject": null,
+  "baseline_prompt": "A minimal Scandinavian dining chair with slender light oak legs, a simple upholstered seat pad in light grey fabric, clean geometric lines, isolated against a seamless pure white background, soft studio lighting, detailed 3D product render.",
+  "elements": [
+    {
+      "id": 1,
+      "type": "text",
+      "text": "minimal, Scandinavian, clean lines",
+      "position": {"x": 50, "y": 50},
+      "size": {"x": 1.2, "y": 1.2}
+    },
+    {
+      "id": 2,
+      "type": "palette",
+      "colors": ["#F5F0E8", "#D4C5A9", "#8B7355", "#4A4A4A"],
+      "position": {"x": 400, "y": 50},
+      "size": {"x": 1.0, "y": 1.0}
+    }
+  ],
+  "clusters": []
+}

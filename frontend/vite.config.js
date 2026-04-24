@@ -15,7 +15,10 @@ export default defineConfig(({ mode }) => {
       host: '0.0.0.0',
       port,
       strictPort: true,
-      open: true
+      open: true,
+      historyApiFallback: {
+        rewrites: [{ from: /.*/, to: '/index.html' }]
+      }
     }
   }
 })
