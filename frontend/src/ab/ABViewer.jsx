@@ -122,8 +122,10 @@ function GLBScene({ url }) {
   const gltf = useLoader(GLTFLoader, url)
   return (
     <>
-      <ambientLight intensity={0.6} />
-      <directionalLight position={[3, 5, 3]} intensity={1.2} />
+      <ambientLight intensity={1.5} />
+      <directionalLight position={[10, 10, 10]} intensity={2.5} />
+      <directionalLight position={[-10, -10, -10]} intensity={1} />
+      <Environment preset="city" />
       <Center>
         <primitive object={gltf.scene} />
       </Center>
