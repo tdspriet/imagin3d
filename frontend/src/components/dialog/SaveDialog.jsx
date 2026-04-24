@@ -5,8 +5,7 @@ import './SaveDialog.css'
 function SaveDialog({ isOpen, onClose, onSaveToSystem, onSaveToDataset }) {
   const [name, setName] = useState('')
   const [prompt, setPrompt] = useState('')
-  const [baselinePrompt, setBaselinePrompt] = useState('')
-  const [status, setStatus] = useState(null)  // { type: 'success'|'error', message: string }
+  const [isMultiview, setIsMultiview] = useState(false)
   const [saving, setSaving] = useState(false)
 
   const handleClose = useCallback(() => {
@@ -17,8 +16,7 @@ function SaveDialog({ isOpen, onClose, onSaveToSystem, onSaveToDataset }) {
     if (!isOpen) {
       setName('')
       setPrompt('')
-      setBaselinePrompt('')
-      setStatus(null)
+      setIsMultiview(false)
       setSaving(false)
       return
     }
@@ -35,19 +33,20 @@ function SaveDialog({ isOpen, onClose, onSaveToSystem, onSaveToDataset }) {
 
   if (!isOpen) return null
 
-  const slugifiedName = name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '')
+  const slugifiedName = name
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_|_$/g, '')
   const canSaveToDataset = slugifiedName.length > 0
 
   const handleSaveToDataset = async () => {
     if (!canSaveToDataset || saving) return
     setSaving(true)
-    setStatus(null)
     try {
-      await onSaveToDataset({ name: slugifiedName, prompt: prompt.trim(), baselinePrompt: baselinePrompt.trim() })
-      setStatus({ type: 'success', message: `Saved to pipeline/datasets/${slugifiedName}/` })
+      await onSaveToDataset({ name: slugifiedName, prompt: prompt.trim(), isMultiview })
+      onClose?.()
     } catch (err) {
-      setStatus({ type: 'error', message: err.message || 'Failed to save to dataset.' })
-    } finally {
       setSaving(false)
     }
   }
@@ -73,14 +72,26 @@ function SaveDialog({ isOpen, onClose, onSaveToSystem, onSaveToDataset }) {
 
         <header className="save-dialog__header">
           <h2>Save Moodboard</h2>
-          <p>Save to your local machine or add it as an evaluation dataset for the A/B pipeline.</p>
         </header>
 
-        {/* Dataset fields */}
+        <button
+          className="save-dialog__btn save-dialog__btn--system"
+          onClick={handleSaveToSystem}
+          disabled={saving}
+        >
+          <MdSave size={17} />
+          Save to system
+        </button>
+
+        <div className="save-dialog__divider">OR</div>
+
+        <header className="save-dialog__header">
+          <p>Save to the Coder instance for A/B pipeline testing.</p>
+        </header>
+
         <div className="save-dialog__field">
           <label className="save-dialog__label" htmlFor="sd-name">
             Dataset name
-            <span>(for pipeline use)</span>
           </label>
           <input
             id="sd-name"
@@ -92,14 +103,15 @@ function SaveDialog({ isOpen, onClose, onSaveToSystem, onSaveToDataset }) {
             autoFocus
           />
           {slugifiedName && name.trim() !== slugifiedName && (
-            <p className="save-dialog__hint">Will be saved as: <strong>{slugifiedName}</strong></p>
+            <p className="save-dialog__hint">
+              Will be saved as: <strong>{slugifiedName}</strong>
+            </p>
           )}
         </div>
 
         <div className="save-dialog__field">
           <label className="save-dialog__label" htmlFor="sd-prompt">
-            Imagin3D prompt
-            <span>(optional — can be added later)</span>
+            Prompt
           </label>
           <input
             id="sd-prompt"
@@ -111,27 +123,21 @@ function SaveDialog({ isOpen, onClose, onSaveToSystem, onSaveToDataset }) {
           />
         </div>
 
-        <div className="save-dialog__field">
-          <label className="save-dialog__label" htmlFor="sd-baseline">
-            Baseline prompt
-            <span>(what a human would type without the moodboard)</span>
+        <div className="save-dialog__option">
+          <label className="save-dialog__toggle">
+            <input
+              type="checkbox"
+              className="save-dialog__toggle-input"
+              checked={isMultiview}
+              onChange={e => setIsMultiview(e.target.checked)}
+              disabled={saving}
+            />
+            <div className="save-dialog__toggle-track">
+              <div className="save-dialog__toggle-thumb"></div>
+            </div>
+            <span className="save-dialog__toggle-label">Generate multiple views</span>
           </label>
-          <textarea
-            id="sd-baseline"
-            className="save-dialog__textarea"
-            value={baselinePrompt}
-            onChange={e => setBaselinePrompt(e.target.value)}
-            placeholder="e.g. A futuristic lounge chair with organic flowing curves, metallic finish, isolated on a white background, studio lighting, detailed 3D render."
-            disabled={saving}
-            rows={3}
-          />
         </div>
-
-        {status && (
-          <div className={`save-dialog__status save-dialog__status--${status.type}`}>
-            {status.message}
-          </div>
-        )}
 
         <div className="save-dialog__actions">
           <button
@@ -141,17 +147,6 @@ function SaveDialog({ isOpen, onClose, onSaveToSystem, onSaveToDataset }) {
           >
             <MdStorage size={17} />
             {saving ? 'Saving…' : 'Save to dataset'}
-          </button>
-
-          <div className="save-dialog__divider">or</div>
-
-          <button
-            className="save-dialog__btn save-dialog__btn--system"
-            onClick={handleSaveToSystem}
-            disabled={saving}
-          >
-            <MdSave size={17} />
-            Save to system
           </button>
         </div>
       </div>

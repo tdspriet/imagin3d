@@ -77,6 +77,49 @@ Don't forgot the fill in ``...`` with the actual values.
   python run.py
 ```
 
+## A/B Pipeline
+
+The A/B pipeline runs both the Imagin3D system and a text-only baseline on the same moodboard, scores each generated 3D model with CLIP metrics, and writes results for the `/AB` viewer.
+
+### Prerequisites
+
+Install the CLIP evaluation dependency in the backend conda environment:
+```sh
+conda activate trellis2
+pip install open-clip-torch
+```
+
+### 1 — Save a moodboard as a dataset
+
+In the frontend, open a moodboard and click **Save** → fill in a dataset name and prompt, then click **Save to dataset**. This writes `pipeline/datasets/<name>/moodboard.json`.
+
+### 2 — Run the pipeline
+
+From the repo root with the `trellis2` conda environment active:
+
+```sh
+# Run a single dataset
+python -m pipeline.run_ab --dataset <name>
+
+# Run all datasets sequentially
+python -m pipeline.run_ab --all
+
+# Run one arm only
+python -m pipeline.run_ab --dataset <name> --skip-baseline    # Imagin3D only
+python -m pipeline.run_ab --dataset <name> --skip-imagin3d    # baseline only
+```
+
+Results are written to `pipeline/runs/<timestamp>_<name>/`:
+- `imagin3d/sample.glb` and `baseline/sample.glb` — the generated 3D models
+- `imagin3d/scores.json` and `baseline/scores.json` — CLIP preservation + closeness metrics
+- `manifest.json` — consumed by the `/AB` viewer
+
+### 3 — Review in the browser
+
+Start the backend and open the frontend at the `/AB` route. Participants see a randomised A/B pair and vote for their preferred model.
+
+---
+
 ## Architecture
 
 <img width="1882" height="1602" alt="architecture_mixed" src="https://github.com/user-attachments/assets/d1543e60-91f4-46e5-857b-d74b78492cd6" />

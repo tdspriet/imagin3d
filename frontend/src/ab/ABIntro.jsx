@@ -6,29 +6,28 @@ export default function ABIntro({ onStart }) {
   return (
     <div style={styles.page}>
       <div style={styles.card}>
-        <h1 style={styles.title}>Imagin3D — A/B Preference Study</h1>
-
+        <h1 style={styles.title}>Imagin3D - A/B Preference Study</h1>
+        <br></br>
         <p>
           In this study you will be shown a series of design moodboards, each
           accompanied by two anonymised 3D models generated from that board.
           Your task is to select which model better captures the overall design
           intent expressed by the moodboard.
         </p>
-
+        <br></br>
         <ul style={{ lineHeight: 1.8 }}>
-          <li>There are no right or wrong answers — we want your honest impression.</li>
           <li>Rotate the models freely before deciding.</li>
           <li>You may leave a short comment explaining your choice.</li>
           <li>Take as long as you need per case.</li>
         </ul>
 
         <label style={styles.label}>
-          Participant ID (initials or alias — used only for analysis):
+          Participant Name:
           <input
             style={styles.input}
             value={id}
             onChange={e => setId(e.target.value)}
-            placeholder="e.g. TD"
+            placeholder="e.g. John Doe"
             maxLength={20}
           />
         </label>

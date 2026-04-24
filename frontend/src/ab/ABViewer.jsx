@@ -20,8 +20,6 @@ export default function ABViewer({ caseData, caseNumber, totalCases, backendUrl,
 
   const leftGlb  = `${backendUrl}${baseUrl}/${leftArm}/sample.glb`
   const rightGlb = `${backendUrl}${baseUrl}/${rightArm}/sample.glb`
-  const snapshotUrl = `${backendUrl}${baseUrl}/moodboard_snapshot.png`
-
   const handleSubmit = () => {
     if (!preferred) return
     onVote({ preferred, leftArm, rightArm, notes })
@@ -35,12 +33,6 @@ export default function ABViewer({ caseData, caseNumber, totalCases, backendUrl,
       <div style={s.header}>
         <span style={s.progress}>Case {caseNumber} / {totalCases}</span>
         <h2 style={s.caseTitle}>Which model better captures this moodboard?</h2>
-      </div>
-
-      {/* Moodboard reference */}
-      <div style={s.snapshotWrap}>
-        <p style={s.snapshotLabel}>Reference Moodboard</p>
-        <img src={snapshotUrl} alt="moodboard" style={s.snapshot} />
       </div>
 
       {/* 3D model pair */}
@@ -161,11 +153,14 @@ const s = {
     padding: '1.5rem',
     minHeight: '100vh',
     background: '#fff',
+    display: 'flex',
+    flexDirection: 'column',
+    justifyContent: 'center',
   },
   header: {
-    display: 'flex',
-    alignItems: 'baseline',
-    gap: '1.5rem',
+    display: 'grid',
+    gridTemplateColumns: '1fr auto 1fr',
+    alignItems: 'center',
     marginBottom: '1rem',
     borderBottom: '2px solid #000',
     paddingBottom: '0.75rem',
@@ -178,21 +173,8 @@ const s = {
   caseTitle: {
     margin: 0,
     fontSize: '1.25rem',
-  },
-  snapshotWrap: {
-    marginBottom: '1.25rem',
+    gridColumn: 2,
     textAlign: 'center',
-  },
-  snapshotLabel: {
-    fontSize: '0.85rem',
-    color: '#555',
-    marginBottom: '0.4rem',
-  },
-  snapshot: {
-    maxWidth: '100%',
-    maxHeight: 220,
-    border: '1px solid #ddd',
-    objectFit: 'contain',
   },
   modelsRow: {
     display: 'flex',
@@ -233,6 +215,7 @@ const s = {
     flexDirection: 'column',
     gap: '0.75rem',
     maxWidth: 600,
+    width: '100%',
     margin: '0 auto',
   },
   notes: {
@@ -241,6 +224,7 @@ const s = {
     border: '1px solid #ccc',
     resize: 'vertical',
     fontFamily: 'inherit',
+    boxSizing: 'border-box',
   },
   btn: {
     padding: '0.85rem',

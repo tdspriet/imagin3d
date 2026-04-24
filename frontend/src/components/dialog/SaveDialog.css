@@ -23,7 +23,7 @@
   border-radius: 14px;
   padding: 24px 28px 32px;
   box-shadow: 0 18px 48px rgba(0, 0, 0, 0.22);
-  border: 1px solid rgba(0, 0, 0, 0.08);
+  border: 1px solid var(--color-border);
 }
 
 .save-dialog__close {
@@ -33,19 +33,21 @@
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  border: 1px solid var(--color-border);
-  background: var(--color-surface);
-  color: var(--color-text);
+  border: 1px solid var(--color-button-border);
+  background: var(--color-button-bg);
+  color: var(--color-text-primary);
   font-size: 20px;
   line-height: 1;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
 }
 
 .save-dialog__close:hover {
-  background: var(--color-surface-hover);
+  background: var(--color-button-bg-hover);
+  border-color: var(--color-button-border-hover);
 }
 
 .save-dialog__header {
@@ -56,13 +58,13 @@
   margin: 0 0 8px 0;
   font-size: 1.5rem;
   font-weight: 600;
-  color: var(--color-text);
+  color: var(--color-text-primary);
 }
 
 .save-dialog__header p {
   margin: 0;
   font-size: 0.95rem;
-  color: var(--color-text-secondary);
+  color: var(--color-text-muted);
 }
 
 .save-dialog__field {
@@ -75,12 +77,12 @@
 .save-dialog__label {
   font-size: 0.9rem;
   font-weight: 500;
-  color: var(--color-text);
+  color: var(--color-text-primary);
 }
 
 .save-dialog__label span {
   font-weight: 400;
-  color: var(--color-text-secondary);
+  color: var(--color-text-muted);
   margin-left: 4px;
 }
 
@@ -89,10 +91,10 @@
   width: 100%;
   padding: 10px 12px;
   font-size: 0.95rem;
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--color-button-border);
   border-radius: 8px;
   background: var(--color-surface);
-  color: var(--color-text);
+  color: var(--color-text-primary);
   font-family: inherit;
   box-sizing: border-box;
 }
@@ -100,8 +102,8 @@
 .save-dialog__input:focus,
 .save-dialog__textarea:focus {
   outline: none;
-  border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px rgba(var(--color-primary-rgb), 0.15);
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.18);
 }
 
 .save-dialog__input::placeholder,
@@ -120,6 +122,75 @@
   margin-top: 2px;
 }
 
+/* ── Multiview toggle ─────────────────────────────────────────────────────── */
+
+.save-dialog__option {
+  margin-bottom: 20px;
+}
+
+.save-dialog__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.save-dialog__toggle-input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.save-dialog__toggle-track {
+  width: 40px;
+  height: 24px;
+  background: var(--color-border-muted);
+  border: 1px solid var(--color-border-strong);
+  border-radius: 12px;
+  position: relative;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.save-dialog__toggle-thumb {
+  width: 18px;
+  height: 18px;
+  background: var(--color-text-muted);
+  border-radius: 50%;
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  transition: transform 0.2s cubic-bezier(0.2, 0.85, 0.32, 1.2), background-color 0.2s ease;
+}
+
+.save-dialog__toggle-input:checked + .save-dialog__toggle-track {
+  background: var(--accent-progress);
+  border-color: var(--accent-progress);
+}
+
+.save-dialog__toggle-input:checked + .save-dialog__toggle-track .save-dialog__toggle-thumb {
+  transform: translateX(16px);
+  background: #ffffff;
+}
+
+.save-dialog__toggle-input:focus-visible + .save-dialog__toggle-track {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+
+.save-dialog__toggle-input:disabled + .save-dialog__toggle-track {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.save-dialog__toggle-label {
+  font-size: 0.95rem;
+  color: var(--color-text-primary);
+}
+
+/* ── Divider ─────────────────────────────────────────────────────────────── */
+
 .save-dialog__divider {
   display: flex;
   align-items: center;
@@ -137,6 +208,8 @@
   background: var(--color-border);
 }
 
+/* ── Action buttons ──────────────────────────────────────────────────────── */
+
 .save-dialog__actions {
   display: flex;
   flex-direction: column;
@@ -150,8 +223,7 @@
   font-weight: 500;
   border-radius: 8px;
   cursor: pointer;
-  transition: all 0.15s ease;
-  border: none;
+  transition: background-color 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
   width: 100%;
   display: flex;
   align-items: center;
@@ -165,53 +237,24 @@
 }
 
 .save-dialog__btn--dataset {
-  background: #1a1a1a;
-  color: #ffffff;
-}
-
-[data-theme="dark"] .save-dialog__btn--dataset {
-  background: #ffffff;
-  color: #1a1a1a;
+  background: var(--color-button-bg);
+  color: var(--color-text-primary);
+  border: 1px solid var(--color-button-border);
 }
 
 .save-dialog__btn--dataset:hover:not(:disabled) {
-  opacity: 0.85;
+  background: var(--color-button-bg-hover);
+  border-color: var(--color-button-border-hover);
 }
 
 .save-dialog__btn--system {
-  background: var(--color-surface-hover);
-  color: var(--color-text);
-  border: 1px solid var(--color-border);
+  background: var(--color-button-bg);
+  color: var(--color-text-primary);
+  border: 1px solid var(--color-button-border);
 }
 
 .save-dialog__btn--system:hover:not(:disabled) {
-  background: var(--color-border);
+  background: var(--color-button-bg-hover);
+  border-color: var(--color-button-border-hover);
 }
 
-.save-dialog__status {
-  margin-top: 12px;
-  padding: 10px 14px;
-  border-radius: 8px;
-  font-size: 0.88rem;
-  text-align: center;
-}
-
-.save-dialog__status--success {
-  background: rgba(34, 197, 94, 0.12);
-  color: #166534;
-  border: 1px solid rgba(34, 197, 94, 0.3);
-}
-
-[data-theme="dark"] .save-dialog__status--success {
-  color: #86efac;
-}
-
-.save-dialog__status--error {
-  background: rgba(239, 68, 68, 0.1);
-  color: #991b1b;
-  border: 1px solid rgba(239, 68, 68, 0.25);
-}
-
-[data-theme="dark"] .save-dialog__status--error {
-  color: #fca5a5;
-}

@@ -53,8 +53,7 @@ import structlog
 from pipeline.core.dataset import load as load_moodboard
 from pipeline.core.imagin3d_runner import run_imagin3d
 from pipeline.core.baseline_runner import run_baseline
-from pipeline.core.moodboard_snapshot import render as render_snapshot
-from pipeline.eval.clip_metrics import clip_preservation, clip_closeness
+from pipeline.eval.clip_metrics import clip_preservation, clip_closeness, _load_clip
 from pipeline.eval.render import render_glb
 
 logger = structlog.stdlib.get_logger(__name__)
@@ -88,12 +87,8 @@ async def _run_dataset(
 
     logger.info("Starting A/B run", dataset=moodboard.name, run_dir=str(run_dir))
 
-    # Moodboard snapshot (PIL composite for the viewer)
-    snapshot_path = run_dir / "moodboard_snapshot.png"
-    try:
-        render_snapshot(moodboard, snapshot_path)
-    except Exception as e:
-        logger.warning("Moodboard snapshot failed (non-fatal)", error=str(e))
+    # Probe CLIP before starting any GPU work so a missing install is loud.
+    _load_clip()
 
     imagin3d_scores: dict = {}
     baseline_scores: dict = {}
@@ -171,20 +166,27 @@ async def _score_arm(
     if master_paths:
         try:
             preservation = clip_preservation(master_paths, render_paths)
+        except ImportError:
+            raise
         except Exception as e:
             logger.warning(f"{arm}: preservation metric failed", error=str(e))
 
-    # Closeness metric: build element dicts from the moodboard + weights
+    # Closeness metric: use imagin3d's routed weights for both arms so the same
+    # relevant elements form the centroid regardless of which arm is being scored.
     closeness = 0.0
     per_element: dict = {}
-    weights_path = arm_dir / "weights.json"
+    weights_path = run_dir / "imagin3d" / "weights.json"
     try:
-        if weights_path.exists() and moodboard.elements:
+        if moodboard.elements and weights_path.exists():
             weights_map = json.loads(weights_path.read_text())
-            elements_for_clip = _build_elements_for_clip(moodboard, weights_map, arm_dir)
+            elements_for_clip = _build_elements_for_clip(moodboard, run_dir, weights_map)
             closeness, per_element = clip_closeness(
                 elements_for_clip, render_paths, moodboard.base_dir
             )
+        elif not weights_path.exists():
+            logger.warning(f"{arm}: skipping closeness — imagin3d/weights.json not found")
+    except ImportError:
+        raise
     except Exception as e:
         logger.warning(f"{arm}: closeness metric failed", error=str(e))
 
@@ -197,25 +199,22 @@ async def _score_arm(
     }
 
 
-def _build_elements_for_clip(moodboard, weights_map: dict, arm_dir: Path) -> list[dict]:
+def _build_elements_for_clip(moodboard, run_dir: Path, weights_map: dict) -> list[dict]:
+    """Build element dicts for CLIP scoring using imagin3d's routed weights."""
+    assets_dir = run_dir / "moodboard_assets"
     elements = []
     for elem in moodboard.elements:
-        weight = int(weights_map.get(str(elem.id), 0))
-        e: dict = {
-            "id": elem.id,
-            "type": elem.type,
-            "weight": weight,
-        }
-        if elem.type in ("image", "video") and elem.path:
+        e: dict = {"id": elem.id, "type": elem.type, "weight": int(weights_map.get(str(elem.id), 0))}
+        if elem.type == "image" and elem.path:
             e["path"] = elem.path
+        elif elem.type == "video":
+            e["frames_dir"] = str(assets_dir / "video_frames" / str(elem.id))
+        elif elem.type == "model":
+            e["render_dir"] = str(assets_dir / "model_renders" / str(elem.id))
         elif elem.type == "text":
             e["text"] = elem.text or ""
         elif elem.type == "palette":
             e["colors"] = elem.colors or []
-        elif elem.type == "model":
-            # Use Blender renders produced during Imagin3D ingestion
-            render_dir = arm_dir.parent / "imagin3d" / ".." / "backend" / "artifacts" / "model_renders" / str(elem.id)
-            e["render_dir"] = str(render_dir) if render_dir.exists() else None
         elements.append(e)
     return elements
 
@@ -244,7 +243,6 @@ def _write_manifest(
         "run_dir": run_dir.name,
         "moodboard_name": moodboard.name,
         "prompt": moodboard.prompt,
-        "moodboard_snapshot": "moodboard_snapshot.png",
         "arms": {
             "imagin3d": {
                 "glb": "imagin3d/sample.glb",

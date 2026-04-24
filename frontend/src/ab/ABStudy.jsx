@@ -51,7 +51,7 @@ export default function ABStudy() {
   if (done) {
     return (
       <CenteredMessage>
-        <h2>Study complete — thank you!</h2>
+        <h2>Study complete, thank you!</h2>
         <p>All {cases.length} case{cases.length !== 1 ? 's' : ''} rated.</p>
       </CenteredMessage>
     )

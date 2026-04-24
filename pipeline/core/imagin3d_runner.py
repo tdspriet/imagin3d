@@ -128,7 +128,7 @@ async def run_imagin3d(moodboard: Moodboard, run_dir: Path) -> Path:
     # 8. Archive outputs
     arm_dir = run_dir / "imagin3d"
     arm_dir.mkdir(parents=True, exist_ok=True)
-    _snapshot(arm_dir, weights=weights_summary)
+    _snapshot(arm_dir, run_dir, weights=weights_summary)
 
     glb_dst = arm_dir / "sample.glb"
     logger.info("Imagin3D arm complete", glb=str(glb_dst))
@@ -268,7 +268,7 @@ async def _handle_adapt_subject(
     return img_path, f"\n\nReference file details:\n{title}: {desc}"
 
 
-def _snapshot(arm_dir: Path, weights: dict[str, Any] | None = None) -> None:
+def _snapshot(arm_dir: Path, run_dir: Path, weights: dict[str, Any] | None = None) -> None:
     _cp(ARTIFACTS / "master_prompt.txt",       arm_dir / "master_prompt.txt")
     _cp(ARTIFACTS / "master_image.jpg",        arm_dir / "master_image.jpg")
     _cp(ARTIFACTS / "master_image_front.jpg",  arm_dir / "master_image_front.jpg")
@@ -276,6 +276,15 @@ def _snapshot(arm_dir: Path, weights: dict[str, Any] | None = None) -> None:
     _cp(ARTIFACTS / "trellis" / "sample.glb",  arm_dir / "sample.glb")
     if weights:
         (arm_dir / "weights.json").write_text(json.dumps(weights, indent=2))
+    # Archive moodboard assets used by the CLIP closeness metric for both arms.
+    assets_dir = run_dir / "moodboard_assets"
+    for sub in ("video_frames", "model_renders"):
+        src = ARTIFACTS / sub
+        if src.exists():
+            dst = assets_dir / sub
+            if dst.exists():
+                shutil.rmtree(dst)
+            shutil.copytree(src, dst)
 
 
 def _cp(src: Path, dst: Path) -> None:

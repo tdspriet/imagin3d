@@ -50,7 +50,6 @@ class AdaptSubject:
 class Moodboard:
     name: str
     prompt: str
-    baseline_prompt: str
     elements: list[MoodboardElement] = field(default_factory=list)
     clusters: list[MoodboardCluster] = field(default_factory=list)
     multiview: bool = False
@@ -93,7 +92,6 @@ def load(moodboard_dir: str | Path) -> Moodboard:
     return Moodboard(
         name=data["name"],
         prompt=data["prompt"],
-        baseline_prompt=data["baseline_prompt"],
         elements=elements,
         clusters=clusters,
         multiview=data.get("multiview", False),

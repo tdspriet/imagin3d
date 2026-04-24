@@ -1057,7 +1057,7 @@ export const useMoodboardStore = create((set, get) => ({
   },
 
   // Save moodboard as a pipeline dataset on the server
-  saveToDataset: async ({ name, prompt, baselinePrompt }) => {
+  saveToDataset: async ({ name, prompt, isMultiview }) => {
     const { nodes } = get()
     const { payload } = serializeDataForBackend(nodes)
 
@@ -1067,7 +1067,7 @@ export const useMoodboardStore = create((set, get) => ({
       body: JSON.stringify({
         name,
         prompt,
-        baseline_prompt: baselinePrompt,
+        multiview: isMultiview ?? false,
         elements: payload.elements,
         clusters: payload.clusters,
       }),

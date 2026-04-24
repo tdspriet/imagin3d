@@ -902,7 +902,7 @@ async def ab_vote(vote: ABVote):
 class DatasetSaveRequest(BaseModel):
     name: str
     prompt: Optional[str] = ""
-    baseline_prompt: Optional[str] = ""
+    multiview: bool = False
     elements: List[Dict[str, Any]] = Field(default_factory=list)
     clusters: List[Dict[str, Any]] = Field(default_factory=list)
 
@@ -973,8 +973,7 @@ async def save_to_dataset(req: DatasetSaveRequest):
     moodboard_json = {
         "name": req.name,
         "prompt": req.prompt,
-        "baseline_prompt": req.baseline_prompt,
-        "multiview": False,
+        "multiview": req.multiview,
         "adapt_subject": None,
         "elements": saved_elements,
         "clusters": req.clusters

@@ -106,10 +106,20 @@ def _encode_element(elem: dict[str, Any], base_dir: Path) -> np.ndarray | None:
     """
     etype = elem.get("type", "")
 
-    if etype in ("image", "video"):
+    if etype == "image":
         path = base_dir / elem["path"] if elem.get("path") else None
         if path and path.exists():
             return encode_image(path)
+
+    elif etype == "video":
+        frames_dir = elem.get("frames_dir")
+        if frames_dir:
+            frames = sorted(Path(frames_dir).glob("frame_*.jpg"))
+            if frames:
+                embs = [encode_image(f) for f in frames]
+                avg = np.mean(embs, axis=0)
+                norm = np.linalg.norm(avg)
+                return avg / norm if norm > 0 else avg
 
     elif etype == "model":
         # Use pre-rendered views if they exist; otherwise skip

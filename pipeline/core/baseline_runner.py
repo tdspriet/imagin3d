@@ -1,9 +1,7 @@
 """Baseline arm runner: text prompt → Gemini Nano Banana → Trellis v2.
 
 The baseline is defined as:
-  1. A researcher hand-writes a text prompt capturing the moodboard's design
-     intent (stored in moodboard.json as `baseline_prompt`).
-  2. That prompt is fed to the same Gemini 2.5 Flash Image (Nano Banana) model
+  1. The shared moodboard prompt is fed to the Gemini 2.5 Flash Image (Nano Banana) model
      used by Imagin3D's Visualizer, but without any visual style references.
   3. The resulting image is passed to TrellisEngine v2 — the same 3D generator
      used by Imagin3D — producing a GLB mesh.
@@ -38,7 +36,7 @@ ARTIFACTS = BACKEND_ROOT / "artifacts"
 
 
 async def run_baseline(moodboard: Moodboard, run_dir: Path) -> Path:
-    """Run the baseline pipeline on the moodboard's baseline_prompt.
+    """Run the baseline pipeline on the moodboard's shared prompt.
 
     Returns the path to the archived sample.glb inside run_dir.
     """
@@ -50,11 +48,11 @@ async def run_baseline(moodboard: Moodboard, run_dir: Path) -> Path:
     # 1. Text-to-image via Gemini 2.5 Flash Image (Nano Banana) with no visual refs
     logger.info("Baseline: generating 2D image from text prompt")
     baseline_image_path = await _generate_baseline_image(
-        moodboard.baseline_prompt, arm_dir
+        moodboard.prompt, arm_dir
     )
 
     # 2. Save the prompt for the record
-    (arm_dir / "baseline_prompt.txt").write_text(moodboard.baseline_prompt)
+    (arm_dir / "prompt.txt").write_text(moodboard.prompt)
 
     # 3. 3D generation via TrellisEngine v2
     logger.info("Baseline: running Trellis v2")
@@ -75,20 +73,14 @@ async def run_baseline(moodboard: Moodboard, run_dir: Path) -> Path:
 # Internal helpers
 # ---------------------------------------------------------------------------
 
-async def _generate_baseline_image(baseline_prompt: str, arm_dir: Path) -> Path:
-    """Call the Visualizer with the baseline prompt and no style images.
-
-    The Visualizer is already initialised by orchestrator._initialize().
-    We use the 'baseline/visualizer.j2' template which only uses the
-    baseline_prompt field — no moodboard context.
-    """
+async def _generate_baseline_image(prompt: str, arm_dir: Path) -> Path:
+    """Call the Visualizer with the prompt and no style images."""
     visualizer = orchestrator.visualizer
     original_name = visualizer.name
 
     try:
-        # Temporarily switch to the 'baseline' template subdir
         visualizer.name = "visualizer"
-        ctx = {"baseline_prompt": baseline_prompt}
+        ctx = {"prompt": prompt}
 
         import jinja2
         import pathlib

@@ -10,7 +10,6 @@ Each moodboard lives in its own subdirectory under `pipeline/datasets/<name>/` a
 | `prompt` | string | The Imagin3D generation prompt (natural language description of the desired object) |
 | `multiview` | bool | If `true`, Imagin3D generates front + back master images (better geometry, slower) |
 | `adapt_subject` | `null` \| object | Optional. If set, switches Imagin3D to adaptation mode. See below. |
-| `baseline_prompt` | string | A manually authored text prompt for the baseline arm — what a human would type into a text-to-image tool to achieve the same design intent |
 | `elements` | array | Moodboard elements. See below. |
 | `clusters` | array | Logical groups of element IDs. See below. |
 
